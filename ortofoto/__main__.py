@@ -161,12 +161,14 @@ def procesar(op, avisar=print):
         from .concreto import concreto_visible
 
         vis = concreto_visible(orto, base, [(p.e, p.n) for p in puntos], avisar=avisar)
-        conf_cv = unir.Codigo(capa="CONCRETO VISIBLE (FOTO)", tipo="contorno", capa_area="CONCRETO VISIBLE (FOTO)",
-                              prefijo="CV", color=4, color_area=4, patron="ANSI37", escala_patron=0.1,
-                              nombre="Concreto visible en foto (sin puntos)")
-        areas.agregar_concreto_visible(met, vis, conf_cv)
-        log.append(f"Concreto visible en la foto sin puntos: {sum(a.codigo == 'CV' for a in met.areas)} areas "
-                   f"(capa CONCRETO VISIBLE (FOTO))")
+        # Configurable en la tabla de codigos (codigo CV): capa, prefijo del metrado, achurado
+        conf_cv = codigos.get("CV") or unir.Codigo(
+            capa="CONCRETO EXISTENTE (FOTO)", tipo="contorno", capa_area="CONCRETO EXISTENTE (FOTO)", prefijo="CO",
+            color=4, color_area=4, patron="ANSI37", escala_patron=0.1, nombre="Concreto (visto en la foto)")
+        if conf_cv.activo:
+            areas.agregar_concreto_visible(met, vis, conf_cv)
+            log.append(f"Concreto visto en la foto: {sum(a.codigo == 'CV' for a in met.areas)} areas "
+                       f"(capa {conf_cv.capa_area}, metrado {conf_cv.prefijo})")
     resumen = areas.guardar_metrado(met, ruta_libre(out / "metrado.xlsx", avisar), ruta_libre(out / "metrado.csv", avisar))
     avisar("Guardando DXF...")
     exportar.guardar_dxf(ruta_libre(out / "resultado.dxf", avisar), puntos, resultados, met, codigos, alias, orto,

@@ -575,7 +575,7 @@ def agregar_concreto_visible(met, poligonos, conf):
         for g in getattr(resto, "geoms", [resto]):
             if isinstance(g, Polygon) and g.area >= 5.0:
                 met.areas.append(Area("CV", conf, g, "foto", revisar=True,
-                                      nota="concreto visible en la foto, sin puntos: asignar (vereda, pista...)"))
+                                      nota="concreto visto en la foto (sin puntos topograficos)"))
     _numerar(met)
 
 

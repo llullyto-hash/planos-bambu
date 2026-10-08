@@ -27,6 +27,8 @@
   "F":      {"alias": "CSH"},
   "ALC":    {"nombre": "Alcantarilla", "capa": "ALCANTARILLA TUBULAR DE CONCRETO", "tipo": "linea", "separacion_max": 10, "color": 10},
   "CERCO":  {"nombre": "Cerco", "capa": "CERCO", "tipo": "linea", "separacion_max": 30, "color": 30},
+  "CV":     {"nombre": "Concreto (visto en la foto)", "capa": "CONCRETO EXISTENTE (FOTO)", "tipo": "contorno", "separacion_max": 8, "color": 4,
+             "capa_area": "CONCRETO EXISTENTE (FOTO)", "prefijo": "CO", "color_area": 4, "patron": "ANSI37", "escala_patron": 0.1},
   "ARB":    {"nombre": "Arbol", "capa": "ARBOLES", "tipo": "punto", "color": 100},
   "CJ":     {"nombre": "Caja de agua / desague", "capa": "CAJA DE AGUA Y DESAGUE", "tipo": "punto", "color": 150},
   "CDA":    {"alias": "CJ"},
