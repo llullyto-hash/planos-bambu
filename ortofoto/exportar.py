@@ -125,6 +125,13 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
             msp.add_circle((x, y), 0.4, dxfattribs={"layer": CAPA_PUNTO_FOTO})
             msp.add_text(motivo, height=0.15, dxfattribs={"layer": CAPA_PUNTO_FOTO}).set_placement((x + 0.5, y + 0.2))
 
+    # Concreto visto en la foto sin puntos topograficos que lo respalden (solo contorno, sin metrado)
+    if metrado.sin_puntos:
+        _capa(doc, "REVISAR CONCRETO SIN PUNTOS", 6)
+        for g in metrado.sin_puntos:
+            msp.add_lwpolyline(list(g.exterior.coords)[:-1], close=True,
+                               dxfattribs={"layer": "REVISAR CONCRETO SIN PUNTOS"})
+
     # Ortofoto de fondo: el archivo original, con el calce corregido (no se copia).
     # Si se trabaja sobre el plano del proyecto, la foto ya esta insertada ahi.
     if orto is not None and orto.origen is not None and not base_dxf:

@@ -231,3 +231,45 @@ def concreto_visible(orto, base, puntos_xy, area_min=AREA_MIN_VISIBLE, corredor=
             continue
         res.append(g.simplify(max(tp, 0.05)))
     return res
+
+
+ANCHO_CORTE = 0.8  # m: tierra/pasto mas angosto que esto no corta la vereda (ruido, bordes)
+
+
+def cortar_por_foto(orto, pol):
+    """Quita de una vereda los tramos donde la foto muestra tierra o pasto (no hay concreto).
+
+    La sombra y los aleros (oscuros) NO cortan: la foto no sabe que hay debajo. Si lo quitado
+    atraviesa la vereda, esta queda partida en pedazos, cada uno cerrado contra la fachada.
+    Devuelve (lista_de_poligonos, area_quitada).
+    """
+    x0, y0, x1, y1 = pol.bounds
+    try:
+        sub = orto.recortar(x0, y0, x1, y1)
+    except ValueError:
+        return [pol], 0.0
+    if sub.rgb.shape[0] < 5 or sub.rgb.shape[1] < 5:
+        return [pol], 0.0
+    tp = sub.tam_pixel
+    lb = _lab(sub.rgb)
+    L = ndi.gaussian_filter(lb[..., 0], 1)
+    a = ndi.gaussian_filter(lb[..., 1], 1)
+    b = ndi.gaussian_filter(lb[..., 2], 1)
+    croma = np.hypot(a, b)
+    dentro = _rasterizar(pol, sub.afin, L.shape)
+    v = max(3, int(0.5 / tp) | 1)
+    tex = np.sqrt(np.maximum(ndi.uniform_filter(lb[..., 0] ** 2, v) - ndi.uniform_filter(lb[..., 0], v) ** 2, 0))
+    sombra = L < L_MIN - 15
+    pasto = (a < -6) & ~sombra
+    # Tierra: beige/amarilla (b mayor que a), lisa. Los techos (rojizos o corrugados) no cuentan:
+    # sobre la vereda son aleros y debajo puede haber concreto.
+    tierra = (croma > CROMA_MAX + 4) & (b > 8) & (a < 0.8 * b) & (tex < TEXTURA_MAX * 1.5) & ~sombra
+    no_concreto = (pasto | tierra) & dentro
+    r = max(1, int(round(ANCHO_CORTE / tp / 2)))
+    no_concreto = ndi.binary_opening(no_concreto, structure=np.ones((2 * r + 1, 2 * r + 1)))
+    if not no_concreto.any():
+        return [pol], 0.0
+    quitar = _vectorizar(no_concreto, sub.afin).buffer(tp)
+    resto = pol.difference(quitar)
+    piezas = [g for g in getattr(resto, "geoms", [resto]) if isinstance(g, Polygon) and g.area >= 1.0]
+    return piezas, pol.area - sum(g.area for g in piezas)

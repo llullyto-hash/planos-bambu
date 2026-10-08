@@ -5,6 +5,7 @@ from ortofoto import areas, calce, exportar, unir
 from ortofoto.__main__ import CODIGOS_DEFECTO, Opciones, procesar
 from ortofoto.imagen import Ortofoto, afin_desde_dxf
 from ortofoto.topografia import Punto
+from shapely.geometry import Point
 
 AFIN = [0.05, 0.0, 550115.0, 0.0, -0.05, 9072960.0]
 
@@ -269,3 +270,34 @@ def test_puntos_visibles_en_el_dxf(tmp_path):
     doc = ezdxf.readfile(tmp_path / "s" / "resultado.dxf")
     assert doc.header["$PDMODE"] == 34 and doc.header["$PDSIZE"] == 0.25
     assert len(doc.modelspace().query('POINT[layer=="PT-VER"]')) == len(pts)
+
+
+def test_concreto_de_la_foto_coherente_con_los_puntos():
+    from shapely.geometry import box
+
+    codigos, _ = unir.cargar_codigos(CODIGOS_DEFECTO)
+    met = areas.Metrado()
+    losa = box(0, 0, 10, 3)  # lo que se ve en la foto
+    sin_respaldo = box(20, 0, 26, 3)
+    # Puntos levantados en el borde de la losa (uno 0.2 m afuera: el borde debe pasar por el)
+    pts = [(2, 0.05), (5, -0.2), (8, 0.0), (10.1, 1.5), (4, 3.0)]
+    areas.agregar_concreto_visible(met, [losa, sin_respaldo], codigos["CV"], pts)
+    assert len(met.areas) == 1 and len(met.sin_puntos) == 1
+    borde = met.areas[0].poligono.exterior
+    assert all(borde.distance(Point(p)) < 1e-6 for p in pts)
+    assert met.areas[0].etiqueta == "CO - 01"
+
+
+def test_vereda_se_corta_donde_la_foto_muestra_tierra():
+    from shapely.geometry import box
+
+    from ortofoto.concreto import cortar_por_foto
+
+    gsd = 0.05
+    img = np.full((60, 600, 3), (190, 188, 182), np.uint8)  # concreto 30 m x 3 m
+    img[:, 260:340] = (176, 146, 102)  # 4 m de tierra beige atravesando la vereda
+    img[:, 100:140] = (60, 55, 50)  # sombra de alero: NO debe cortar
+    orto = Ortofoto(img, [gsd, 0, 0, 0, -gsd, 3.0])
+    piezas, quitado = cortar_por_foto(orto, box(0, 0, 30, 3))
+    assert len(piezas) == 2 and 10 < quitado < 14
+    assert all(p.bounds[1] < 0.01 and p.bounds[3] > 2.99 for p in piezas)  # cada pedazo cerrado de lado a lado

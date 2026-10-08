@@ -166,9 +166,10 @@ def procesar(op, avisar=print):
             capa="CONCRETO EXISTENTE (FOTO)", tipo="contorno", capa_area="CONCRETO EXISTENTE (FOTO)", prefijo="CO",
             color=4, color_area=4, patron="ANSI37", escala_patron=0.1, nombre="Concreto (visto en la foto)")
         if conf_cv.activo:
-            areas.agregar_concreto_visible(met, vis, conf_cv)
-            log.append(f"Concreto visto en la foto: {sum(a.codigo == 'CV' for a in met.areas)} areas "
-                       f"(capa {conf_cv.capa_area}, metrado {conf_cv.prefijo})")
+            areas.agregar_concreto_visible(met, vis, conf_cv, [(p.e, p.n) for p in puntos])
+            log.append(f"Concreto visto en la foto y respaldado por puntos: {sum(a.codigo == 'CV' for a in met.areas)} "
+                       f"areas (capa {conf_cv.capa_area}, metrado {conf_cv.prefijo}); sin puntos en su borde: "
+                       f"{len(met.sin_puntos)} (capa REVISAR CONCRETO SIN PUNTOS, sin metrado)")
     resumen = areas.guardar_metrado(met, ruta_libre(out / "metrado.xlsx", avisar), ruta_libre(out / "metrado.csv", avisar))
     avisar("Guardando DXF...")
     exportar.guardar_dxf(ruta_libre(out / "resultado.dxf", avisar), puntos, resultados, met, codigos, alias, orto,

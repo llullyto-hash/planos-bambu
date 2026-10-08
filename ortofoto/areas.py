@@ -57,6 +57,7 @@ class Metrado:
     areas: list = field(default_factory=list)
     lineas: list = field(default_factory=list)
     puntos_revisar: list = field(default_factory=list)  # (x, y, motivo)
+    sin_puntos: list = field(default_factory=list)  # concreto visto en la foto sin respaldo de puntos
 
 
 def _bordes(res):
@@ -432,6 +433,20 @@ def _ajustar_con_foto(res, base, ars_puntos, met):
         else:
             a.revisar, a.nota = True, f"la foto no coincide con los puntos ({relacion:.0%} del area)"
         final.append(a)
+    # Donde la foto muestra tierra o pasto atravesando la vereda, no hay concreto: se corta
+    from .concreto import cortar_por_foto
+
+    cortadas = []
+    for a in final:
+        piezas, quitado = cortar_por_foto(res.orto, a.poligono)
+        if quitado < 0.5 or not piezas:
+            cortadas.append(a)
+            continue
+        for g in piezas:
+            cortadas.append(Area(a.codigo, a.conf, g, a.origen, a.ancho, a.largo, a.revisar,
+                                 nota=(a.nota + "; " if a.nota else "") +
+                                 f"cortada donde la foto no muestra concreto ({quitado:.1f} m2 quitados)"))
+    final = cortadas
     # Concreto visto en la foto, pegado a la fachada, que no salio de los puntos
     for k, v in enumerate(vistas):
         if k not in usadas and not any(v.poligono.intersects(a.poligono) for a in final):
@@ -567,15 +582,52 @@ def _unir_sobrantes(res, usados):
     res.cadenas = [[resto[i] for i in c] for c in sub.cadenas]
 
 
-def agregar_concreto_visible(met, poligonos, conf):
-    """Concreto visto en la foto que no es parte de ninguna area ya armada (se propone para revisar)."""
+PUNTOS_BORDE_MIN = 3  # puntos topograficos sobre el borde para aceptar un area vista en la foto
+TOL_BORDE = 0.4  # m
+
+
+def pasar_por_puntos(pol, puntos_xy, tol=TOL_BORDE):
+    """Ajusta el contorno para que pase exactamente por los puntos topograficos de su borde.
+
+    Cada punto a menos de `tol` del borde se inserta en el contorno (en su posicion a lo largo
+    del borde) y se quitan los vertices de la foto que esten a menos de `tol` de ese punto.
+    Devuelve (poligono_ajustado, cantidad_de_puntos_en_el_borde).
+    """
+    anillo = pol.exterior
+    largo = anillo.length
+    en_borde = [(anillo.project(Point(p)), tuple(p)) for p in puntos_xy if anillo.distance(Point(p)) < tol]
+    if not en_borde:
+        return pol, 0
+    verts = [(anillo.project(Point(c)), c) for c in list(anillo.coords)[:-1]]
+    quitar = {i for i, (sv, c) in enumerate(verts)
+              for sp, pc in en_borde if np.hypot(c[0] - pc[0], c[1] - pc[1]) < tol}
+    nuevos = sorted([v for i, v in enumerate(verts) if i not in quitar] + en_borde, key=lambda t: t[0] % largo)
+    ajustado = Polygon([c for _, c in nuevos])
+    if not ajustado.is_valid or abs(ajustado.area - pol.area) > 0.3 * pol.area:
+        ajustado = pol  # el ajuste deformaria el area: se deja la forma de la foto
+    return ajustado, len(en_borde)
+
+
+def agregar_concreto_visible(met, poligonos, conf, puntos_xy=()):
+    """Concreto visto en la foto, coherente con la topografia.
+
+    Solo se acepta (con metrado) si al menos PUNTOS_BORDE_MIN puntos topograficos caen sobre su
+    borde; el borde se ajusta para pasar por esos puntos. Lo demas va a met.sin_puntos (revisar).
+    """
     ocupado = unary_union([a.poligono for a in met.areas]) if met.areas else Polygon()
+    pts = np.asarray(puntos_xy, float).reshape(-1, 2)
     for pol in poligonos:
         resto = pol.difference(ocupado) if not ocupado.is_empty else pol
         for g in getattr(resto, "geoms", [resto]):
-            if isinstance(g, Polygon) and g.area >= 5.0:
-                met.areas.append(Area("CV", conf, g, "foto", revisar=True,
-                                      nota="concreto visto en la foto (sin puntos topograficos)"))
+            if not isinstance(g, Polygon) or g.area < 5.0:
+                continue
+            cerca = pts[[g.buffer(TOL_BORDE).contains(Point(p)) for p in pts]] if len(pts) else pts
+            ajustado, n = pasar_por_puntos(g, cerca)
+            if n >= PUNTOS_BORDE_MIN:
+                met.areas.append(Area("CV", conf, ajustado, "foto", revisar=False,
+                                      nota=f"concreto visto en la foto; borde ajustado a {n} puntos topograficos"))
+            else:
+                met.sin_puntos.append(g)
     _numerar(met)
 
 
