@@ -57,6 +57,7 @@ class App(tk.Tk):
         self.calce = tk.StringVar(value="foto")
         self.calce_auto = tk.BooleanVar(value=True)
         self.completar = tk.BooleanVar(value=True)
+        self.veredas_foto = tk.BooleanVar(value=False)
         self.radio = tk.StringVar(value="3")
         self.resolucion = tk.StringVar(value="0")
         self._armar()
@@ -142,6 +143,9 @@ class App(tk.Tk):
         ttk.Label(fila2, text="Con fotos muy grandes y poca memoria use 6 a 8.", foreground="#666").pack(side="left")
         ttk.Checkbutton(cal, text="Con foto: unir tambien lo que la foto no confirma (queda en la capa REVISAR UNION)",
                         variable=self.completar).grid(row=7, column=0, columnspan=3, sticky="w", pady=(6, 0))
+        ttk.Checkbutton(cal, text="Dibujar las veredas con la forma del concreto visible en la foto "
+                                  "(EN PRUEBA; requiere el plano del proyecto)",
+                        variable=self.veredas_foto).grid(row=8, column=0, columnspan=3, sticky="w", pady=(6, 0))
         self._fila_archivo(f, 5, "Plantilla de capas (opcional)", "plantilla", [("DXF", "*.dxf")],
                            ayuda="DXF del cual copiar colores, tipos de linea y grosores (p.ej. el plano PETRO)")
         self._fila_archivo(f, 7, "Carpeta de resultados *", "salida", None, carpeta=True)
@@ -329,7 +333,7 @@ class App(tk.Tk):
             calce_auto=self.calce_auto.get(), radio_calce=float(self.radio.get().replace(",", ".") or 3),
             resolucion=float(self.resolucion.get().replace(",", ".") or 0) / 100,
             plantilla=self.var["plantilla"].get(), capas_apagadas=capas_apagadas, completar=self.completar.get(),
-            plano_base=self.var["plano_base"].get(),
+            plano_base=self.var["plano_base"].get(), veredas_foto=self.veredas_foto.get(),
             capas_limite=tuple(c.strip() for c in self.capas_limite.get().split(",") if c.strip()) or ("FACHADA",),
             codigos_editados=(copy.deepcopy(self.codigos), dict(self.alias)))
 

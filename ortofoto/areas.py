@@ -35,6 +35,7 @@ class Area:
     largo: float = 0.0
     revisar: bool = False
     etiqueta: str = ""
+    nota: str = ""
 
     @property
     def area(self):
@@ -55,6 +56,7 @@ class Linea:
 class Metrado:
     areas: list = field(default_factory=list)
     lineas: list = field(default_factory=list)
+    puntos_revisar: list = field(default_factory=list)  # (x, y, motivo)
 
 
 def _bordes(res):
@@ -227,7 +229,7 @@ def _franjas_por_secciones(res, referencias):
     return areas, bordes, usados
 
 
-def cerrar_areas(resultados, base=None):
+def cerrar_areas(resultados, base=None, usar_foto=False):
     """Devuelve Metrado con areas (sin superposiciones) y lineas.
 
     base: PlanoBase con los limites de propiedad (fachadas) del plano del proyecto.
@@ -244,6 +246,8 @@ def cerrar_areas(resultados, base=None):
             if con_base:
                 # El borde interior es el limite de propiedad dibujado en el plano
                 ars, bordes, usados = _franjas_contra_limite(res, base)
+                if usar_foto and res.orto is not None:
+                    ars = _ajustar_con_foto(res, base, ars, met)
             else:
                 refs = [ln for cod in conf.referencia for ln in lineas_por_codigo.get(cod, [])]
                 ars, bordes, usados = _franjas_por_secciones(res, refs)
@@ -387,6 +391,52 @@ def _franjas_contra_limite(res, base):
             bordes.append(LineString(ce))
             usados.update(int(i) for i in ii)
     return areas, bordes, usados
+
+
+def _ajustar_con_foto(res, base, ars_puntos, met):
+    """Reemplaza la forma de cada vereda por la que se ve en la ortofoto, si coincide con los puntos."""
+    from .concreto import veredas_desde_foto
+
+    conf = res.conf
+    xy = np.array([(p.e, p.n) for p in res.puntos])
+    grupos = {}
+    for i, (x, y) in enumerate(xy):
+        k = base.limite_de(x, y, dist=conf.ancho_max + 1.0)
+        if k >= 0:
+            grupos.setdefault(k, []).append(i)
+    vistas = veredas_desde_foto(res.orto, base, xy, conf, grupos)
+    for v in vistas:
+        for i in v.lejos:
+            met.puntos_revisar.append((float(xy[i][0]), float(xy[i][1]),
+                                       f"{res.puntos[i].num} {res.puntos[i].desc}: no calza con la foto"))
+    final, usadas = [], set()
+    for a in ars_puntos:
+        cand = [k for k, v in enumerate(vistas) if v.poligono.intersects(a.poligono)]
+        if not cand:
+            a.revisar, a.nota = True, "no se ve concreto en la foto"
+            final.append(a)
+            continue
+        foto = unary_union([vistas[k].poligono for k in cand]).intersection(a.poligono.buffer(1.0))
+        foto = base.recortar(foto) if not foto.is_empty else foto
+        if isinstance(foto, MultiPolygon):
+            foto = max(foto.geoms, key=lambda g: g.area)
+        relacion = foto.area / max(a.area, 1e-6) if isinstance(foto, Polygon) else 0
+        if isinstance(foto, Polygon) and 0.5 <= relacion <= 2.0:
+            lejos = any(i in vistas[k].lejos for k in cand for i in vistas[k].puntos
+                        if a.poligono.buffer(0.5).contains(Point(xy[i])))
+            a.poligono, a.origen = foto, "foto"
+            a.revisar = a.revisar or lejos
+            a.nota = "forma de la foto" + ("; hay puntos que no calzan" if lejos else "")
+            usadas.update(cand)
+        else:
+            a.revisar, a.nota = True, f"la foto no coincide con los puntos ({relacion:.0%} del area)"
+        final.append(a)
+    # Concreto visto en la foto, pegado a la fachada, que no salio de los puntos
+    for k, v in enumerate(vistas):
+        if k not in usadas and not any(v.poligono.intersects(a.poligono) for a in final):
+            final.append(Area(res.codigo, conf, v.poligono, "foto", revisar=True,
+                              nota="vista en la foto, sin area de puntos"))
+    return final
 
 
 def _franjas_por_estaciones(res, indices, barreras=None):
@@ -547,15 +597,16 @@ def guardar_metrado(met, ruta_xlsx, ruta_csv=None):
     for ar in met.areas:
         x, y = punto_etiqueta(ar.poligono)
         filas.append([ar.etiqueta, ar.conf.nombre or ar.codigo, ar.conf.capa_area, "m2", round(ar.area, 2),
-                      round(ar.largo, 2), round(ar.ancho, 2), "SI" if ar.revisar else "", round(x, 3), round(y, 3)])
+                      round(ar.largo, 2), round(ar.ancho, 2), "SI" if ar.revisar else "", round(x, 3), round(y, 3),
+                      ar.nota])
     for ln in met.lineas:
         if not ln.etiqueta:
             continue
         x, y = ln.linea.interpolate(0.5, normalized=True).coords[0]
         filas.append([ln.etiqueta, ln.conf.nombre or ln.codigo, ln.conf.capa, "m", round(ln.linea.length, 2),
-                      round(ln.linea.length, 2), "", "", round(x, 3), round(y, 3)])
+                      round(ln.linea.length, 2), "", "", round(x, 3), round(y, 3), ""])
     cab = ["Etiqueta", "Elemento", "Capa", "Unidad", "Metrado", "Largo (m)", "Ancho medio (m)", "Revisar",
-           "Este", "Norte"]
+           "Este", "Norte", "Observacion"]
     resumen = {}
     for f in filas:
         clave = (f[0].split(" - ")[0], f[1], f[3])

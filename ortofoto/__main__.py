@@ -45,6 +45,7 @@ class Opciones:
     completar: bool = True  # con foto: unir tambien lo que la foto no confirma (queda para revisar)
     plano_base: str = ""  # DXF del proyecto (lotes, fachadas): el resultado se agrega sobre una copia
     capas_limite: tuple = basemod.CAPAS_LIMITE  # capas del limite de propiedad en el plano base
+    veredas_foto: bool = False  # forma de las veredas segun el concreto visible en la ortofoto
     codigos_editados: tuple = None  # (codigos, alias) ya cargados desde la ventana
 
 
@@ -154,7 +155,7 @@ def procesar(op, avisar=print):
     resultados, sin_conf = unir.unir_todo(puntos, codigos, orto, alias=alias, avisar=avisar,
                                          completar=op.completar, base=base)
     avisar("Cerrando areas y calculando metrados...")
-    met = areas.cerrar_areas(resultados, base)
+    met = areas.cerrar_areas(resultados, base, usar_foto=op.veredas_foto and orto is not None)
     resumen = areas.guardar_metrado(met, ruta_libre(out / "metrado.xlsx", avisar), ruta_libre(out / "metrado.csv", avisar))
     avisar("Guardando DXF...")
     exportar.guardar_dxf(ruta_libre(out / "resultado.dxf", avisar), puntos, resultados, met, codigos, alias, orto,
@@ -203,6 +204,8 @@ def main(argv=None):
                     help="Capas del limite de propiedad en el plano base (por defecto FACHADA)")
     ap.add_argument("--desactivar", nargs="*", default=[], help="Codigos que no se procesan (p.ej. PTA CNTA)")
     ap.add_argument("--apagar", nargs="*", default=[], help="Capas que salen apagadas en el DXF")
+    ap.add_argument("--veredas-foto", action="store_true",
+                    help="Dibujar las veredas con la forma del concreto visible en la ortofoto (requiere plano base)")
     ap.add_argument("--solo-confirmadas", action="store_true",
                     help="Con foto: no unir lo que la foto no confirma (por defecto se une y se marca a revisar)")
     ap.add_argument("--ventana", type=float, nargs=4, metavar=("XMIN", "YMIN", "XMAX", "YMAX"))
@@ -213,7 +216,7 @@ def main(argv=None):
                   codigos=a.codigos, plantilla=a.plantilla, ventana=tuple(a.ventana) if a.ventana else None,
                   desactivados={c.upper() for c in a.desactivar}, capas_apagadas=set(a.apagar),
                   completar=not a.solo_confirmadas, plano_base=a.plano_base,
-                  capas_limite=tuple(a.capas_limite))
+                  capas_limite=tuple(a.capas_limite), veredas_foto=a.veredas_foto)
     return procesar(op)
 
 

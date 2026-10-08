@@ -213,3 +213,49 @@ def test_archivo_abierto_se_guarda_con_otro_nombre(tmp_path, monkeypatch):
     avisos = []
     assert m.ruta_libre(bloqueado, avisos.append) == tmp_path / "resultado_2.dxf"
     assert avisos and "resultado_2.dxf" in avisos[0]
+
+
+def test_vereda_con_la_forma_de_la_foto(tmp_path):
+    """La foto muestra una vereda que se angosta; los puntos (cada 8 m) no lo ven. Con la foto, la forma sigue lo real."""
+    import ezdxf
+    from PIL import ImageDraw
+    from shapely.geometry import Polygon as P
+
+    from ortofoto import base as basemod
+
+    ruta_base = _plano_base(tmp_path)
+    gsd = 0.05
+    x0, y0, x1, y1 = -5.0, -12.0, 45.0, 5.0
+    w, h = int((x1 - x0) / gsd), int((y1 - y0) / gsd)
+    rng = np.random.default_rng(1)
+    img = Image.new("RGB", (w, h), (150, 120, 90))  # tierra
+    dr = ImageDraw.Draw(img)
+    px = lambda pts: [((x - x0) / gsd, (y1 - y) / gsd) for x, y in pts]
+    dr.polygon(px([(0, 0), (40, 0), (40, 5), (0, 5)]), fill=(140, 60, 50))  # techos
+    # Vereda real: 2 m de ancho, pero entre x=14 y x=22 solo 0.8 m (tramo angosto)
+    real = P([(0, 0), (14, 0), (14, 0), (22, 0), (40, 0), (40, -2), (22, -2), (22, -0.8), (14, -0.8), (14, -2), (0, -2)])
+    dr.polygon(px(list(real.exterior.coords)), fill=(195, 192, 185))
+    arr = np.asarray(img).astype(float) + rng.normal(0, 5, (h, w, 3))
+    Image.fromarray(arr.clip(0, 255).astype(np.uint8)).save(tmp_path / "foto.png")
+    (tmp_path / "foto.pgw").write_text(f"{gsd}\n0\n0\n{-gsd}\n{x0 + gsd / 2}\n{y1 - gsd / 2}\n")
+    pts = []
+    for k, x in enumerate(np.arange(2, 39, 8)):
+        pts += [Punto(f"v{k}a", x, -0.2, 0, "VER"), Punto(f"v{k}b", x, -1.95, 0, "VER")]
+    op = dict(puntos=_csv(tmp_path, pts), plano_base=ruta_base, orto=str(tmp_path / "foto.png"), calce_auto=False)
+    _, met_p, _ = procesar(Opciones(salida=str(tmp_path / "p"), **op), avisar=lambda *a: None)
+    _, met_f, _ = procesar(Opciones(salida=str(tmp_path / "f"), veredas_foto=True, **op), avisar=lambda *a: None)
+    vp = unary([a.poligono for a in met_p.areas if a.codigo == "VER"])
+    vf = unary([a.poligono for a in met_f.areas if a.codigo == "VER"])
+    iou = lambda a, b: a.intersection(b).area / a.union(b).area
+    from shapely.geometry import box
+
+    tramo = box(2, -3, 34, 1)  # solo donde hay puntos levantados
+    real, vf, vp = real.intersection(tramo), vf.intersection(tramo), vp.intersection(tramo)
+    assert iou(vf, real) > 0.85
+    assert iou(vf, real) > iou(vp, real) + 0.05  # la foto mejora la forma
+
+
+def unary(pols):
+    from shapely.ops import unary_union
+
+    return unary_union(pols)

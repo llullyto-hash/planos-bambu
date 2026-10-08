@@ -10,6 +10,7 @@ CAPA_REVISAR = "REVISAR UNION"
 CAPA_REVISAR_AREA = "REVISAR AREA"
 CAPA_SIN_PAREJA = "REVISAR BORDE SIN CERRAR"
 CAPA_ETIQUETAS = "TEXTO METRADO"
+CAPA_PUNTO_FOTO = "REVISAR PUNTO VS FOTO"
 CAPA_ORTOFOTO = "ORTOFOTO"
 ALTURA_TEXTO = 0.25
 
@@ -113,6 +114,13 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
                                   "attachment_point": 5})
         if ar.revisar:
             msp.add_lwpolyline(exterior, close=True, dxfattribs={"layer": CAPA_REVISAR_AREA, "lineweight": 50})
+
+    # Puntos que no calzan con lo que se ve en la ortofoto
+    if metrado.puntos_revisar:
+        _capa(doc, CAPA_PUNTO_FOTO, 1)
+        for x, y, motivo in metrado.puntos_revisar:
+            msp.add_circle((x, y), 0.4, dxfattribs={"layer": CAPA_PUNTO_FOTO})
+            msp.add_text(motivo, height=0.15, dxfattribs={"layer": CAPA_PUNTO_FOTO}).set_placement((x + 0.5, y + 0.2))
 
     # Ortofoto de fondo: el archivo original, con el calce corregido (no se copia).
     # Si se trabaja sobre el plano del proyecto, la foto ya esta insertada ahi.
