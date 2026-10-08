@@ -1,6 +1,8 @@
 import numpy as np
+from PIL import Image
 
-from ortofoto import calce, exportar, unir
+from ortofoto import areas, calce, exportar, unir
+from ortofoto.__main__ import CODIGOS_DEFECTO, Opciones, procesar
 from ortofoto.imagen import Ortofoto, afin_desde_dxf
 from ortofoto.topografia import Punto
 
@@ -20,21 +22,38 @@ def test_control_afin_y_helmert():
     assert np.allclose(afin2, AFIN, atol=1e-6) and res2.max() < 1e-6
 
 
-def test_imagen_en_dxf_ida_y_vuelta(tmp_path):
-    orto = Ortofoto(np.full((60, 80, 3), 128, np.uint8), AFIN)
-    pts = [Punto("1", 550116, 9072958, 150, "VER"), Punto("2", 550117, 9072958, 150, "VER")]
-    codigos, alias = unir.cargar_codigos("ortofoto/codigos.json")
-    res, _ = unir.unir_todo(pts, codigos, None, alias=alias)
-    exportar.guardar_dxf(res, codigos, tmp_path / "a.dxf", orto, "foto.jpg")
-    afin, nombre, tam = afin_desde_dxf(tmp_path / "a.dxf")
-    assert nombre == "foto.jpg" and tam == (80, 60)
-    assert np.allclose(afin, AFIN, atol=1e-6)
-
-
 def test_world_file_ida_y_vuelta(tmp_path):
     orto = Ortofoto(np.full((60, 80, 3), 128, np.uint8), AFIN)
     orto.guardar(tmp_path / "f.png")
-    assert np.allclose(Ortofoto.abrir(tmp_path / "f.png").afin, AFIN, atol=1e-6)
+    assert np.allclose(Ortofoto.cargar(tmp_path / "f.png").afin, AFIN, atol=1e-6)
+
+
+def test_carga_por_ventana_resolucion_y_tamano_distinto(tmp_path):
+    # Foto exportada a la mitad de tamano: el calce del DXF (hecho sobre el original) se reescala
+    img = np.zeros((200, 400, 3), np.uint8)
+    img[100:, 200:] = 255
+    Image.fromarray(img).save(tmp_path / "f.png")
+    afin_original = [0.025, 0, 1000.0, 0, -0.025, 2000.0]  # original de 800x400 px
+    o = Ortofoto.cargar(tmp_path / "f.png", afin=afin_original, tam_ref=(800, 400),
+                        ventana=(1004.0, 1996.0, 1006.0, 1998.0), resolucion=0.1)
+    assert abs(o.tam_pixel - 0.1) < 0.005  # redondeo a pixeles enteros
+    assert o.rgb.shape[:2] == (20, 20)
+    assert np.allclose(o.a_terreno(0, 0), (1004.0, 1998.0), atol=0.05)
+    assert o.origen["tam"] == (400, 200) and np.allclose(o.origen["afin"][0], 0.05)
+
+
+def test_imagen_en_dxf_ida_y_vuelta(tmp_path):
+    img = np.full((60, 80, 3), 128, np.uint8)
+    Image.fromarray(img).save(tmp_path / "foto.png")
+    orto = Ortofoto.cargar(tmp_path / "foto.png", afin=AFIN)
+    pts = [Punto("1", 550116, 9072958, 150, "VER"), Punto("2", 550117, 9072958, 150, "VER")]
+    codigos, alias = unir.cargar_codigos(CODIGOS_DEFECTO)
+    res, _ = unir.unir_todo(pts, codigos, None, alias=alias, avisar=lambda *a: None)
+    met = areas.cerrar_areas(res)
+    exportar.guardar_dxf(tmp_path / "a.dxf", pts, res, met, codigos, alias, orto)
+    afin, nombre, tam = afin_desde_dxf(tmp_path / "a.dxf")
+    assert nombre == "foto.png" and tam == (80, 60)
+    assert np.allclose(afin, AFIN, atol=1e-6)
 
 
 def test_union_sigue_borde_de_la_foto():
@@ -47,5 +66,74 @@ def test_union_sigue_borde_de_la_foto():
     pts += [Punto(str(100 + i), x + 1.2, n_inf, 0, "VER") for i, x in enumerate(np.arange(1, 17, 2.5))]
     conf = unir.Codigo("VEREDA EXIS.", separacion_max=4)
     r = unir.unir_codigo("VER", pts, conf, orto)
-    cruzan = [u for u in r.uniones if abs(pts[u.i].n - pts[u.j].n) > 0.5]
-    assert not cruzan and len(r.cadenas) == 2
+    confirmadas = [u for u in r.uniones if not u.revisar]
+    cruzan = [u for u in confirmadas if abs(pts[u.i].n - pts[u.j].n) > 0.5]
+    assert not cruzan and len(confirmadas) == len(pts) - 2
+
+
+def _vereda_por_secciones(x0=0.0, y0=0.0, n=6, paso=8.0, ancho=2.0, cod="VER"):
+    """Vereda levantada por secciones (fachada -> sardinel) a lo largo del eje X."""
+    pts = []
+    for k in range(n):
+        x = x0 + k * paso
+        pts += [Punto(f"{cod}{k}a", x, y0 - 0.1, 0, cod), Punto(f"{cod}{k}b", x, y0 - ancho, 0, cod)]
+    return pts
+
+
+def test_vereda_por_secciones_con_fachada():
+    codigos, alias = unir.cargar_codigos(CODIGOS_DEFECTO)
+    fachada = [Punto(f"f{k}", x, 0.0, 0, "CSH") for k, x in enumerate(np.arange(-2, 45, 6))]
+    # Vereda enfrente (otra cuadra, a 9 m): no debe unirse con la primera
+    pts = fachada + _vereda_por_secciones() + _vereda_por_secciones(y0=-9.0, cod="VER")
+    res, _ = unir.unir_todo(pts, codigos, None, alias=alias, avisar=lambda *a: None)
+    met = areas.cerrar_areas(res)
+    veredas = [a for a in met.areas if a.codigo == "VER"]
+    assert len(veredas) == 2
+    for a in veredas:
+        assert abs(a.area - 1.9 * 40) < 1  # 1.9 m x 40 m (borde interior a 0.1 m de la fachada)
+        assert a.poligono.bounds[3] - a.poligono.bounds[1] < 2.5  # no se pega con la otra cuadra
+    assert {a.etiqueta for a in veredas} == {"VD - 01", "VD - 02"}
+
+
+def test_vereda_por_secciones_sin_referencia():
+    codigos, alias = unir.cargar_codigos(CODIGOS_DEFECTO)
+    pts = _vereda_por_secciones(n=5, paso=10)
+    res, _ = unir.unir_todo(pts, codigos, None, alias=alias, avisar=lambda *a: None)
+    met = areas.cerrar_areas(res)
+    assert len(met.areas) == 1 and abs(met.areas[0].area - 1.9 * 40) < 3
+
+
+def test_martillo_abierto_se_cierra_y_desactivar_codigo(tmp_path):
+    codigos, alias = unir.cargar_codigos(CODIGOS_DEFECTO)
+    mar = [Punto(str(i), x, y, 0, "MRTLLO") for i, (x, y) in enumerate([(0, 0), (0, 3), (3, 4), (6, 3), (6, 0)])]
+    res, _ = unir.unir_todo(mar, codigos, None, alias=alias, avisar=lambda *a: None)
+    met = areas.cerrar_areas(res)
+    assert len(met.areas) == 1 and met.areas[0].etiqueta == "MT - 01" and met.areas[0].area > 15
+    # Desactivado desde la ventana / linea de comandos: no se une ni genera areas
+    with open(tmp_path / "p.csv", "w") as fh:
+        for p in mar:
+            fh.write(f"{p.num},{p.n},{p.e},{p.z},{p.desc}\n")
+    _, met2, _ = procesar(Opciones(puntos=str(tmp_path / "p.csv"), salida=str(tmp_path / "s"),
+                                   desactivados={"MAR"}), avisar=lambda *a: None)
+    assert not met2.areas
+    assert (tmp_path / "s" / "metrado.xlsx").exists() and (tmp_path / "s" / "resultado.dxf").exists()
+
+
+def test_capas_de_puntos_por_codigo(tmp_path):
+    import ezdxf
+
+    pts = _vereda_por_secciones(n=3) + [Punto("t", 5, 5, 1, "TN")]
+    _, met, _ = procesar(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s"),
+                                  capas_apagadas={"PT-TN"}), avisar=lambda *a: None)
+    doc = ezdxf.readfile(tmp_path / "s" / "resultado.dxf")
+    assert "PT-VER" in doc.layers and "PT-TN" in doc.layers
+    assert doc.layers.get("PT-TN").is_off() and not doc.layers.get("PT-VER").is_off()
+    assert len(doc.modelspace().query('HATCH[layer=="Vereda a demoler"]')) == len(met.areas) == 1
+
+
+def _csv(tmp_path, pts):
+    ruta = tmp_path / "pts.csv"
+    with open(ruta, "w") as fh:
+        for p in pts:
+            fh.write(f"{p.num},{p.n},{p.e},{p.z},{p.desc}\n")
+    return str(ruta)

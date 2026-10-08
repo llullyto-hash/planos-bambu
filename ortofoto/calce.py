@@ -45,32 +45,30 @@ def leer_control(ruta):
     return pares
 
 
-def calce_automatico(orto, puntos, radio=3.0, paso=None):
+def calce_automatico(orto, puntos, radio=3.0, paso=None, max_puntos=800, semilla=0):
     """Busca el desplazamiento (dE, dN) que mejor apoya los puntos sobre bordes.
 
-    Los puntos levantados en bordes (vereda, sardinel, lindero...) deben caer
-    sobre cambios de color de la foto. Se prueba una grilla de desplazamientos
-    y se queda con el que maximiza el gradiente medio en esos puntos.
-    Devuelve (dE, dN, puntaje_final, puntaje_inicial); la correccion de la
-    foto es orto.desplazar(dE, dN).
+    Los puntos levantados en bordes (vereda, sardinel, fachada...) deben caer
+    sobre cambios de color de la foto. Para cada punto se mide el borde en una
+    grilla de desplazamientos alrededor (+-radio) y se promedia: el maximo de
+    ese mapa es el calce. Devuelve (dE, dN, puntaje_final, puntaje_inicial); la
+    correccion de la foto es orto.desplazar(dE, dN).
     """
     pts = np.array([(p.e, p.n) for p in puntos], float)
     if len(pts) < 5:
         return 0.0, 0.0, 0.0, 0.0
+    if len(pts) > max_puntos:
+        pts = pts[np.random.default_rng(semilla).choice(len(pts), max_puntos, replace=False)]
+    # Ordenar por bloque de la foto para leer cada bloque una sola vez
+    pts = pts[np.argsort([hash(orto.bloque_de(*p)) for p in pts], kind="stable")]
     paso = paso or max(orto.tam_pixel, 0.05)
-
-    def puntaje(de, dn):
-        mag, _, _ = orto.muestrear_bordes(pts[:, 0] - de, pts[:, 1] - dn)
-        return float(np.mean(np.minimum(mag, 1.0)))
-
-    inicial = puntaje(0.0, 0.0)
-    mejor = (inicial, 0.0, 0.0)
-    # Busqueda gruesa y luego fina alrededor del mejor
-    for r, s in [(radio, max(paso * 4, radio / 15)), (paso * 6, paso)]:
-        cen_e, cen_n = mejor[1], mejor[2]
-        for de in np.arange(cen_e - r, cen_e + r + 1e-9, s):
-            for dn in np.arange(cen_n - r, cen_n + r + 1e-9, s):
-                v = puntaje(de, dn)
-                if v > mejor[0]:
-                    mejor = (v, float(de), float(dn))
-    return mejor[1], mejor[2], mejor[0], inicial
+    despl = np.arange(-radio, radio + 1e-9, paso)
+    dE, dN = np.meshgrid(despl, despl, indexing="ij")
+    mapa = np.zeros(dE.shape)
+    for e, n in pts:
+        mag, _, _ = orto.muestrear_bordes((e - dE).ravel(), (n - dN).ravel())
+        mapa += np.minimum(mag, 1.0).reshape(dE.shape)
+    mapa /= len(pts)
+    i0 = len(despl) // 2
+    k = np.unravel_index(np.argmax(mapa), mapa.shape)
+    return float(dE[k]), float(dN[k]), float(mapa[k]), float(mapa[i0, i0])

@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial import cKDTree
 
-from .. import calce, exportar, topografia, unir
+from .. import areas, calce, exportar, topografia, unir
 from ..__main__ import CODIGOS_BORDE, CODIGOS_DEFECTO
 from ..imagen import Ortofoto
 
@@ -59,11 +59,14 @@ def _densificar(lineas, paso=0.05):
     return np.vstack(pts)
 
 
-def evaluar(resultados, arbol, tol=0.3):
+def evaluar(resultados, arbol, tol=0.3, revisar=None):
+    """revisar=None: todas las uniones; False: solo las confirmadas; True: solo las marcadas."""
     por_codigo = {}
     for r in resultados:
         ok = tot = 0
         for u in r.uniones:
+            if revisar is not None and u.revisar != revisar:
+                continue
             a = np.array([r.puntos[u.i].e, r.puntos[u.i].n])
             b = np.array([r.puntos[u.j].e, r.puntos[u.j].n])
             m = np.linspace(0.05, 0.95, 15)
@@ -73,6 +76,38 @@ def evaluar(resultados, arbol, tol=0.3):
         if tot:
             por_codigo[r.codigo] = (ok, tot)
     return por_codigo
+
+
+def areas_referencia(ruta, ventana, capas):
+    """Poligonos dibujados por el proyectista en las capas de area (p.ej. 'Vereda a demoler')."""
+    from ezdxf import recover
+    from shapely.geometry import Polygon, box
+    from shapely.ops import unary_union
+
+    doc, _ = recover.readfile(ruta)
+    zona = box(*ventana)
+    pols = []
+    for e in doc.modelspace().query("LWPOLYLINE"):
+        if e.dxf.layer in capas and e.closed and len(e) > 2:
+            p = Polygon([(x, y) for x, y in e.get_points("xy")]).buffer(0)
+            if p.intersects(zona):
+                pols.append(p)
+    return unary_union(pols) if pols else None
+
+
+def comparar_areas(met, ref):
+    from shapely.ops import unary_union
+
+    if ref is None or not met.areas:
+        return None
+    gen = unary_union([a.poligono for a in met.areas if a.conf.capa_area in CAPAS_AREA])
+    if gen.is_empty:
+        return None
+    inter = gen.intersection(ref).area
+    return inter / gen.area, inter / ref.area, gen.area, ref.area
+
+
+CAPAS_AREA = {"Vereda a demoler"}
 
 
 def main(argv=None):
@@ -99,8 +134,11 @@ def main(argv=None):
     filas = []
     totales = collections.Counter()
     res_sin, _ = unir.unir_todo(puntos, codigos, None, alias=alias)
+    met_sin = areas.cerrar_areas(res_sin)
     res_con, _ = unir.unir_todo(puntos, codigos, orto, alias=alias)
-    ev_sin, ev_con = evaluar(res_sin, arbol), evaluar(res_con, arbol)
+    met_con = areas.cerrar_areas(res_con)
+    ev_sin, ev_con = evaluar(res_sin, arbol), evaluar(res_con, arbol, revisar=False)
+    ev_rev = evaluar(res_con, arbol, revisar=True)
     for cod in sorted(set(ev_sin) | set(ev_con)):
         s, c = ev_sin.get(cod, (0, 0)), ev_con.get(cod, (0, 0))
         totales["sin_ok"] += s[0]; totales["sin"] += s[1]; totales["con_ok"] += c[0]; totales["con"] += c[1]
@@ -109,15 +147,24 @@ def main(argv=None):
     texto = "\n".join([
         f"Calce automatico: dE={de:+.2f} dN={dn:+.2f}",
         "",
-        "| Codigo | Solo geometria (correctas/total) | Con ortofoto (correctas/total) |",
+        "| Codigo | Solo geometria (correctas/total) | Con ortofoto, confirmadas por la foto |",
         "|---|---|---|", *filas,
         f"| **Total** | **{t['sin_ok']}/{t['sin']} ({t['sin_ok'] / max(t['sin'], 1):.0%})** | "
         f"**{t['con_ok']}/{t['con']} ({t['con_ok'] / max(t['con'], 1):.0%})** |",
     ])
+    ok_r, tot_r = (sum(v[0] for v in ev_rev.values()), sum(v[1] for v in ev_rev.values()))
+    texto += (f"\n\nCon ortofoto, ademas se unieron {tot_r} tramos que la foto no confirma (capa REVISAR UNION); "
+              f"de esos, {ok_r} ({ok_r / max(tot_r, 1):.0%}) coinciden con el dibujo.")
+    ref_areas = areas_referencia(args.referencia, args.ventana, CAPAS_AREA)
+    for nombre, met in (("solo geometria", met_sin), ("con ortofoto", met_con)):
+        c = comparar_areas(met, ref_areas)
+        if c:
+            texto += (f"\n\nVeredas ({nombre}): {c[0]:.0%} del area generada coincide con lo dibujado; "
+                      f"cubre {c[1]:.0%} de lo dibujado ({c[2]:.0f} m2 generados, {c[3]:.0f} m2 dibujados)")
     (out / "evaluacion.md").write_text(texto + "\n", encoding="utf-8")
     print(texto)
-    exportar.guardar_vista(res_sin, out / "vista_sin_foto.png", orto, ref)
-    exportar.guardar_vista(res_con, out / "vista_con_foto.png", orto, ref)
+    exportar.guardar_vista(res_sin, out / "vista_sin_foto.png", orto, ref, met_sin)
+    exportar.guardar_vista(res_con, out / "vista_con_foto.png", orto, ref, met_con)
 
 
 if __name__ == "__main__":

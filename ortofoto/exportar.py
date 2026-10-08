@@ -1,71 +1,129 @@
-"""Salida: DXF con polilineas por capa y vista PNG para revision."""
+"""Salida: DXF por capas (puntos, bordes, areas con achurado, etiquetas) y vista PNG."""
 from pathlib import Path
 
 import numpy as np
 
-CAPA_PUNTOS = "TOPO-PUNTOS"
+from .areas import punto_etiqueta
+
+PREFIJO_PUNTOS = "PT-"  # una capa de puntos por codigo: PT-VER, PT-CNTA...
 CAPA_REVISAR = "REVISAR UNION"
+CAPA_REVISAR_AREA = "REVISAR AREA"
+CAPA_SIN_PAREJA = "REVISAR BORDE SIN CERRAR"
+CAPA_ETIQUETAS = "TEXTO METRADO"
 CAPA_ORTOFOTO = "ORTOFOTO"
+ALTURA_TEXTO = 0.25
 
 
-def _capa(doc, nombre, color=7, tipo_linea="Continuous", plantilla=None):
+def _capa(doc, nombre, color=7, tipo_linea="Continuous", plantilla=None, apagada=False):
     if nombre in doc.layers:
-        return
+        return doc.layers.get(nombre)
+    lw = -3
     if plantilla is not None and nombre in plantilla.layers:
         ref = plantilla.layers.get(nombre)
-        color, tipo_linea = ref.dxf.color, ref.dxf.linetype
-        lw = ref.dxf.lineweight
-    else:
-        lw = -3
+        color, tipo_linea, lw = ref.dxf.color, ref.dxf.linetype, ref.dxf.lineweight
     if tipo_linea not in doc.linetypes:
         tipo_linea = "Continuous"
-    doc.layers.add(nombre, color=abs(color), linetype=tipo_linea, lineweight=lw)
+    capa = doc.layers.add(nombre, color=abs(color) or 7, linetype=tipo_linea, lineweight=lw)
+    if apagada:
+        capa.off()
+    return capa
 
 
-def guardar_dxf(resultados, codigos, ruta, orto=None, ruta_imagen=None, plantilla=None, puntos=None):
+def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=None, plantilla=None,
+                capas_apagadas=()):
     import ezdxf
+    from ezdxf.enums import TextEntityAlignment
 
+    alias = alias or {}
     doc = ezdxf.new("R2018", setup=True)
     doc.header["$INSUNITS"] = 6  # metros
-    tpl = ezdxf.readfile(plantilla) if plantilla else None
+    tpl = None
+    if plantilla:
+        from ezdxf import recover
+
+        tpl, _ = recover.readfile(plantilla)
     msp = doc.modelspace()
-    _capa(doc, CAPA_PUNTOS, 8)
-    _capa(doc, CAPA_REVISAR, 1)
-    # Todos los puntos, incluso los de codigos sin configurar
-    for p in puntos if puntos is not None else [p for r in resultados for p in r.puntos]:
-        msp.add_point((p.e, p.n, p.z), dxfattribs={"layer": CAPA_PUNTOS})
-        msp.add_text(f"{p.num} {p.desc}", height=0.12,
-                     dxfattribs={"layer": CAPA_PUNTOS}).set_placement((p.e + 0.1, p.n + 0.1))
+    for nombre, color in ((CAPA_REVISAR, 1), (CAPA_REVISAR_AREA, 1), (CAPA_SIN_PAREJA, 6), (CAPA_ETIQUETAS, 7)):
+        _capa(doc, nombre, color, plantilla=tpl)
+
+    # Puntos: una capa por codigo, para poder apagarlos y unir a mano
+    for p in puntos:
+        cod = alias.get(p.codigo, p.codigo) or "SIN-CODIGO"
+        conf = codigos.get(cod)
+        capa = PREFIJO_PUNTOS + cod
+        _capa(doc, capa, conf.color if conf else 8, apagada=capa in capas_apagadas)
+        msp.add_point((p.e, p.n, p.z), dxfattribs={"layer": capa})
+        msp.add_text(f"{p.num} {p.desc} {p.z:.2f}", height=0.1, dxfattribs={"layer": capa}).set_placement(
+            (p.e + 0.08, p.n + 0.08))
+
+    # Bordes unidos
     for r in resultados:
-        conf = codigos[r.codigo]
-        _capa(doc, conf.capa, conf.color, conf.tipo_linea, tpl)
+        conf = r.conf
+        if conf.tipo == "punto":
+            continue
+        _capa(doc, conf.capa, conf.color, conf.tipo_linea, tpl, conf.capa in capas_apagadas)
         for cad in r.cadenas:
             cerrada = cad[0] == cad[-1]
             idx = cad[:-1] if cerrada else cad
-            pl = msp.add_lwpolyline([(r.puntos[i].e, r.puntos[i].n) for i in idx],
-                                    dxfattribs={"layer": conf.capa})
+            pl = msp.add_lwpolyline([(r.puntos[i].e, r.puntos[i].n) for i in idx], dxfattribs={"layer": conf.capa})
             pl.closed = cerrada
         for u in r.uniones:
             if u.revisar:
                 a, b = r.puntos[u.i], r.puntos[u.j]
-                msp.add_line((a.e, a.n), (b.e, b.n), dxfattribs={"layer": CAPA_REVISAR, "lineweight": 50})
-    if orto is not None and ruta_imagen:
-        # Foto de fondo con el calce ya corregido
+                msp.add_line((a.e, a.n), (b.e, b.n), dxfattribs={"layer": CAPA_REVISAR})
+
+    # Bordes de franja que no encontraron su pareja: hay que cerrarlos a mano
+    for ln in metrado.lineas:
+        if ln.borde:
+            msp.add_lwpolyline(list(ln.linea.coords), dxfattribs={"layer": ln.conf.capa})
+        elif ln.sin_pareja:
+            msp.add_lwpolyline(list(ln.linea.coords), dxfattribs={"layer": CAPA_SIN_PAREJA})
+        elif ln.etiqueta:
+            x, y = ln.linea.interpolate(0.5, normalized=True).coords[0]
+            msp.add_mtext(f"{ln.etiqueta}\\PLONG={ln.linea.length:.2f}M",
+                          dxfattribs={"layer": CAPA_ETIQUETAS, "char_height": ALTURA_TEXTO, "insert": (x, y),
+                                      "attachment_point": 5})
+
+    # Areas cerradas + achurado + etiqueta tipo PETRO
+    for ar in metrado.areas:
+        conf = ar.conf
+        _capa(doc, conf.capa_area, conf.color_area or conf.color, plantilla=tpl,
+              apagada=conf.capa_area in capas_apagadas)
+        exterior = list(ar.poligono.exterior.coords)[:-1]
+        attrs = {"layer": conf.capa_area}
+        msp.add_lwpolyline(exterior, close=True, dxfattribs=attrs)
+        h = msp.add_hatch(dxfattribs=attrs)
+        if conf.patron.upper() == "SOLID":
+            h.set_solid_fill(color=256)
+            h.transparency = 0.5
+        else:
+            h.set_pattern_fill(conf.patron, scale=conf.escala_patron, color=256)
+        h.paths.add_polyline_path(exterior, is_closed=True)
+        for agujero in ar.poligono.interiors:
+            h.paths.add_polyline_path(list(agujero.coords)[:-1], is_closed=True)
+        x, y = punto_etiqueta(ar.poligono)
+        msp.add_mtext(f"{ar.etiqueta}\\PAREA= {ar.area:.2f} M2",
+                      dxfattribs={"layer": CAPA_ETIQUETAS, "char_height": ALTURA_TEXTO, "insert": (x, y),
+                                  "attachment_point": 5})
+        if ar.revisar:
+            msp.add_lwpolyline(exterior, close=True, dxfattribs={"layer": CAPA_REVISAR_AREA, "lineweight": 50})
+
+    # Ortofoto de fondo: el archivo original, con el calce corregido (no se copia)
+    if orto is not None and orto.origen is not None:
         _capa(doc, CAPA_ORTOFOTO, 7)
-        h, w = orto.rgb.shape[:2]
-        a, b, c, d, e, f = orto.afin
-        idef = doc.add_image_def(filename=str(ruta_imagen), size_in_pixel=(w, h))
-        ins = (a * 0 + b * h + c, d * 0 + e * h + f)
-        img = msp.add_image(idef, insert=ins, size_in_units=(w * orto.tam_pixel, h * orto.tam_pixel),
+        w, h = orto.origen["tam"]
+        a, b, c, d, e, f = orto.origen["afin"]
+        idef = doc.add_image_def(filename=orto.origen["ruta"], size_in_pixel=(w, h))
+        tam = float(np.hypot(a, d))
+        img = msp.add_image(idef, insert=(b * h + c, e * h + f), size_in_units=(w * tam, h * tam),
                             dxfattribs={"layer": CAPA_ORTOFOTO})
         img.dxf.u_pixel = (a, d, 0)
         img.dxf.v_pixel = (-b, -e, 0)
-        # La imagen va al fondo
         msp.set_redraw_order([(img.dxf.handle, "1")])
     doc.saveas(ruta)
 
 
-def guardar_vista(resultados, ruta, orto=None, referencia=None, max_px=5000, ventana=None):
+def guardar_vista(resultados, ruta, orto=None, referencia=None, metrado=None, max_px=4000, ventana=None):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -77,11 +135,12 @@ def guardar_vista(resultados, ruta, orto=None, referencia=None, max_px=5000, ven
         x1, y1 = todos.max(axis=0) + 5
     else:
         x0, y0, x1, y1 = ventana
-    fig, ax = plt.subplots(figsize=(16, 16 * (y1 - y0) / max(x1 - x0, 1)))
+    ancho = 16
+    fig, ax = plt.subplots(figsize=(ancho, ancho * (y1 - y0) / max(x1 - x0, 1)))
     if orto is not None:
-        c0, f0 = orto.a_pixel(np.array([x0, x1]), np.array([y1, y0]))
-        c0 = np.clip(np.sort(c0).astype(int), 0, orto.rgb.shape[1])
-        f0 = np.clip(np.sort(f0).astype(int), 0, orto.rgb.shape[0])
+        cs, fs = orto.a_pixel(np.array([x0, x1]), np.array([y1, y0]))
+        c0 = np.clip(np.sort(cs).astype(int), 0, orto.rgb.shape[1])
+        f0 = np.clip(np.sort(fs).astype(int), 0, orto.rgb.shape[0])
         paso = max(1, int(max(c0[1] - c0[0], f0[1] - f0[0]) / max_px))
         rec = orto.rgb[f0[0]:f0[1]:paso, c0[0]:c0[1]:paso]
         e0, n0 = orto.a_terreno(c0[0], f0[0])
@@ -91,22 +150,36 @@ def guardar_vista(resultados, ruta, orto=None, referencia=None, max_px=5000, ven
         for linea in referencia:
             ax.plot(*np.array(linea).T, color="white", lw=2.2, alpha=0.6)
     paleta = plt.get_cmap("tab10")
+    colores = {}
     for k, r in enumerate(resultados):
-        col = paleta(k % 10)
+        col = colores.setdefault(r.codigo, paleta(k % 10))
         xy = np.array([(p.e, p.n) for p in r.puntos])
-        ax.plot(xy[:, 0], xy[:, 1], "o", ms=2.5, color=col, mec="black", mew=0.3)
+        ax.plot(xy[:, 0], xy[:, 1], "o", ms=1.8, color=col, mec="black", mew=0.2)
         for u in r.uniones:
             seg = xy[[u.i, u.j]]
-            ax.plot(seg[:, 0], seg[:, 1], color="red" if u.revisar else col, lw=1.6 if u.revisar else 1.1,
+            ax.plot(seg[:, 0], seg[:, 1], color="red" if u.revisar else col, lw=1.4 if u.revisar else 0.9,
                     ls="--" if u.revisar else "-")
-        ax.plot([], [], color=col, lw=3, label=f"{r.codigo} ({len(r.puntos)} pts, {len(r.cadenas)} lineas)")
+        etiqueta = f"{r.codigo} ({len(r.puntos)} pts"
+        etiqueta += f", {len(r.cadenas)} lineas)" if r.conf.tipo != "punto" else ")"
+        ax.plot([], [], color=col, lw=3, label=etiqueta)
+    if metrado is not None:
+        for ar in metrado.areas:
+            col = colores.get(ar.codigo, "gray")
+            xs, ys = ar.poligono.exterior.xy
+            ax.fill(xs, ys, color=col, alpha=0.35, lw=0)
+            if ar.revisar:
+                ax.plot(xs, ys, color="red", lw=1)
+            x, y = punto_etiqueta(ar.poligono)
+            ax.text(x, y, ar.etiqueta, fontsize=3.5, ha="center", va="center")
+        for ln in metrado.lineas:
+            if ln.sin_pareja:
+                ax.plot(*ln.linea.xy, color="magenta", lw=1.2, ls=":")
+        ax.plot([], [], color="magenta", ls=":", label="borde sin cerrar")
     ax.plot([], [], color="red", ls="--", label="union a revisar")
-    if referencia:
-        ax.plot([], [], color="white", lw=3, alpha=0.6, label="dibujo de referencia")
-    ax.legend(loc="upper right", fontsize=8, framealpha=0.85)
+    ax.legend(loc="upper right", fontsize=7, framealpha=0.85)
     ax.set_xlim(x0, x1)
     ax.set_ylim(y0, y1)
     ax.set_aspect("equal")
     ax.ticklabel_format(useOffset=False, style="plain")
-    fig.savefig(ruta, dpi=150, bbox_inches="tight")
+    fig.savefig(ruta, dpi=170, bbox_inches="tight")
     plt.close(fig)

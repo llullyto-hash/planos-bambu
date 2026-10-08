@@ -3,3 +3,4 @@ salida_analisis/
 *.dxf
 *.dwg
 *.zip
+.venv/
