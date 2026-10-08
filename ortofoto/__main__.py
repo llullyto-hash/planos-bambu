@@ -156,6 +156,17 @@ def procesar(op, avisar=print):
                                          completar=op.completar, base=base)
     avisar("Cerrando areas y calculando metrados...")
     met = areas.cerrar_areas(resultados, base, usar_foto=op.veredas_foto and orto is not None)
+    if op.veredas_foto and orto is not None:
+        avisar("Buscando concreto visible en la foto...")
+        from .concreto import concreto_visible
+
+        vis = concreto_visible(orto, base, [(p.e, p.n) for p in puntos], avisar=avisar)
+        conf_cv = unir.Codigo(capa="CONCRETO VISIBLE (FOTO)", tipo="contorno", capa_area="CONCRETO VISIBLE (FOTO)",
+                              prefijo="CV", color=4, color_area=4, patron="ANSI37", escala_patron=0.1,
+                              nombre="Concreto visible en foto (sin puntos)")
+        areas.agregar_concreto_visible(met, vis, conf_cv)
+        log.append(f"Concreto visible en la foto sin puntos: {sum(a.codigo == 'CV' for a in met.areas)} areas "
+                   f"(capa CONCRETO VISIBLE (FOTO))")
     resumen = areas.guardar_metrado(met, ruta_libre(out / "metrado.xlsx", avisar), ruta_libre(out / "metrado.csv", avisar))
     avisar("Guardando DXF...")
     exportar.guardar_dxf(ruta_libre(out / "resultado.dxf", avisar), puntos, resultados, met, codigos, alias, orto,

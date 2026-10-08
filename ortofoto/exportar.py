@@ -53,6 +53,9 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
     for nombre, color in ((CAPA_REVISAR, 1), (CAPA_REVISAR_AREA, 1), (CAPA_SIN_PAREJA, 6), (CAPA_ETIQUETAS, 7)):
         _capa(doc, nombre, color, plantilla=tpl)
 
+    # Puntos visibles: circulo con cruz de 25 cm (si no, AutoCAD los dibuja como un punto diminuto)
+    doc.header["$PDMODE"] = 34
+    doc.header["$PDSIZE"] = 0.25
     # Puntos: una capa por codigo, para poder apagarlos y unir a mano
     for p in puntos:
         cod = alias.get(p.codigo, p.codigo) or "SIN-CODIGO"

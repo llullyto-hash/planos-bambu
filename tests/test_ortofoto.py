@@ -259,3 +259,13 @@ def unary(pols):
     from shapely.ops import unary_union
 
     return unary_union(pols)
+
+
+def test_puntos_visibles_en_el_dxf(tmp_path):
+    import ezdxf
+
+    pts = _vereda_por_secciones(n=3)
+    procesar(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s")), avisar=lambda *a: None)
+    doc = ezdxf.readfile(tmp_path / "s" / "resultado.dxf")
+    assert doc.header["$PDMODE"] == 34 and doc.header["$PDSIZE"] == 0.25
+    assert len(doc.modelspace().query('POINT[layer=="PT-VER"]')) == len(pts)

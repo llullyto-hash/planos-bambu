@@ -18,6 +18,12 @@ from shapely.ops import unary_union
 UMBRAL = 3.2  # distancia de Mahalanobis maxima al modelo de concreto
 RADIO_MUESTRA = 0.15  # m alrededor de cada semilla para aprender el color
 TOL_PUNTO = 0.6  # m: un punto de borde mas lejos que esto del contorno detectado se marca
+# Como se ve el concreto expuesto en una ortofoto (L de 0 a 100, croma y textura en unidades Lab)
+L_MIN = 60.0  # mas oscuro que esto es sombra o techo, no concreto a la vista
+CROMA_MAX = 14.0
+TEXTURA_MAX = 6.0
+AREA_MIN_VISIBLE = 15.0  # m2: manchas menores no se proponen
+BLOQUE_VIS = 2048
 
 
 @dataclass
@@ -88,6 +94,9 @@ def detectar_franja(orto, zona, semillas_xy, tam_px=None):
     m = np.vstack(muestras)
     # Modelo robusto: mediana y covarianza de las muestras mas tipicas
     med = np.median(m, 0)
+    if med[0] < L_MIN or med[3] > TEXTURA_MAX:
+        # Donde estan los puntos no se ve concreto (sombra, alero, techo): la foto no ayuda aqui
+        return Polygon()
     d0 = np.abs(m - med).sum(1)
     tipicas = m[d0 <= np.percentile(d0, 70)]
     cov = np.cov(tipicas.T) + np.diag([4.0, 1.0, 1.0, 1.0])
@@ -159,4 +168,66 @@ def veredas_desde_foto(orto, base, puntos_xy, conf, grupos):
                 if es_borde and p.exterior.distance(Point(puntos_xy[i])) > TOL_PUNTO:
                     lejos.append(i)
             res.append(VeredaFoto(p, usados, lejos))
+    return res
+
+
+def concreto_visible(orto, base, puntos_xy, area_min=AREA_MIN_VISIBLE, corredor=5.0, avisar=print):
+    """Todo el concreto expuesto que se ve en la foto en las calles (fuera de las manzanas).
+
+    Claro, sin color fuerte y liso (las calaminas tienen franjas, la tierra es mas coloreada).
+    Solo dentro del corredor levantado (a menos de `corredor` m de algun punto topografico),
+    para no confundir techos claros fuera de la zona de trabajo. Se procesa por bloques.
+    """
+    from shapely import STRtree
+
+    h, w = orto.rgb.shape[:2]
+    tp = orto.tam_pixel
+    margen = 32
+    manzanas = base.union_manzanas() if base is not None else Polygon()
+    pts = [Point(x, y) for x, y in puntos_xy]
+    arbol = STRtree(pts) if pts else None
+    piezas = []
+    bloques = [(f, c) for f in range(0, h, BLOQUE_VIS) for c in range(0, w, BLOQUE_VIS)]
+    for k, (f0, c0) in enumerate(bloques):
+        f1, c1 = min(h, f0 + BLOQUE_VIS), min(w, c0 + BLOQUE_VIS)
+        fa, ca = max(0, f0 - margen), max(0, c0 - margen)
+        fb, cb = min(h, f1 + margen), min(w, c1 + margen)
+        sub = orto.rgb[fa:fb, ca:cb]
+        if sub.size == 0:
+            continue
+        lb = _lab(sub)
+        L = ndi.gaussian_filter(lb[..., 0], 1)
+        C = np.hypot(ndi.gaussian_filter(lb[..., 1], 1), ndi.gaussian_filter(lb[..., 2], 1))
+        v = max(3, int(0.5 / tp) | 1)
+        tex = np.sqrt(np.maximum(ndi.uniform_filter(lb[..., 0] ** 2, v) - ndi.uniform_filter(lb[..., 0], v) ** 2, 0))
+        mask = (L > L_MIN + 8) & (C < CROMA_MAX) & (tex < TEXTURA_MAX)
+        it = max(1, int(round(0.2 / tp)))
+        mask = ndi.binary_opening(mask, iterations=it)
+        mask = ndi.binary_closing(mask, iterations=it + 1)
+        mask[: f0 - fa, :] = False
+        mask[f1 - fa:, :] = False
+        mask[:, : c0 - ca] = False
+        mask[:, c1 - ca:] = False
+        if not mask.any():
+            continue
+        a, b, _, d, e, _ = orto.afin
+        e0, n0 = orto.a_terreno(ca, fa)
+        pol = _vectorizar(mask, [a, b, e0, d, e, n0])
+        if not pol.is_empty:
+            piezas.append(pol)
+        if len(bloques) > 4 and k % 10 == 9:
+            avisar(f"  concreto visible: bloque {k + 1}/{len(bloques)}")
+    if not piezas:
+        return []
+    total = unary_union(piezas).buffer(tp, join_style=2).buffer(-tp, join_style=2)
+    if not manzanas.is_empty:
+        total = total.difference(manzanas.buffer(0.3))
+    res = []
+    for g in getattr(total, "geoms", [total]):
+        if not isinstance(g, Polygon) or g.area < area_min:
+            continue
+        # Dentro del corredor levantado: al menos 3 puntos a menos de `corredor` m
+        if arbol is not None and len(arbol.query(g.buffer(corredor))) < 3:
+            continue
+        res.append(g.simplify(max(tp, 0.05)))
     return res

@@ -413,7 +413,8 @@ def _ajustar_con_foto(res, base, ars_puntos, met):
     for a in ars_puntos:
         cand = [k for k, v in enumerate(vistas) if v.poligono.intersects(a.poligono)]
         if not cand:
-            a.revisar, a.nota = True, "no se ve concreto en la foto"
+            # Bajo alero o en sombra: la foto no muestra esta vereda; queda la forma de los puntos
+            a.nota = "no visible en la foto (alero/sombra): forma de los puntos"
             final.append(a)
             continue
         foto = unary_union([vistas[k].poligono for k in cand]).intersection(a.poligono.buffer(1.0))
@@ -564,6 +565,18 @@ def _unir_sobrantes(res, usados):
     unir._resolver(sub, xy, uniones, res.orto is not None, res.barreras or unir.Barreras(), res.completar)
     res.uniones = [unir.Union(resto[u.i], resto[u.j], u.largo, u.apoyo, u.costo, u.revisar) for u in sub.uniones]
     res.cadenas = [[resto[i] for i in c] for c in sub.cadenas]
+
+
+def agregar_concreto_visible(met, poligonos, conf):
+    """Concreto visto en la foto que no es parte de ninguna area ya armada (se propone para revisar)."""
+    ocupado = unary_union([a.poligono for a in met.areas]) if met.areas else Polygon()
+    for pol in poligonos:
+        resto = pol.difference(ocupado) if not ocupado.is_empty else pol
+        for g in getattr(resto, "geoms", [resto]):
+            if isinstance(g, Polygon) and g.area >= 5.0:
+                met.areas.append(Area("CV", conf, g, "foto", revisar=True,
+                                      nota="concreto visible en la foto, sin puntos: asignar (vereda, pista...)"))
+    _numerar(met)
 
 
 def _numerar(met):
