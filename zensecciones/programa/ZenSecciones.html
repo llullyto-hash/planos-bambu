@@ -1,0 +1,904 @@
+<title>Zen Secciones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: herramienta — calles a la izquierda; a la derecha planta, progresivas, sección grande y fichas de datos */
+:root{
+  --bg:#f3f4f2; --panel:#ffffff; --ink:#1d2226; --muted:#5d666d; --line:#d9ddd9; --soft:#e9ecea;
+  --accent:#d39a00; --accent-ink:#6b4d00; --asphalt:#3b4248;
+  --ok:#2f7d4f; --rev:#c2410c; --int:#2f5fa7; --cruce:#7b4bb0; --sin:#8a9198;
+  --ok-bg:#e3f1e8; --rev-bg:#fbe7dc; --int-bg:#e2eaf6; --cruce-bg:#efe6f8; --sin-bg:#eceeef;
+  --grass:#6aa04a; --concrete:#b9bdb8; --base:#c9a96e; --subbase:#ddc79a; --wall:#8f8a80; --water:#4b8fc9;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#15191c; --panel:#1d2226; --ink:#e7eae8; --muted:#9aa3a9; --line:#323a40; --soft:#262c31;
+  --accent:#f0b81a; --accent-ink:#ffe08a; --asphalt:#8d969c;
+  --ok:#5cc489; --rev:#ff8a52; --int:#7aa5ea; --cruce:#b48ae6; --sin:#7d868d;
+  --ok-bg:#1d3326; --rev-bg:#3a2419; --int-bg:#1d2a3d; --cruce-bg:#2c2238; --sin-bg:#262c31;
+  --grass:#7fb85c; --concrete:#6b746e; --base:#8f7448; --subbase:#6f6045; --wall:#77736b; --water:#6aa9de; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15191c; --panel:#1d2226; --ink:#e7eae8; --muted:#9aa3a9; --line:#323a40; --soft:#262c31;
+  --accent:#f0b81a; --accent-ink:#ffe08a; --asphalt:#8d969c;
+  --ok:#5cc489; --rev:#ff8a52; --int:#7aa5ea; --cruce:#b48ae6; --sin:#7d868d;
+  --ok-bg:#1d3326; --rev-bg:#3a2419; --int-bg:#1d2a3d; --cruce-bg:#2c2238; --sin-bg:#262c31;
+  --grass:#7fb85c; --concrete:#6b746e; --base:#8f7448; --subbase:#6f6045; --wall:#77736b; --water:#6aa9de; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;border-bottom:2px solid var(--ink);padding-bottom:12px}
+h1{font-family:var(--f-display);font-weight:700;font-size:30px;margin:0;line-height:1.05;text-wrap:balance}
+h1 .stripe{display:inline-block;width:28px;height:8px;background:repeating-linear-gradient(90deg,var(--accent) 0 9px,transparent 9px 14px);vertical-align:middle;margin-right:10px;transform:translateY(-3px)}
+.sub{color:var(--muted);font-size:14px;margin-top:4px;max-width:80ch}
+.flow{display:flex;flex-wrap:wrap;gap:6px;font-size:12.5px}
+.flow span{padding:3px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--muted)}
+.flow span b{color:var(--ink);font-family:var(--f-mono);font-weight:500;margin-right:4px}
+.grid{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px}
+.label{font-family:var(--f-display);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.calles{padding:10px;display:flex;flex-direction:column;gap:2px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 10px)}
+@media (max-width:900px){.calles{position:static;flex-direction:row;overflow-x:auto;gap:6px}.calles>.label{display:none}.calle{flex:0 0 auto}}
+.calle{all:unset;cursor:pointer;display:flex;flex-direction:column;padding:8px 10px;border-radius:4px;border-left:3px solid transparent}
+.calle:hover{background:var(--soft)}
+.calle:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.calle.on{background:var(--soft);border-left-color:var(--accent)}
+.calle .n{font-weight:600;font-size:14px}
+.calle .m{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);white-space:normal}
+.main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.sec{padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+h2{font-family:var(--f-display);font-weight:700;font-size:24px;margin:0;line-height:1.1}
+.alt{font-size:13px;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.chip{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.c-ok{color:var(--ok);background:var(--ok-bg)} .c-rev{color:var(--rev);background:var(--rev-bg)}
+.c-int{color:var(--int);background:var(--int-bg)} .c-cruce{color:var(--cruce);background:var(--cruce-bg)} .c-sin{color:var(--sin);background:var(--sin-bg)}
+#planta{width:100%;height:auto;display:block;background:var(--soft);border-radius:4px;max-height:300px}
+.tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:4px;max-height:420px}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:5px 7px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-family:var(--f-display);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--soft);position:sticky;top:0;z-index:1}
+td.l,th.l{text-align:left} td.bl,th.bl{border-left:1px solid var(--line)}
+td.mono{font-family:var(--f-mono);font-size:12.5px}
+tbody tr{cursor:pointer} tbody tr:hover{background:var(--soft)}
+tbody tr.sel{background:var(--soft);box-shadow:inset 3px 0 0 var(--accent)}
+tbody tr.off td{opacity:.45}
+.ed{color:var(--accent-ink);font-weight:600}
+.tag{font-size:11px;font-weight:600;padding:1px 6px;border-radius:3px;background:var(--soft);color:var(--muted);margin-left:4px}
+.tag.on{background:color-mix(in srgb,var(--accent) 22%,var(--panel));color:var(--accent-ink)}
+.svgbox{overflow-x:auto;background:var(--soft);border-radius:4px}
+#seccion{display:block;width:100%;min-width:640px;height:auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}
+.card{border:1px solid var(--line);border-radius:5px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card h3{margin:0;font-family:var(--f-display);font-size:16px;font-weight:600}
+.sides{display:grid;grid-template-columns:minmax(0,1.2fr) 1fr 1fr;gap:5px 8px;align-items:center;font-size:13px}
+.sides .h{font-family:var(--f-display);font-weight:600;text-transform:uppercase;font-size:12px;letter-spacing:.06em;color:var(--muted);text-align:center}
+.sides label,.f2 label{color:var(--muted)}
+.f2{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 8px;font-size:13px}
+.f2 label{display:flex;flex-direction:column;gap:3px}
+input,select,textarea{font:inherit;font-family:var(--f-mono);font-size:13px;width:100%;padding:5px 6px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);min-width:0}
+textarea{min-height:90px;resize:vertical}
+input[type=checkbox]{width:auto}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input.calc{border-style:dashed;color:var(--muted)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;font-weight:600;font-size:13px;padding:6px 11px;border-radius:4px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button.pri{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+button.sm{padding:3px 8px;font-size:12px}
+button:hover{border-color:var(--muted)}
+.note{font-size:12.5px;color:var(--muted)}
+.toast{font-size:12.5px;color:var(--ok);min-height:1em}
+.blist{display:flex;flex-direction:column;gap:6px}
+.bl-row{display:grid;grid-template-columns:1.3fr .8fr .8fr auto;gap:6px;align-items:center}
+.range{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted);padding-top:6px;border-top:1px dashed var(--line)}
+.range input{width:84px}
+details summary{cursor:pointer;font-size:13px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.calle,tbody tr{transition:background .12s}}
+</style>
+<style>
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.step{border:1px solid var(--line);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--panel);min-width:0}
+.step .num{font-family:var(--f-mono);font-size:12px;color:var(--accent-ink);background:color-mix(in srgb,var(--accent) 18%,var(--panel));border-radius:3px;padding:1px 6px;margin-right:6px}
+.step h3{margin:0;font-family:var(--f-display);font-size:18px;font-weight:700}
+.drop{border:1.5px dashed var(--line);border-radius:6px;padding:14px;text-align:center;font-size:13.5px;color:var(--muted);cursor:pointer;display:block}
+.drop:hover,.drop.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,var(--panel))}
+.drop input{display:none}
+.drop b{color:var(--ink)}
+.status{font-size:13px;display:flex;flex-direction:column;gap:3px}
+.status .ok{color:var(--ok)} .status .warn{color:var(--rev)} .status .info{color:var(--muted)}
+.roles{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:5px 8px;align-items:center;font-size:13px}
+.roles label{color:var(--muted)}
+#grBox:not([hidden]),#rasBox:not([hidden]){display:flex}
+.banner{font-size:13.5px;padding:9px 12px;border-radius:5px;background:var(--int-bg);color:var(--int)}
+.banner b{color:inherit}
+</style>
+
+<div class="wrap">
+<header>
+  <div>
+    <h1><span class="stripe"></span>Zen Secciones</h1>
+    <div class="sub">Ingresa la planta de diseño y las secciones del Civil 3D. En cada progresiva se traza una perpendicular al eje y se mide cada elemento por su capa. El ancho sale de la planta; la altura sale de las cotas, dentro del marco de cada sección del Civil.</div>
+  </div>
+  <div class="btns">
+    <button id="pSave">Guardar proyecto</button>
+    <label class="drop" style="padding:6px 11px;font-weight:600;font-size:13px;color:var(--ink)">Abrir proyecto<input type="file" id="pOpen" accept=".json,application/json"></label>
+  </div>
+</header>
+
+<section class="panel sec">
+  <div class="label">Archivos de inicio</div>
+  <div class="steps">
+    <div class="step">
+      <h3><span class="num">1</span>Planta general de diseño</h3>
+      <label class="drop" id="dropP"><input type="file" id="fPlanta" accept=".dxf"><b>Elegir o arrastrar DXF</b><br>Planta con ejes, veredas, sardineles, cunetas y manzanas.</label>
+      <div class="status" id="stP"></div>
+    </div>
+    <div class="step" id="rolesBox" hidden>
+      <h3><span class="num">2</span>Revisar capas</h3>
+      <div class="note">Detecté las capas por su nombre. Corrige la que no corresponda y procesa.</div>
+      <div class="roles" id="roles"></div>
+      <div class="f2"><label>Intervalo (m)<input id="iStep" type="number" value="20" step="5" min="5"></label><label>Medir hasta (m)<input id="iHalf" type="number" value="14" step="1" min="5"></label><label>&nbsp;<button class="pri" id="bProc">Procesar planta</button></label></div>
+    </div>
+    <div class="step">
+      <h3><span class="num">3</span>Secciones del Civil 3D</h3>
+      <label class="drop" id="dropS"><input type="file" id="fSecc" accept=".dxf"><b>Elegir o arrastrar DXF</b><br>Secciones exportadas a AutoCAD (Salida → Exportar a AutoCAD), con su título de progresiva y cotas.</label>
+      <div class="status" id="stS"></div>
+      <div id="grBox" hidden style="flex-direction:column;gap:8px;border-top:1px dashed var(--line);padding-top:10px">
+        <div class="note">Cada grupo de secciones y su calle:</div>
+        <div class="roles" id="grupos"></div>
+        <div class="btns"><button class="pri" id="grBtn">Volver a aplicar marcos</button></div>
+      </div>
+      <div id="rasBox" hidden style="flex-direction:column;gap:8px;border-top:1px dashed var(--line);padding-top:10px">
+        <div class="note" style="color:var(--ink)">Capas del pavimento (corredor) en las secciones. Se toma la línea más alta que cruza el eje:</div><div id="rasLy" style="display:flex;flex-direction:column;gap:4px;font-size:13px"></div>
+        <div class="btns"><button class="pri" id="rasBtn">Volver a copiar cota de rasante</button></div>
+        <div class="note">Copia la cota de la rasante en el eje y en los bordes de calzada de todas las calles con marco. Lo que hayas escrito a mano no se toca.</div>
+      </div>
+      <div class="status" id="stS2"></div>
+    </div>
+  </div>
+  <div class="banner" id="banner"></div>
+</section>
+
+<div class="grid">
+  <nav class="panel calles" id="calles" aria-label="Calles"><div class="label" style="padding:4px 10px 8px">Calles</div></nav>
+  <div class="main">
+    <section class="panel sec">
+      <div class="row">
+        <div><h2 id="cName"></h2><div class="alt" id="cAlt"></div></div>
+        <div class="btns"><button class="sm" id="bInv">Invertir sentido</button><button class="sm" id="bRen">Renombrar</button></div>
+      </div>
+      <div class="legend"><span><i style="background:var(--ok)"></i>OK</span><span><i style="background:var(--int)"></i>Intersección</span><span><i style="background:var(--cruce)"></i>Cuneta tapada</span><span><i style="background:var(--rev)"></i>Revisar</span><span><i style="background:var(--sin)"></i>Sin elementos</span><span><i style="background:transparent;border:2px solid var(--muted)"></i>No se genera</span></div>
+      <svg id="planta" viewBox="0 0 1000 300" role="img" aria-label="Planta del eje con progresivas"></svg>
+    </section>
+
+    <section class="panel sec">
+      <div class="row"><div class="label">Progresivas (clic para editar)</div><span class="note" id="genCount"></span></div>
+      <div class="tbl-wrap"><table id="tbl"></table></div>
+    </section>
+
+    <section class="panel sec">
+      <div class="row"><div class="label" id="secTitle">Sección</div>
+        <div class="btns"><label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="gen"> Generar esta sección</label>
+        <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="verCiv" checked> Ver corredor del Civil</label>
+        <label class="note" style="display:flex;gap:6px;align-items:center">Escala vertical <select id="exag" style="width:auto"><option value="1" selected>×1</option><option value="2">×2</option><option value="5">×5</option><option value="10">×10</option></select></label></div></div>
+      <div class="svgbox"><svg id="seccion" viewBox="0 0 1000 380" role="img" aria-label="Sección transversal"></svg></div>
+      <div class="cards">
+        <div class="card"><h3>Anchos leídos de la planta</h3><div class="sides" id="anchos"></div>
+          <div class="range">Copiar anchos a <input id="aDe" placeholder="0+000"> – <input id="aHa" placeholder="0+100"><button class="sm" id="aCopy">Copiar</button></div></div>
+        <div class="card"><h3>Cotas de esta progresiva</h3><div class="note">Primero la cota del eje (se copia de la rasante del Civil, en azul); luego bordes, vereda, cuneta y muro. Lo que dejes vacío se calcula.</div><div class="sides" id="cotas"></div>
+          <div class="note">Casilla punteada = valor calculado. Si das corona y base del muro, la altura sale sola.</div></div>
+        <div class="card"><h3>Muro de contención</h3><div id="muro"></div></div>
+        <div class="card"><h3>Bloques</h3><div class="blist" id="bloques"></div>
+          <div class="btns"><button class="sm" id="bAdd">Agregar bloque</button></div>
+          <div class="range">Copiar bloques a <input id="bDe" placeholder="0+000"> – <input id="bHa" placeholder="0+100"><button class="sm" id="bCopy">Copiar</button></div></div>
+      </div>
+      <div class="toast" id="toast" role="status"></div>
+    </section>
+
+    <section class="panel sec">
+      <div class="label">Datos de la calle</div>
+      <div class="cards">
+        <div class="card"><h3>Sección típica (rellena lo que no tenga cota)</h3>
+          <div class="f2">
+            <label>Bombeo %<input id="t-bomb" type="number" step="0.5"></label>
+            <label>Alt. vereda (m)<input id="t-hv" type="number" step="0.01"></label>
+            <label>Prof. cuneta (m)<input id="t-prof" type="number" step="0.01"></label>
+            <label>Pared cuneta (m)<input id="t-tc" type="number" step="0.01"></label>
+            <label>Esp. vereda (m)<input id="t-ev" type="number" step="0.01"></label>
+            <label>Uña sardinel (m)<input id="t-us" type="number" step="0.01"></label>
+          </div></div>
+        <div class="card"><h3>Pavimento</h3>
+          <div class="f2">
+            <label>Tipo<select id="p-tipo"><option value="rigido">Rígido (losa)</option><option value="flexible">Flexible (carpeta)</option><option value="adoquin">Adoquinado</option></select></label>
+            <label id="p-l1">Losa (m)<input id="p-e1" type="number" step="0.01"></label>
+            <label>Base (m)<input id="p-e2" type="number" step="0.01"></label>
+            <label>Sub-base (m)<input id="p-e3" type="number" step="0.01"></label>
+          </div>
+          <div class="note">La línea inferior del paquete sale como capa SEC-SUBRASANTE, la que usa el programa de cortes y rellenos.</div></div>
+        <div class="card"><h3>Pegar cotas desde Excel</h3>
+          <div class="note">Columnas: Progresiva · Eje · Borde izq · Borde der · Vereda izq · Vereda der · Fondo cun. izq · Fondo cun. der · Corona muro izq · Corona muro der · Base muro izq · Base muro der.</div>
+          <textarea id="paste" placeholder="0+020&#9;152.350&#9;152.290&#9;152.280&#9;152.460&#9;152.450"></textarea>
+          <div class="btns"><button class="sm" id="pasteBtn">Cargar cotas</button></div></div>
+      </div>
+    </section>
+
+    <section class="panel sec">
+      <div class="label">Exportar</div>
+      <div class="btns">
+        <button class="pri" id="xTodo">Todas las calles (DXF)</button>
+        <button id="xCalle">Solo esta calle (DXF)</button>
+        <button id="xCsv">Tabla de anchos y cotas (CSV)</button>
+      </div>
+      <div class="note" id="xNote"></div>
+      <div class="toast" id="xMsg" role="status"></div>
+    </section>
+  </div>
+</div>
+</div>
+
+<script>
+const EJEMPLO=[{"id":0,"name":"PSJE. SAN JOSÉ","alt":[],"L":101.75,"calzTip":null,"axis":[[499517.4,9187329.9],[499597.0,9187266.5]],"sts":[{"st":0,"x":499517.4,"y":9187329.9,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":20,"x":499533.0,"y":9187317.4,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":40,"x":499548.7,"y":9187305.0,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":60,"x":499564.3,"y":9187292.5,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":80,"x":499579.9,"y":9187280.0,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":100,"x":499595.6,"y":9187267.6,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":101.75,"x":499596.9,"y":9187266.5,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"}],"tramos":[{"s":"sin","ini":0,"fin":101.75,"n":7,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"}]},{"id":1,"name":"CA. MARACANÁ","alt":["CA. BELEN"],"L":570.0,"calzTip":3.6,"axis":[[499582.4,9187426.0],[499649.3,9187379.8],[499652.4,9187377.2],[499655.3,9187374.5],[499658.0,9187371.5],[499660.5,9187368.4],[499662.8,9187365.1],[499664.8,9187361.7],[499666.7,9187358.2],[499668.2,9187354.5],[499674.6,9187337.7],[499676.2,9187334.0],[499678.0,9187330.4],[499680.0,9187326.9],[499682.2,9187323.5],[499684.5,9187320.2],[499687.0,9187317.0],[499689.7,9187314.0],[499692.5,9187311.1],[499695.4,9187308.3],[499698.5,9187305.7],[499701.7,9187303.3],[499705.0,9187301.0],[499708.5,9187298.9],[499816.8,9187236.2],[499820.4,9187234.3],[499824.1,9187232.6],[499827.8,9187231.0],[499831.5,9187229.5],[499893.6,9187207.5],[499897.5,9187206.1],[499901.4,9187204.5],[500059.2,9187139.3]],"sts":[{"st":0,"x":499582.4,"y":9187426.0,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2},"R":null,"s":"rev","m":"lado der sin elementos"},{"st":20,"x":499598.9,"y":9187414.7,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":4.76},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":5.72},"s":"ok","m":""},{"st":40,"x":499615.4,"y":9187403.3,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":10.26},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":5.54},"s":"ok","m":""},{"st":60,"x":499631.8,"y":9187392.0,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":10.97},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":5.5},"s":"ok","m":""},{"st":80,"x":499648.3,"y":9187380.6,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":10.96},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":5.15},"s":"ok","m":""},{"st":100,"x":499662.0,"y":9187366.2,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":10.17},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":6.06},"s":"ok","m":""},{"st":120,"x":499670.6,"y":9187348.2,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2},"R":null,"s":"int","m":"Martillo / intersección"},{"st":140,"x":499678.4,"y":9187329.8,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":5.73},"R":null,"s":"rev","m":"lado der sin elementos"},{"st":160,"x":499690.0,"y":9187313.6,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.5,"ver":1.7,"lim":5.89},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.7,"ver":1.5,"lim":5.9},"s":"ok","m":""},{"st":180,"x":499705.3,"y":9187300.8,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.85,"lim":5.79},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.2,"ver":1.5,"lim":7.49},"s":"ok","m":""},{"st":200,"x":499722.6,"y":9187290.7,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.8,"lim":5.74},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.8,"lim":8.2},"s":"ok","m":""},{"st":220,"x":499739.9,"y":9187280.7,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.8},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.8,"lim":8.55},"s":"ok","m":""},{"st":240,"x":499757.2,"y":9187270.7,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.8,"lim":7.9},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.8,"lim":8.54},"s":"ok","m":""},{"st":260,"x":499774.5,"y":9187260.6,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.8,"lim":8.7},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.8,"lim":8.22},"s":"ok","m":""},{"st":280,"x":499791.8,"y":9187250.6,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.95,"ver":1.8,"lim":9.54},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.95,"ver":1.8,"lim":8.06},"s":"ok","m":""},{"st":300,"x":499809.1,"y":9187240.6,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.95,"ver":1.8,"lim":10.68},"R":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"s":"cruce","m":"Cuneta cerrada / tapada"},{"st":320,"x":499826.8,"y":9187231.4,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.95,"ver":1.8,"lim":10.93},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8,"lim":7.34},"s":"ok","m":""},{"st":340,"x":499845.6,"y":9187224.5,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8,"lim":10.25},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8,"lim":9.32},"s":"ok","m":""},{"st":360,"x":499864.5,"y":9187217.8,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8,"lim":10.3},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8,"lim":11.5},"s":"ok","m":""},{"st":380,"x":499883.3,"y":9187211.2,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8,"lim":9.19},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8,"lim":13.69},"s":"ok","m":""},{"st":400,"x":499902.1,"y":9187204.2,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8,"lim":10.5},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8},"s":"ok","m":""},{"st":420,"x":499920.6,"y":9187196.6,"L":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"s":"cruce","m":"Cuneta cerrada / tapada"},{"st":440,"x":499939.1,"y":9187189.0,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.95,"ver":1.8,"lim":6.23},"s":"ok","m":""},{"st":460,"x":499957.5,"y":9187181.3,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.95,"ver":1.8,"lim":7.86},"s":"ok","m":""},{"st":480,"x":499976.0,"y":9187173.7,"L":{"calz":3.6,"cun":"abierta","cunA":10.35,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0},"s":"cruce","m":"Cuneta cerrada / tapada"},{"st":500,"x":499994.5,"y":9187166.0,"L":{"calz":3.6,"cun":"abierta","cunA":10.35,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"abierta","cunA":0.55,"sar":0,"fr":2.05,"ver":1.8,"lim":9.14},"s":"rev","m":"cuneta izq 10.35 m: lectura dudosa"},{"st":520,"x":500013.0,"y":9187158.4,"L":{"calz":3.6,"cun":"abierta","cunA":10.35,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"abierta","cunA":0.55,"sar":0,"fr":2.05,"ver":1.8,"lim":9.65},"s":"rev","m":"cuneta izq 10.35 m: lectura dudosa"},{"st":540,"x":500031.5,"y":9187150.8,"L":{"calz":3.6,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":7.5},"R":{"calz":3.6,"cun":"abierta","cunA":0.55,"sar":0,"fr":2.05,"ver":1.8,"lim":10.15},"s":"int","m":"Martillo / intersección"},{"st":560,"x":500050.0,"y":9187143.1,"L":null,"R":{"calz":3.6,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":3.7,"lim":12.25},"s":"int","m":"Martillo / intersección"},{"st":570.0,"x":500059.2,"y":9187139.3,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"}],"tramos":[{"s":"rev","ini":0,"fin":0,"n":1,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2},"R":null,"m":"lado der sin elementos"},{"s":"ok","ini":20,"fin":100,"n":5,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":4.76},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":5.72},"m":""},{"s":"int","ini":120,"fin":120,"n":1,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2},"R":null,"m":"Martillo / intersección"},{"s":"rev","ini":140,"fin":140,"n":1,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0,"ver":1.2,"lim":5.73},"R":null,"m":"lado der sin elementos"},{"s":"ok","ini":160,"fin":160,"n":1,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.5,"ver":1.7,"lim":5.89},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.7,"ver":1.5,"lim":5.9},"m":""},{"s":"ok","ini":180,"fin":180,"n":1,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.85,"lim":5.79},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.2,"ver":1.5,"lim":7.49},"m":""},{"s":"ok","ini":200,"fin":260,"n":4,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.8,"lim":5.74},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":2.45,"ver":1.8,"lim":8.2},"m":""},{"s":"ok","ini":280,"fin":280,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.95,"ver":1.8,"lim":9.54},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.95,"ver":1.8,"lim":8.06},"m":""},{"s":"cruce","ini":300,"fin":300,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.95,"ver":1.8,"lim":10.68},"R":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"m":"Cuneta cerrada / tapada"},{"s":"ok","ini":320,"fin":320,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.95,"ver":1.8,"lim":10.93},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8,"lim":7.34},"m":""},{"s":"ok","ini":340,"fin":400,"n":4,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8,"lim":10.25},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8,"lim":9.32},"m":""},{"s":"cruce","ini":420,"fin":420,"n":1,"L":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"m":"Cuneta cerrada / tapada"},{"s":"ok","ini":440,"fin":460,"n":2,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":1.85,"ver":1.8},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.95,"ver":1.8,"lim":6.23},"m":""},{"s":"cruce","ini":480,"fin":480,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":10.35,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0},"m":"Cuneta cerrada / tapada"},{"s":"rev","ini":500,"fin":500,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":10.35,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"abierta","cunA":0.55,"sar":0,"fr":2.05,"ver":1.8,"lim":9.14},"m":"cuneta izq 10.35 m: lectura dudosa"},{"s":"rev","ini":520,"fin":520,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":10.35,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"abierta","cunA":0.55,"sar":0,"fr":2.05,"ver":1.8,"lim":9.65},"m":"cuneta izq 10.35 m: lectura dudosa"},{"s":"int","ini":540,"fin":560,"n":2,"L":{"calz":3.6,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":7.5},"R":{"calz":3.6,"cun":"abierta","cunA":0.55,"sar":0,"fr":2.05,"ver":1.8,"lim":10.15},"m":"Martillo / intersección"},{"s":"sin","ini":570.0,"fin":570.0,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"}]},{"id":2,"name":"CA. PRIMAVERA","alt":[],"L":405.69,"calzTip":4.0,"axis":[[499716.8,9187558.3],[499727.3,9187519.4],[499728.3,9187515.4],[499729.1,9187511.5],[499729.9,9187507.5],[499738.8,9187456.9],[499739.7,9187453.1],[499740.8,9187449.2],[499742.0,9187445.4],[499743.3,9187441.6],[499744.8,9187437.9],[499746.5,9187434.3],[499748.3,9187430.7],[499750.2,9187427.2],[499752.3,9187423.8],[499754.5,9187420.4],[499756.8,9187417.2],[499759.3,9187414.0],[499761.9,9187411.0],[499764.6,9187408.0],[499767.4,9187405.2],[499770.3,9187402.5],[499773.4,9187399.9],[499805.3,9187374.8],[499808.5,9187372.3],[499811.7,9187369.9],[499815.0,9187367.6],[499854.3,9187340.8],[499857.6,9187338.5],[499860.8,9187336.2],[499864.0,9187333.8],[499867.2,9187331.3],[499870.3,9187328.8],[499957.8,9187256.3]],"sts":[{"st":0,"x":499716.8,"y":9187558.3,"L":{"calz":4.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.5,"lim":6.35},"R":null,"s":"rev","m":"lado der sin elementos"},{"st":20,"x":499722.1,"y":9187539.0,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":5.87},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5},"s":"ok","m":""},{"st":40,"x":499727.3,"y":9187519.7,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":5.78},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5},"s":"ok","m":""},{"st":60,"x":499731.2,"y":9187500.1,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":6.04},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":4.71},"s":"ok","m":""},{"st":80,"x":499734.7,"y":9187480.4,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":5.21},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":6.24},"s":"ok","m":""},{"st":100,"x":499738.1,"y":9187460.7,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":4.78},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":6.41},"s":"ok","m":""},{"st":120,"x":499743.4,"y":9187441.4,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":6.5},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":8.58},"s":"ok","m":""},{"st":140,"x":499752.4,"y":9187423.6,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":13.77},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":8.26},"s":"ok","m":""},{"st":160,"x":499764.7,"y":9187407.9,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":13.13},"R":null,"s":"int","m":"Martillo / intersección"},{"st":180,"x":499779.8,"y":9187394.8,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":7.71},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":9.94},"s":"ok","m":""},{"st":200,"x":499795.5,"y":9187382.5,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":7.72},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":9.48},"s":"ok","m":""},{"st":220,"x":499811.3,"y":9187370.2,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":7.37},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":8.8},"s":"ok","m":""},{"st":240,"x":499827.8,"y":9187358.9,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":6.5},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":8.51},"s":"ok","m":""},{"st":260,"x":499844.3,"y":9187347.6,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":7.46},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":8.35},"s":"ok","m":""},{"st":280,"x":499860.7,"y":9187336.2,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":8.09},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":8.06},"s":"ok","m":""},{"st":300,"x":499876.4,"y":9187323.7,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":320,"x":499891.8,"y":9187311.0,"L":{"calz":4.0,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":1.1},"R":{"calz":4.0,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":1.1,"lim":6.3},"s":"cruce","m":"Cuneta cerrada / tapada"},{"st":340,"x":499907.2,"y":9187298.2,"L":{"calz":4.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.5},"R":{"calz":4.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.5,"lim":5.63},"s":"ok","m":""},{"st":360,"x":499922.6,"y":9187285.5,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":10.91},"s":"ok","m":""},{"st":380,"x":499938.0,"y":9187272.7,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":8.32},"s":"ok","m":""},{"st":400,"x":499953.4,"y":9187259.9,"L":null,"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":5.74},"s":"int","m":"Martillo / intersección"},{"st":405.69,"x":499957.8,"y":9187256.3,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"}],"tramos":[{"s":"rev","ini":0,"fin":0,"n":1,"L":{"calz":4.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.5,"lim":6.35},"R":null,"m":"lado der sin elementos"},{"s":"ok","ini":20,"fin":140,"n":7,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":5.87},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5},"m":""},{"s":"int","ini":160,"fin":160,"n":1,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":13.13},"R":null,"m":"Martillo / intersección"},{"s":"ok","ini":180,"fin":280,"n":6,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":7.71},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":9.94},"m":""},{"s":"sin","ini":300,"fin":300,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"s":"cruce","ini":320,"fin":320,"n":1,"L":{"calz":4.0,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":1.1},"R":{"calz":4.0,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":1.1,"lim":6.3},"m":"Cuneta cerrada / tapada"},{"s":"ok","ini":340,"fin":340,"n":1,"L":{"calz":4.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.5},"R":{"calz":4.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.5,"lim":5.63},"m":""},{"s":"ok","ini":360,"fin":380,"n":2,"L":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5},"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":10.91},"m":""},{"s":"int","ini":400,"fin":400,"n":1,"L":null,"R":{"calz":4.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.5,"ver":1.5,"lim":5.74},"m":"Martillo / intersección"},{"s":"sin","ini":405.69,"fin":405.69,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"}]},{"id":3,"name":"CA. 24 DE DICIEMBRE","alt":[],"L":530.23,"calzTip":3.0,"axis":[[499844.7,9187796.9],[499865.5,9187763.3],[499868.8,9187760.8],[499872.5,9187759.3],[499876.6,9187758.9],[499889.2,9187759.9],[499893.2,9187759.0],[499896.8,9187757.1],[499899.7,9187754.4],[499917.9,9187731.8],[499920.1,9187728.4],[499922.0,9187724.8],[499971.2,9187611.2],[499972.7,9187607.4],[499974.1,9187603.7],[499975.4,9187599.9],[499976.6,9187596.1],[499977.7,9187592.3],[499978.7,9187588.4],[499979.6,9187584.5],[499980.4,9187580.6],[499981.1,9187576.6],[499981.7,9187572.7],[499982.1,9187568.7],[499982.5,9187564.7],[499982.8,9187560.7],[499982.9,9187556.7],[499983.0,9187552.7],[499982.9,9187548.7],[499982.8,9187544.7],[499982.5,9187540.7],[499982.1,9187536.8],[499981.6,9187532.8],[499981.0,9187528.8],[499980.3,9187524.9],[499979.5,9187521.0],[499978.6,9187517.1],[499977.6,9187513.2],[499976.5,9187509.4],[499975.3,9187505.6],[499959.8,9187462.3],[499958.7,9187458.4],[499958.1,9187454.5],[499958.1,9187450.5],[499958.6,9187446.5],[499959.6,9187442.6],[499967.5,9187425.2],[499969.5,9187421.6],[499972.0,9187418.4],[499974.8,9187415.5],[499978.1,9187413.0],[500049.5,9187370.5],[500049.5,9187370.5]],"sts":[{"st":0,"x":499844.6,"y":9187796.9,"L":{"calz":2.7,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.55,"ver":0.6,"lim":6.44},"s":"int","m":"Martillo / intersección"},{"st":20,"x":499855.0,"y":9187779.8,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":3.6},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.55,"ver":0.6,"lim":3.52},"s":"ok","m":""},{"st":40,"x":499865.9,"y":9187763.0,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":4.75},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.55,"ver":0.6,"lim":3.53},"s":"ok","m":""},{"st":60,"x":499884.8,"y":9187759.6,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15},"R":{"calz":2.7,"cun":"cerrada","cunA":0.7,"sar":0.15,"fr":0,"ver":0,"lim":8.66},"s":"cruce","m":"Cuneta cerrada / tapada"},{"st":80,"x":499901.8,"y":9187751.8,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":3.58},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":4.22},"s":"ok","m":""},{"st":100,"x":499914.4,"y":9187736.2,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":4.39},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":4.6},"s":"ok","m":""},{"st":120,"x":499924.5,"y":9187719.1,"L":{"calz":3.0,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0,"lim":6.64},"R":{"calz":3.0,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0,"lim":6.36},"s":"int","m":"Martillo / intersección"},{"st":140,"x":499932.5,"y":9187700.7,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.89},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.31},"s":"ok","m":""},{"st":160,"x":499940.4,"y":9187682.4,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":7.06},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.47},"s":"ok","m":""},{"st":180,"x":499948.4,"y":9187664.0,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":7.2},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":7.33},"s":"ok","m":""},{"st":200,"x":499956.3,"y":9187645.7,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":7.34},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":7.94},"s":"ok","m":""},{"st":220,"x":499964.2,"y":9187627.3,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":7.48},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.81},"s":"ok","m":""},{"st":240,"x":499972.1,"y":9187608.9,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":5.49},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""},{"st":260,"x":499978.3,"y":9187589.9,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.13},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""},{"st":280,"x":499982.0,"y":9187570.3,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.39},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""},{"st":300,"x":499982.9,"y":9187550.3,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""},{"st":320,"x":499981.3,"y":9187530.4,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""},{"st":340,"x":499977.0,"y":9187510.9,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""},{"st":360,"x":499970.5,"y":9187492.0,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""},{"st":380,"x":499963.7,"y":9187473.2,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""},{"st":400,"x":499958.1,"y":9187454.0,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""},{"st":420,"x":499963.0,"y":9187434.9,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":440,"x":499972.7,"y":9187417.6,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.6,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5},"s":"ok","m":""},{"st":460,"x":499989.2,"y":9187406.4,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5},"s":"ok","m":""},{"st":480,"x":500006.4,"y":9187396.1,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5},"s":"ok","m":""},{"st":500,"x":500023.6,"y":9187385.9,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5},"s":"ok","m":""},{"st":520,"x":500040.7,"y":9187375.7,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":10.75,"cun":"abierta","cunA":1.05,"sar":0,"fr":0,"ver":0},"s":"int","m":"Martillo / intersección"},{"st":530.23,"x":500049.5,"y":9187370.5,"L":{"calz":3.0,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0},"R":{"calz":10.7,"cun":"abierta","cunA":1.0,"sar":0,"fr":0,"ver":1.45},"s":"int","m":"Martillo / intersección"}],"tramos":[{"s":"int","ini":0,"fin":0,"n":1,"L":{"calz":2.7,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.55,"ver":0.6,"lim":6.44},"m":"Martillo / intersección"},{"s":"ok","ini":20,"fin":40,"n":2,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":3.6},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.55,"ver":0.6,"lim":3.52},"m":""},{"s":"cruce","ini":60,"fin":60,"n":1,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15},"R":{"calz":2.7,"cun":"cerrada","cunA":0.7,"sar":0.15,"fr":0,"ver":0,"lim":8.66},"m":"Cuneta cerrada / tapada"},{"s":"ok","ini":80,"fin":100,"n":2,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":3.58},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":4.22},"m":""},{"s":"int","ini":120,"fin":120,"n":1,"L":{"calz":3.0,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0,"lim":6.64},"R":{"calz":3.0,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0,"lim":6.36},"m":"Martillo / intersección"},{"s":"ok","ini":140,"fin":400,"n":14,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.89},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.31},"m":""},{"s":"sin","ini":420,"fin":420,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"s":"ok","ini":440,"fin":440,"n":1,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.6,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5},"m":""},{"s":"ok","ini":460,"fin":500,"n":3,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":3.0,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5},"m":""},{"s":"int","ini":520,"fin":530.23,"n":2,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"R":{"calz":10.75,"cun":"abierta","cunA":1.05,"sar":0,"fr":0,"ver":0},"m":"Martillo / intersección"}]},{"id":4,"name":"CA. PALESTINA","alt":["JR. SAN JUAN"],"L":1025.37,"calzTip":3.6,"axis":[[499799.7,9187066.2],[499813.4,9187090.0],[499815.7,9187093.3],[499818.2,9187096.5],[499821.0,9187099.4],[499823.9,9187102.2],[499881.0,9187148.0],[499884.1,9187150.6],[499887.1,9187153.3],[499889.9,9187156.1],[499892.7,9187159.1],[499895.3,9187162.1],[499897.8,9187165.2],[499960.5,9187253.9],[499962.5,9187257.3],[499964.2,9187261.0],[499965.3,9187264.9],[499965.9,9187268.9],[499965.9,9187272.9],[499965.4,9187276.9],[499963.1,9187286.6],[499962.5,9187290.5],[499962.2,9187294.6],[499962.3,9187298.6],[499962.7,9187302.5],[499963.5,9187306.5],[499964.7,9187310.3],[499966.2,9187314.0],[499968.0,9187317.6],[499970.1,9187321.0],[499972.5,9187324.2],[499975.2,9187327.2],[499978.2,9187329.9],[499981.4,9187332.3],[500012.3,9187350.8],[500015.8,9187352.7],[500019.3,9187354.6],[500022.8,9187356.4],[500026.5,9187358.2],[500030.1,9187359.8],[500033.8,9187361.3],[500037.5,9187362.8],[500041.3,9187364.2],[500045.1,9187365.4],[500048.9,9187366.6],[500052.8,9187367.6],[500056.7,9187368.6],[500060.5,9187369.5],[500064.5,9187370.3],[500068.4,9187370.9],[500072.4,9187371.5],[500076.3,9187372.0],[500080.3,9187372.4],[500084.3,9187372.7],[500088.3,9187372.8],[500092.3,9187372.9],[500096.3,9187372.9],[500100.3,9187372.8],[500104.3,9187372.6],[500108.3,9187372.2],[500112.3,9187371.8],[500116.2,9187371.3],[500120.2,9187370.7],[500124.1,9187370.0],[500128.0,9187369.2],[500131.9,9187368.3],[500135.8,9187367.3],[500139.7,9187366.2],[500318.3,9187308.8],[500322.2,9187307.7],[500326.1,9187306.8],[500330.1,9187306.0],[500334.0,9187305.5],[500338.0,9187305.2],[500342.0,9187305.1],[500346.1,9187305.2],[500350.1,9187305.5],[500354.0,9187305.9],[500358.0,9187306.6],[500361.9,9187307.5],[500365.8,9187308.6],[500369.6,9187309.9],[500499.7,9187358.0],[500503.3,9187359.6],[500506.9,9187361.3],[500510.4,9187363.2],[500513.9,9187365.3],[500544.6,9187386.4],[500548.0,9187388.6],[500551.5,9187390.6],[500555.1,9187392.4],[500558.9,9187394.0],[500562.7,9187395.4],[500566.6,9187396.5],[500570.5,9187397.4],[500574.5,9187398.1],[500578.5,9187398.6],[500631.7,9187402.2]],"sts":[{"st":0,"x":499799.7,"y":9187066.2,"L":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0,"lim":6.29},"R":null,"s":"int","m":"Martillo / intersección"},{"st":20,"x":499809.6,"y":9187083.6,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":8.61},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":5.44},"s":"ok","m":""},{"st":40,"x":499821.3,"y":9187099.8,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":7.92},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":8.13},"s":"ok","m":""},{"st":60,"x":499836.7,"y":9187112.5,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":7.5},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":8.8},"s":"ok","m":""},{"st":80,"x":499852.3,"y":9187125.0,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":8.08},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":13.75},"s":"ok","m":""},{"st":100,"x":499867.9,"y":9187137.5,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":8.68},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5},"s":"ok","m":""},{"st":120,"x":499883.5,"y":9187150.0,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":11.16},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5},"s":"ok","m":""},{"st":140,"x":499897.2,"y":9187164.5,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":12.24},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5},"s":"ok","m":""},{"st":160,"x":499908.8,"y":9187180.8,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":10.69},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5},"s":"ok","m":""},{"st":180,"x":499920.4,"y":9187197.1,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":200,"x":499931.9,"y":9187213.5,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":8.11},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5},"s":"ok","m":""},{"st":220,"x":499943.5,"y":9187229.8,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":8.06},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5},"s":"ok","m":""},{"st":240,"x":499955.0,"y":9187246.1,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":8.01},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5},"s":"ok","m":""},{"st":260,"x":499964.9,"y":9187263.4,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":280,"x":499963.9,"y":9187283.1,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":300,"x":499962.8,"y":9187302.9,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":320,"x":499970.3,"y":9187321.2,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":340,"x":499984.9,"y":9187334.6,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":360,"x":500002.2,"y":9187344.8,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":380,"x":500019.5,"y":9187354.7,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":400,"x":500037.7,"y":9187362.9,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":6.55,"ver":2.4},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5},"s":"ok","m":""},{"st":420,"x":500056.9,"y":9187368.7,"L":{"calz":3.65,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5},"s":"int","m":"Martillo / intersección"},{"st":440,"x":500076.6,"y":9187372.0,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":460,"x":500096.5,"y":9187372.9,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":480,"x":500116.5,"y":9187371.3,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":500,"x":500136.0,"y":9187367.2,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":520,"x":500155.1,"y":9187361.2,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":9.36},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":540,"x":500174.2,"y":9187355.1,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":8.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":560,"x":500193.2,"y":9187349.0,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":7.84},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":580,"x":500212.2,"y":9187342.9,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":7.27},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":600,"x":500231.3,"y":9187336.7,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":6.72},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":620,"x":500250.3,"y":9187330.6,"L":null,"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"rev","m":"lado izq sin elementos"},{"st":640,"x":500269.4,"y":9187324.5,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":6.86},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":660,"x":500288.4,"y":9187318.4,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":7.29},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":680,"x":500307.4,"y":9187312.3,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":8.03},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":700,"x":500326.6,"y":9187306.6,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":10.51},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":720,"x":500346.5,"y":9187305.2,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":9.04},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"s":"ok","m":""},{"st":740,"x":500366.2,"y":9187308.7,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":8.22},"R":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"s":"cruce","m":"Cuneta cerrada / tapada"},{"st":760,"x":500384.9,"y":9187315.5,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.01},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.85,"ver":1.5,"lim":6.6},"s":"ok","m":""},{"st":780,"x":500403.7,"y":9187322.5,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":6.53},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.85,"ver":1.5,"lim":6.59},"s":"ok","m":""},{"st":800,"x":500422.5,"y":9187329.4,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.85},"R":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"s":"int","m":"Martillo / intersección"},{"st":820,"x":500441.2,"y":9187336.3,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.93},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.85,"ver":1.5,"lim":7.39},"s":"ok","m":""},{"st":840,"x":500460.0,"y":9187343.3,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.55},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.8},"s":"ok","m":""},{"st":860,"x":500478.8,"y":9187350.2,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.28},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":8.2},"s":"ok","m":""},{"st":880,"x":500497.5,"y":9187357.1,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":8.86},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":6.97},"s":"ok","m":""},{"st":900,"x":500515.3,"y":9187366.2,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":9.21},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":7.98},"s":"ok","m":""},{"st":920,"x":500531.8,"y":9187377.6,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":8.99},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":8.32},"s":"ok","m":""},{"st":940,"x":500548.3,"y":9187388.8,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":8.74},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":8.74},"s":"ok","m":""},{"st":960,"x":500566.7,"y":9187396.5,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":7.89},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":6.7},"s":"ok","m":""},{"st":980,"x":500586.5,"y":9187399.1,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":7.29},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":8.0},"s":"ok","m":""},{"st":1000,"x":500606.4,"y":9187400.5,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":7.99},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":7.74},"s":"ok","m":""},{"st":1020,"x":500626.4,"y":9187401.8,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":8.05},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.88},"s":"ok","m":""},{"st":1025.37,"x":500631.7,"y":9187402.2,"L":{"calz":3.6,"cun":"abierta","cunA":1.4,"sar":0,"fr":0,"ver":1.7,"lim":7.98},"R":{"calz":3.6,"cun":"abierta","cunA":0.9,"sar":0,"fr":0,"ver":0},"s":"rev","m":"cuneta izq 1.40 m: lectura dudosa"}],"tramos":[{"s":"int","ini":0,"fin":0,"n":1,"L":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0,"lim":6.29},"R":null,"m":"Martillo / intersección"},{"s":"ok","ini":20,"fin":160,"n":8,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":8.61},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":5.44},"m":""},{"s":"sin","ini":180,"fin":180,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"s":"ok","ini":200,"fin":240,"n":3,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":8.11},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5},"m":""},{"s":"sin","ini":260,"fin":260,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"s":"ok","ini":280,"fin":380,"n":6,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"m":""},{"s":"ok","ini":400,"fin":400,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":6.55,"ver":2.4},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5},"m":""},{"s":"int","ini":420,"fin":420,"n":1,"L":{"calz":3.65,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5},"m":"Martillo / intersección"},{"s":"ok","ini":440,"fin":600,"n":9,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"m":""},{"s":"rev","ini":620,"fin":620,"n":1,"L":null,"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"m":"lado izq sin elementos"},{"s":"ok","ini":640,"fin":720,"n":5,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":6.86},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5},"m":""},{"s":"cruce","ini":740,"fin":740,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":8.22},"R":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"m":"Cuneta cerrada / tapada"},{"s":"ok","ini":760,"fin":780,"n":2,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.01},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.85,"ver":1.5,"lim":6.6},"m":""},{"s":"int","ini":800,"fin":800,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.85},"R":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"m":"Martillo / intersección"},{"s":"ok","ini":820,"fin":820,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.93},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.85,"ver":1.5,"lim":7.39},"m":""},{"s":"ok","ini":840,"fin":860,"n":2,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.55},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.8},"m":""},{"s":"ok","ini":880,"fin":1000,"n":7,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":8.86},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.45,"ver":1.5,"lim":6.97},"m":""},{"s":"ok","ini":1020,"fin":1020,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":8.05},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.95,"ver":1.5,"lim":7.88},"m":""},{"s":"rev","ini":1025.37,"fin":1025.37,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":1.4,"sar":0,"fr":0,"ver":1.7,"lim":7.98},"R":{"calz":3.6,"cun":"abierta","cunA":0.9,"sar":0,"fr":0,"ver":0},"m":"cuneta izq 1.40 m: lectura dudosa"}]},{"id":5,"name":"CA. SAN JOSÉ","alt":[],"L":155.51,"calzTip":3.0,"axis":[[499570.3,9187217.3],[499589.7,9187250.4],[499591.9,9187253.7],[499594.2,9187257.1],[499596.6,9187260.3],[499599.2,9187263.4],[499601.8,9187266.5],[499617.2,9187283.7],[499620.0,9187286.6],[499623.0,9187289.3],[499626.0,9187292.1],[499673.3,9187331.8],[499673.3,9187331.8]],"sts":[{"st":0,"x":499570.3,"y":9187217.3,"L":null,"R":{"calz":3.0,"cun":"abierta","cunA":0.55,"sar":0,"fr":0,"ver":1.55,"lim":5.3},"s":"rev","m":"lado izq sin elementos"},{"st":20,"x":499580.4,"y":9187234.5,"L":null,"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.45,"lim":5.92},"s":"rev","m":"lado izq sin elementos"},{"st":40,"x":499590.6,"y":9187251.8,"L":null,"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.45,"lim":5.79},"s":"rev","m":"lado izq sin elementos"},{"st":60,"x":499602.8,"y":9187267.6,"L":null,"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.45,"lim":4.97},"s":"rev","m":"lado izq sin elementos"},{"st":80,"x":499616.1,"y":9187282.5,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":8.4},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.45,"lim":4.89},"s":"ok","m":""},{"st":100,"x":499630.8,"y":9187296.1,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":10.01},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.45,"lim":6.69},"s":"ok","m":""},{"st":120,"x":499646.1,"y":9187308.9,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":140,"x":499661.4,"y":9187321.8,"L":null,"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.45,"ver":1.5,"lim":5.76},"s":"int","m":"Martillo / intersección"},{"st":155.51,"x":499673.3,"y":9187331.7,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"}],"tramos":[{"s":"rev","ini":0,"fin":0,"n":1,"L":null,"R":{"calz":3.0,"cun":"abierta","cunA":0.55,"sar":0,"fr":0,"ver":1.55,"lim":5.3},"m":"lado izq sin elementos"},{"s":"rev","ini":20,"fin":20,"n":1,"L":null,"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.45,"lim":5.92},"m":"lado izq sin elementos"},{"s":"rev","ini":40,"fin":40,"n":1,"L":null,"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.45,"lim":5.79},"m":"lado izq sin elementos"},{"s":"rev","ini":60,"fin":60,"n":1,"L":null,"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.45,"lim":4.97},"m":"lado izq sin elementos"},{"s":"ok","ini":80,"fin":100,"n":2,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.15,"lim":8.4},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0,"ver":1.45,"lim":4.89},"m":""},{"s":"sin","ini":120,"fin":120,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"s":"int","ini":140,"fin":140,"n":1,"L":null,"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":0.45,"ver":1.5,"lim":5.76},"m":"Martillo / intersección"},{"s":"sin","ini":155.51,"fin":155.51,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"}]},{"id":6,"name":"CA. 13 DE MAYO","alt":[],"L":500.11,"calzTip":3.0,"axis":[[500028.0,9187156.9],[500046.2,9187186.2],[500048.7,9187189.4],[500051.3,9187192.4],[500054.1,9187195.3],[500057.1,9187197.9],[500060.3,9187200.4],[500063.6,9187202.6],[500067.1,9187204.6],[500070.7,9187206.4],[500074.4,9187207.9],[500078.2,9187209.2],[500082.1,9187210.2],[500086.1,9187210.9],[500090.1,9187211.4],[500094.1,9187211.6],[500098.1,9187211.6],[500127.6,9187208.6],[500131.5,9187208.0],[500135.5,9187207.2],[500139.3,9187206.1],[500143.2,9187204.8],[500146.8,9187203.2],[500150.4,9187201.4],[500153.9,9187199.3],[500157.2,9187197.0],[500160.3,9187194.5],[500163.3,9187191.8],[500166.0,9187188.9],[500168.6,9187185.8],[500171.0,9187182.5],[500173.1,9187179.1],[500175.0,9187175.6],[500210.4,9187099.6],[500212.2,9187096.0],[500214.1,9187092.4],[500216.1,9187088.8],[500330.8,9186901.8],[500330.8,9186901.8]],"sts":[{"st":0,"x":500027.9,"y":9187156.9,"L":{"calz":3.35,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":7.55},"R":{"calz":0.9,"cun":"cerrada","cunA":3.4,"sar":0,"fr":0,"ver":0},"s":"int","m":"Martillo / intersección"},{"st":20,"x":500038.5,"y":9187173.9,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":4.34},"s":"ok","m":""},{"st":40,"x":500049.6,"y":9187190.5,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":6.18},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":5.02},"s":"ok","m":""},{"st":60,"x":500064.8,"y":9187203.3,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":5.17},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":5.68},"s":"ok","m":""},{"st":80,"x":500083.4,"y":9187210.5,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":6.29},"s":"ok","m":""},{"st":100,"x":500103.3,"y":9187211.1,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":6.11},"s":"ok","m":""},{"st":120,"x":500123.2,"y":9187209.0,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":5.55},"s":"ok","m":""},{"st":140,"x":500142.7,"y":9187205.0,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":5.41},"s":"ok","m":""},{"st":160,"x":500159.8,"y":9187194.9,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":4.74},"s":"ok","m":""},{"st":180,"x":500172.8,"y":9187179.7,"L":null,"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":7.77},"s":"int","m":"Martillo / intersección"},{"st":200,"x":500181.5,"y":9187161.7,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":7.43},"s":"ok","m":""},{"st":220,"x":500189.9,"y":9187143.6,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":6.78},"s":"ok","m":""},{"st":240,"x":500198.3,"y":9187125.5,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":260,"x":500206.8,"y":9187107.3,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":280,"x":500215.7,"y":9187089.5,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":8.68},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":300,"x":500226.2,"y":9187072.4,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":8.78},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":320,"x":500236.6,"y":9187055.4,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":8.81},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":340,"x":500247.1,"y":9187038.3,"L":null,"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"rev","m":"lado izq sin elementos"},{"st":360,"x":500257.5,"y":9187021.3,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":11.72},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":380,"x":500268.0,"y":9187004.2,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":11.39},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":400,"x":500278.5,"y":9186987.2,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":11.05},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":420,"x":500288.9,"y":9186970.1,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":10.51},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":440,"x":500299.4,"y":9186953.1,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":9.71},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":460,"x":500309.8,"y":9186936.0,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":9.15},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":480,"x":500320.3,"y":9186919.0,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":10.22},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":500,"x":500330.7,"y":9186901.9,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":11.31},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""}],"tramos":[{"s":"int","ini":0,"fin":0,"n":1,"L":{"calz":3.35,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":7.55},"R":{"calz":0.9,"cun":"cerrada","cunA":3.4,"sar":0,"fr":0,"ver":0},"m":"Martillo / intersección"},{"s":"ok","ini":20,"fin":160,"n":8,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":4.34},"m":""},{"s":"int","ini":180,"fin":180,"n":1,"L":null,"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":7.77},"m":"Martillo / intersección"},{"s":"ok","ini":200,"fin":320,"n":7,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":7.43},"m":""},{"s":"rev","ini":340,"fin":340,"n":1,"L":null,"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"m":"lado izq sin elementos"},{"s":"ok","ini":360,"fin":480,"n":7,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":11.72},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"m":""},{"s":"ok","ini":500,"fin":500,"n":1,"L":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":11.31},"R":{"calz":3.0,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"m":""}]},{"id":7,"name":"CA. SAN MIGUEL","alt":[],"L":124.79,"calzTip":3.0,"axis":[[500250.0,9187039.3],[500349.2,9187115.0]],"sts":[{"st":0,"x":500250.0,"y":9187039.3,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":20,"x":500265.9,"y":9187051.4,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":7.17},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":7.69},"s":"ok","m":""},{"st":40,"x":500281.8,"y":9187063.6,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":9.91},"s":"ok","m":""},{"st":60,"x":500297.7,"y":9187075.7,"L":null,"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":10.89},"s":"rev","m":"lado izq sin elementos"},{"st":80,"x":500313.6,"y":9187087.8,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":100,"x":500329.5,"y":9187100.0,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":7.2},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":6.02},"s":"ok","m":""},{"st":120,"x":500345.4,"y":9187112.1,"L":null,"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":5.43},"s":"int","m":"Martillo / intersección"},{"st":124.79,"x":500349.2,"y":9187115.0,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"}],"tramos":[{"s":"sin","ini":0,"fin":0,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"s":"ok","ini":20,"fin":40,"n":2,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":7.17},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":7.69},"m":""},{"s":"rev","ini":60,"fin":60,"n":1,"L":null,"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":10.89},"m":"lado izq sin elementos"},{"s":"ok","ini":80,"fin":100,"n":2,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"m":""},{"s":"int","ini":120,"fin":120,"n":1,"L":null,"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":5.43},"m":"Martillo / intersección"},{"s":"sin","ini":124.79,"fin":124.79,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"}]},{"id":8,"name":"JR. ECOSOL","alt":["CA. SAN ISIDRO"],"L":401.99,"calzTip":3.0,"axis":[[500177.4,9187177.6],[500260.5,9187177.3],[500264.5,9187177.0],[500268.5,9187176.5],[500272.4,9187175.8],[500276.3,9187174.9],[500280.2,9187173.8],[500284.0,9187172.6],[500287.8,9187171.1],[500291.4,9187169.4],[500295.0,9187167.6],[500298.5,9187165.6],[500301.9,9187163.4],[500305.1,9187161.0],[500308.3,9187158.5],[500311.3,9187155.9],[500389.1,9187080.7],[500392.7,9187078.8],[500396.6,9187077.9],[500400.6,9187078.0],[500404.5,9187079.2],[500407.8,9187081.4],[500424.2,9187096.2],[500427.8,9187098.2],[500431.7,9187099.3],[500435.7,9187099.7],[500439.7,9187099.2],[500450.5,9187096.6],[500454.5,9187095.9],[500458.6,9187095.5],[500462.6,9187095.4],[500466.7,9187095.6],[500470.7,9187096.0],[500474.7,9187096.7],[500478.6,9187097.7],[500482.5,9187098.9],[500505.5,9187108.0],[500509.1,9187109.8],[500512.6,9187111.8],[500515.9,9187114.1],[500519.0,9187116.7],[500521.9,9187119.5],[500526.8,9187125.1],[500526.8,9187125.1]],"sts":[{"st":0,"x":500177.4,"y":9187177.6,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":20,"x":500197.4,"y":9187177.5,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":40,"x":500217.4,"y":9187177.4,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":60,"x":500237.4,"y":9187177.4,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":80,"x":500257.4,"y":9187177.3,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":100,"x":500277.2,"y":9187174.7,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":120,"x":500295.7,"y":9187167.2,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":140,"x":500311.7,"y":9187155.4,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":4.04},"s":"ok","m":""},{"st":160,"x":500326.1,"y":9187141.5,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":4.21},"s":"ok","m":""},{"st":180,"x":500340.5,"y":9187127.6,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":4.38},"s":"ok","m":""},{"st":200,"x":500354.9,"y":9187113.7,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":null,"s":"int","m":"Martillo / intersección"},{"st":220,"x":500369.2,"y":9187099.8,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":6.21},"s":"ok","m":""},{"st":240,"x":500383.6,"y":9187085.9,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":260,"x":500400.9,"y":9187078.1,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":280,"x":500416.8,"y":9187089.8,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":300,"x":500433.7,"y":9187099.6,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":5.85},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":320,"x":500453.3,"y":9187096.1,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":6.16},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":340,"x":500473.2,"y":9187096.4,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":6.43},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":360,"x":500492.1,"y":9187102.7,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":6.12},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":380,"x":500510.5,"y":9187110.6,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":5.06},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"s":"ok","m":""},{"st":400,"x":500525.5,"y":9187123.6,"L":{"calz":10.45,"cun":"abierta","cunA":3.1,"sar":0,"fr":0,"ver":0},"R":{"calz":3.0,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"s":"int","m":"Martillo / intersección"},{"st":401.99,"x":500526.9,"y":9187125.1,"L":{"calz":0.8,"cun":"cerrada","cunA":3.4,"sar":0,"fr":0,"ver":0},"R":{"calz":2.8,"cun":"cerrada","cunA":0.85,"sar":0,"fr":0,"ver":0},"s":"int","m":"Martillo / intersección"}],"tramos":[{"s":"sin","ini":0,"fin":0,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"s":"ok","ini":20,"fin":180,"n":9,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"m":""},{"s":"int","ini":200,"fin":200,"n":1,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":null,"m":"Martillo / intersección"},{"s":"ok","ini":220,"fin":380,"n":9,"L":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5},"R":{"calz":3.0,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.15,"ver":1.5,"lim":6.21},"m":""},{"s":"int","ini":400,"fin":401.99,"n":2,"L":{"calz":10.45,"cun":"abierta","cunA":3.1,"sar":0,"fr":0,"ver":0},"R":{"calz":3.0,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"m":"Martillo / intersección"}]},{"id":9,"name":"JR. ECOSOL (2)","alt":[],"L":268.61,"calzTip":3.6,"axis":[[500364.0,9187303.5],[500397.7,9187202.0],[500399.3,9187198.3],[500401.3,9187194.8],[500403.5,9187191.5],[500406.0,9187188.3],[500408.8,9187185.4],[500411.7,9187182.7],[500414.9,9187180.2],[500418.3,9187178.1],[500421.8,9187176.1],[500425.5,9187174.5],[500429.2,9187173.2],[500464.4,9187162.7],[500468.2,9187161.5],[500471.9,9187160.1],[500475.7,9187158.6],[500479.3,9187157.1],[500483.0,9187155.4],[500486.6,9187153.7],[500490.1,9187151.8],[500493.6,9187149.8],[500535.6,9187125.0],[500535.6,9187125.0]],"sts":[{"st":0,"x":500364.0,"y":9187303.5,"L":{"calz":4.95,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0},"R":{"calz":3.15,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"s":"int","m":"Martillo / intersección"},{"st":20,"x":500370.3,"y":9187284.5,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5,"lim":6.65},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5},"s":"ok","m":""},{"st":40,"x":500376.6,"y":9187265.5,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5,"lim":6.43},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5},"s":"ok","m":""},{"st":60,"x":500382.8,"y":9187246.5,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5,"lim":6.57},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5},"s":"ok","m":""},{"st":80,"x":500389.1,"y":9187227.6,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5},"s":"ok","m":""},{"st":100,"x":500395.4,"y":9187208.6,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5,"lim":3.97},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5},"s":"ok","m":""},{"st":120,"x":500404.1,"y":9187190.7,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5,"lim":4.31},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5},"s":"ok","m":""},{"st":140,"x":500419.1,"y":9187177.6,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5,"lim":5.51},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5,"lim":11.13},"s":"ok","m":""},{"st":160,"x":500437.7,"y":9187170.6,"L":{"calz":3.6,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":8.27},"s":"cruce","m":"Cuneta cerrada / tapada"},{"st":180,"x":500456.9,"y":9187165.0,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":7.28},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":9.2},"s":"ok","m":""},{"st":200,"x":500475.9,"y":9187158.6,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":8.08},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":10.29},"s":"ok","m":""},{"st":220,"x":500493.8,"y":9187149.8,"L":{"calz":8.5,"cun":"abierta","cunA":4.85,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":9.39},"s":"rev","m":"cuneta izq 4.85 m: lectura dudosa"},{"st":240,"x":500511.0,"y":9187139.6,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":11.67},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.65,"ver":1.5,"lim":7.51},"s":"ok","m":""},{"st":260,"x":500528.2,"y":9187129.4,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5},"R":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"s":"cruce","m":"Cuneta cerrada / tapada"},{"st":268.61,"x":500535.6,"y":9187125.0,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"}],"tramos":[{"s":"int","ini":0,"fin":0,"n":1,"L":{"calz":4.95,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0},"R":{"calz":3.15,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"m":"Martillo / intersección"},{"s":"ok","ini":20,"fin":140,"n":7,"L":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5,"lim":6.65},"R":{"calz":3.6,"cun":"ninguna","cunA":0,"sar":0.15,"fr":1.25,"ver":1.5},"m":""},{"s":"cruce","ini":160,"fin":160,"n":1,"L":{"calz":3.6,"cun":"cerrada","cunA":0.7,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":8.27},"m":"Cuneta cerrada / tapada"},{"s":"ok","ini":180,"fin":200,"n":2,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":7.28},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":9.2},"m":""},{"s":"rev","ini":220,"fin":220,"n":1,"L":{"calz":8.5,"cun":"abierta","cunA":4.85,"sar":0,"fr":0,"ver":0},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":9.39},"m":"cuneta izq 4.85 m: lectura dudosa"},{"s":"ok","ini":240,"fin":240,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5,"lim":11.67},"R":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.65,"ver":1.5,"lim":7.51},"m":""},{"s":"cruce","ini":260,"fin":260,"n":1,"L":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.75,"ver":1.5},"R":{"calz":3.6,"cun":"cerrada","cunA":0.8,"sar":0,"fr":0,"ver":0},"m":"Cuneta cerrada / tapada"},{"s":"sin","ini":268.61,"fin":268.61,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"}]},{"id":10,"name":"CA. 28 DE JULIO","alt":[],"L":169.81,"calzTip":2.7,"axis":[[500420.7,9187324.1],[500440.1,9187269.8],[500442.7,9187266.7],[500446.0,9187264.5],[500458.1,9187260.1],[500461.2,9187257.6],[500463.0,9187254.1],[500463.4,9187250.1],[500439.0,9187174.8],[500439.0,9187174.8]],"sts":[{"st":0,"x":500420.7,"y":9187324.1,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":20,"x":500427.3,"y":9187305.2,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.64},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.21},"s":"ok","m":""},{"st":40,"x":500433.9,"y":9187286.3,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.85},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.29},"s":"ok","m":""},{"st":60,"x":500441.5,"y":9187267.9,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":5.94},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":9.53},"s":"ok","m":""},{"st":80,"x":500459.3,"y":9187259.4,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":2.2,"lim":6.78},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.25},"s":"ok","m":""},{"st":100,"x":500460.7,"y":9187241.1,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.19},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.35},"s":"ok","m":""},{"st":120,"x":500454.5,"y":9187222.1,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.05},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.06},"s":"ok","m":""},{"st":140,"x":500448.2,"y":9187203.1,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":5.92},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.26},"s":"ok","m":""},{"st":160,"x":500442.0,"y":9187184.1,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":10.38},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.72},"s":"ok","m":""},{"st":169.81,"x":500439.0,"y":9187174.8,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"}],"tramos":[{"s":"sin","ini":0,"fin":0,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"s":"ok","ini":20,"fin":60,"n":3,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.64},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.21},"m":""},{"s":"ok","ini":80,"fin":80,"n":1,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":2.2,"lim":6.78},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.25},"m":""},{"s":"ok","ini":100,"fin":160,"n":4,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.19},"R":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":1.15,"ver":1.5,"lim":6.35},"m":""},{"s":"sin","ini":169.81,"fin":169.81,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"}]},{"id":11,"name":"CA. TODOS UNIDOS","alt":[],"L":116.96,"calzTip":2.7,"axis":[[500494.0,9187153.8],[500532.4,9187264.2]],"sts":[{"st":0,"x":500494.0,"y":9187153.8,"L":null,"R":{"calz":2.7,"cun":"cerrada","cunA":1.9,"sar":0,"fr":0,"ver":3.1},"s":"int","m":"Martillo / intersección"},{"st":20,"x":500500.8,"y":9187172.6,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.03},"R":{"calz":2.7,"cun":"abierta","cunA":0.85,"sar":0,"fr":0.45,"ver":1.5,"lim":5.43},"s":"ok","m":""},{"st":40,"x":500507.6,"y":9187191.4,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":5.51},"R":{"calz":2.7,"cun":"abierta","cunA":0.85,"sar":0,"fr":0.45,"ver":1.5,"lim":4.67},"s":"ok","m":""},{"st":60,"x":500514.4,"y":9187210.2,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":4.18},"R":{"calz":2.7,"cun":"abierta","cunA":0.85,"sar":0,"fr":0.45,"ver":1.5,"lim":4.11},"s":"ok","m":""},{"st":80,"x":500520.7,"y":9187229.2,"L":{"calz":2.85,"cun":"abierta","cunA":0.5,"sar":0,"fr":0,"ver":1.2,"lim":3.75},"R":{"calz":2.85,"cun":"abierta","cunA":0.5,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""},{"st":100,"x":500527.1,"y":9187248.2,"L":{"calz":2.85,"cun":"abierta","cunA":0.5,"sar":0,"fr":0,"ver":1.2,"lim":3.33},"R":{"calz":2.85,"cun":"abierta","cunA":0.5,"sar":0,"fr":0.65,"ver":1.5,"lim":5.81},"s":"ok","m":""},{"st":116.96,"x":500532.4,"y":9187264.2,"L":{"calz":2.85,"cun":"abierta","cunA":0.5,"sar":0,"fr":0,"ver":1.2},"R":null,"s":"rev","m":"lado der sin elementos"}],"tramos":[{"s":"int","ini":0,"fin":0,"n":1,"L":null,"R":{"calz":2.7,"cun":"cerrada","cunA":1.9,"sar":0,"fr":0,"ver":3.1},"m":"Martillo / intersección"},{"s":"ok","ini":20,"fin":60,"n":3,"L":{"calz":2.7,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.03},"R":{"calz":2.7,"cun":"abierta","cunA":0.85,"sar":0,"fr":0.45,"ver":1.5,"lim":5.43},"m":""},{"s":"ok","ini":80,"fin":100,"n":2,"L":{"calz":2.85,"cun":"abierta","cunA":0.5,"sar":0,"fr":0,"ver":1.2,"lim":3.75},"R":{"calz":2.85,"cun":"abierta","cunA":0.5,"sar":0,"fr":0.65,"ver":1.5},"m":""},{"s":"rev","ini":116.96,"fin":116.96,"n":1,"L":{"calz":2.85,"cun":"abierta","cunA":0.5,"sar":0,"fr":0,"ver":1.2},"R":null,"m":"lado der sin elementos"}]},{"id":12,"name":"CA. BELLAVISTA","alt":["PASAJE 2"],"L":207.84,"calzTip":3.6,"axis":[[499800.7,9187075.3],[499744.8,9187111.1],[499744.2,9187115.2],[499766.3,9187165.2],[499768.0,9187168.9],[499769.8,9187172.5],[499771.6,9187176.1],[499773.5,9187179.6],[499805.3,9187237.7],[499805.3,9187237.7]],"sts":[{"st":0,"x":499800.7,"y":9187075.3,"L":null,"R":null,"s":"sin","m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"st":20,"x":499783.7,"y":9187085.8,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":6.21},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.91},"s":"ok","m":""},{"st":40,"x":499766.7,"y":9187096.4,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":6.31},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.28},"s":"ok","m":""},{"st":60,"x":499749.7,"y":9187106.9,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":6.15},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":5.64},"s":"ok","m":""},{"st":80,"x":499747.8,"y":9187123.7,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":6.86},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5},"s":"ok","m":""},{"st":100,"x":499755.9,"y":9187141.9,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":6.33},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":4.46},"s":"ok","m":""},{"st":120,"x":499764.1,"y":9187160.2,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":6.34},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":5.58},"s":"ok","m":""},{"st":140,"x":499772.7,"y":9187178.2,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":6.46},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.52},"s":"ok","m":""},{"st":160,"x":499782.3,"y":9187195.8,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":7.19},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.41},"s":"ok","m":""},{"st":180,"x":499791.9,"y":9187213.3,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":7.62},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.26},"s":"ok","m":""},{"st":200,"x":499801.5,"y":9187230.8,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":6.49},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.11},"s":"ok","m":""},{"st":207.84,"x":499805.3,"y":9187237.7,"L":{"calz":2.45,"cun":"cerrada","cunA":1.15,"sar":0,"fr":0,"ver":0},"R":{"calz":5.0,"cun":"cerrada","cunA":1.6,"sar":0,"fr":0,"ver":0},"s":"int","m":"Martillo / intersección"}],"tramos":[{"s":"sin","ini":0,"fin":0,"n":1,"L":null,"R":null,"m":"Sin elementos de proyecto (intersección o vía sin diseño)"},{"s":"ok","ini":20,"fin":200,"n":10,"L":{"calz":3.6,"cun":"abierta","cunA":0.75,"sar":0,"fr":0.55,"ver":1.5,"lim":6.21},"R":{"calz":3.6,"cun":"abierta","cunA":0.65,"sar":0,"fr":0.65,"ver":1.5,"lim":6.91},"m":""},{"s":"int","ini":207.84,"fin":207.84,"n":1,"L":{"calz":2.45,"cun":"cerrada","cunA":1.15,"sar":0,"fr":0,"ver":0},"R":{"calz":5.0,"cun":"cerrada","cunA":1.6,"sar":0,"fr":0,"ver":0},"m":"Martillo / intersección"}]}];
+const ST={ok:'OK',rev:'Revisar',int:'Intersección',cruce:'Cuneta tapada',sin:'Sin elementos'};
+const BLK={AUTO:{n:'Auto',w:1.8,h:1.5},CAMIONETA:{n:'Camioneta',w:1.9,h:1.9},MOTOTAXI:{n:'Mototaxi',w:1.3,h:1.8},MOTO:{n:'Moto',w:0.8,h:1.4},PERSONA:{n:'Persona',w:0.5,h:1.75},POSTE:{n:'Poste',w:0.3,h:8},ARBOL:{n:'Árbol',w:2.4,h:5}};
+const $=s=>document.querySelector(s);
+const num=v=>v===''||v==null||isNaN(Number(v))?null:Number(v);
+const f2=v=>v==null?'—':Number(v).toFixed(2), f3=v=>v==null?'':Number(v).toFixed(3);
+const fst=v=>{v=Number(v);const k=Math.floor(v/1000+1e-9),m=v-k*1000;return k+'+'+(Math.abs(m-Math.round(m))>0.005?m.toFixed(2).padStart(6,'0'):String(Math.round(m)).padStart(3,'0'))};
+const pst=s=>{s=String(s).trim().replace(',','.');const m=s.match(/(\d+)\s*\+\s*(\d+(?:\.\d+)?)/);if(m)return Number(m[1])*1000+Number(m[2]);const n=Number(s);return isNaN(n)?null:n};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+
+// =====================================================================
+// LECTOR DXF (ASCII)
+// =====================================================================
+function parseDXF(text){
+  const L=text.split(/\r?\n/),n=L.length-1,ents=[],layers={};
+  let i=0,sec=null;
+  const push=e=>{if(e.ps)return;ents.push(e);const c=layers[e.ly]||(layers[e.ly]={n:0,poly:0,txt:0,len:0});c.n++;if(e.pts){c.poly++;c.len+=e.len||0}if(e.text!=null)c.txt++};
+  while(i<n){
+    const code=L[i].trim(),val=L[i+1];
+    if(code==='0'&&val.trim()==='SECTION'){sec=(L[i+3]||'').trim();i+=4;continue}
+    if(code==='0'&&val.trim()==='ENDSEC'){sec=null;i+=2;continue}
+    if(sec!=='ENTITIES'||code!=='0'){i+=2;continue}
+    const type=val.trim();i+=2;
+    const g=[];while(i<n&&L[i].trim()!=='0'){g.push([L[i].trim(),L[i+1]]);i+=2}
+    const get=(c,d)=>{for(const [k,v] of g)if(k===c)return v;return d};
+    const e={t:type,ly:(get('8','0')||'0').trim(),ps:get('67')&&get('67').trim()==='1'};
+    if(type==='LWPOLYLINE'){const pts=[];let cur=null;for(const [k,v] of g){if(k==='10'){cur=[+v,0,0];pts.push(cur)}else if(k==='20'&&cur)cur[1]=+v;else if(k==='42'&&cur)cur[2]=+v}
+      e.raw=pts;e.closed=(parseInt(get('70','0'))&1)===1;e.pts=dens(pts,e.closed);push(e)}
+    else if(type==='POLYLINE'){const flags=parseInt(get('70','0'))||0;const vs=[];
+      while(i<n){const c=L[i].trim(),v=L[i+1].trim();if(c!=='0'){i+=2;continue}
+        if(v==='VERTEX'){i+=2;let x=0,y=0,b=0;while(i<n&&L[i].trim()!=='0'){const k=L[i].trim();if(k==='10')x=+L[i+1];else if(k==='20')y=+L[i+1];else if(k==='42')b=+L[i+1];i+=2}vs.push([x,y,b]);continue}
+        if(v==='SEQEND'){i+=2;while(i<n&&L[i].trim()!=='0')i+=2}break}
+      if(!(flags&16)&&!(flags&64)){e.raw=vs;e.closed=(flags&1)===1;e.pts=dens(vs,e.closed);push(e)}}
+    else if(type==='LINE'){e.pts=[[+get('10',0),+get('20',0)],[+get('11',0),+get('21',0)]];push(e)}
+    else if(type==='ARC'){const cx=+get('10',0),cy=+get('20',0),r=+get('40',0);let a0=+get('50',0),a1=+get('51',0);if(a1<a0)a1+=360;const k=Math.max(4,Math.ceil((a1-a0)/5));e.pts=[];for(let j=0;j<=k;j++){const a=(a0+(a1-a0)*j/k)*Math.PI/180;e.pts.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}push(e)}
+    else if(type==='TEXT'||type==='MTEXT'){let s='';for(const [k,v] of g)if(k==='3')s+=v;s+=get('1','');
+      s=s.replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/\\P/g,' ').replace(/[{}]/g,'').trim();
+      const ax=get('11'),ay=get('21'),jx=parseInt(get('72','0'))||0;
+      {const dx=get('11'),dy=get('21'),r=get('50');e.ang=type==='MTEXT'?(dx!=null&&dy!=null?Math.atan2(+dy,+dx):(r!=null?+r:0)):(r!=null?+r*Math.PI/180:0)}
+      e.att=parseInt(get('71','0'))||0;e.text=s;e.x=+(type==='TEXT'&&ax!=null&&jx?ax:get('10',0));e.y=+(type==='TEXT'&&ay!=null&&jx?ay:get('20',0));e.h=+get('40',1);push(e)}
+    else if(type==='INSERT'){e.name=(get('2','')||'').trim();e.x=+get('10',0);e.y=+get('20',0);push(e)}
+  }
+  ents.forEach(e=>{if(e.pts&&!e.len){let s=0;for(let j=1;j<e.pts.length;j++)s+=dist(e.pts[j-1],e.pts[j]);e.len=s;if(layers[e.ly])layers[e.ly].len+=s}});
+  return {ents,layers};
+}
+function dens(p,closed,step=0.5){
+  const P=closed&&p.length?p.concat([p[0]]):p,out=[];
+  for(let i=0;i<P.length-1;i++){const [x0,y0,b]=P[i],[x1,y1]=P[i+1];
+    if(!b||Math.abs(b)<1e-9){out.push([x0,y0]);continue}
+    const th=4*Math.atan(b),c=Math.hypot(x1-x0,y1-y0);if(c<1e-9){out.push([x0,y0]);continue}
+    const r=c/(2*Math.sin(Math.abs(th)/2)),mx=(x0+x1)/2,my=(y0+y1)/2,d=Math.sqrt(Math.max(r*r-c*c/4,0)),ux=(x1-x0)/c,uy=(y1-y0)/c;
+    const s=((b>0)===(Math.abs(th)<Math.PI))?1:-1,cx=mx-uy*d*s,cy=my+ux*d*s,a0=Math.atan2(y0-cy,x0-cx),k=Math.max(2,Math.floor(Math.abs(th)*r/step));
+    for(let j=0;j<k;j++){const a=a0+th*j/k;out.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}}
+  if(P.length)out.push([P[P.length-1][0],P[P.length-1][1]]);return out;
+}
+
+// =====================================================================
+// PASO 1-2: CAPAS Y PROCESO DE LA PLANTA
+// =====================================================================
+const ROLES=[
+  ['eje','Eje de vía',/^(C-ROAD|EJE DE VIA|EJES?|EJE[ _-].*|.*ALINEAM.*)$/i,'poly'],
+  ['VRD','Vereda',/VRD|VEREDA/i,'poly',/DEMOL|EXIST|HTCH/i],
+  ['SAR','Sardinel',/SARD/i,'poly',/HTCH/i],
+  ['CNT','Cuneta abierta',/CNT|CUNETA/i,'poly',/DMT|DPV|TAPA|HTCH|ABT/i],
+  ['CNTD','Cuneta tapada',/CNT.?DMT|TAPA/i,'poly',/HTCH/i],
+  ['MZ','Manzanas / lím. propiedad',/MANZANA|LOTE|LIM.*PROP/i,'poly'],
+  ['MRT','Martillos',/MRT|MARTILLO/i,'poly',/HTCH/i],
+  ['NOM','Nombres de calle (texto)',/NCALLE|ETIQUETA|NOMBRE.*CALLE/i,'txt'],
+  ['PRG','Progresivas (texto, opcional)',/STAN.*MAJR|PROGRES|STATION/i,'txt']
+];
+let PL=null; // planta cargada {ents,layers,name}
+function autoRoles(layers){const PL0=PL;const names=Object.keys(layers),r={};
+  ROLES.forEach(([k,lab,re,kind,ex])=>{const c=names.filter(n=>re.test(n)&&!(ex&&ex.test(n))&&(kind==='txt'?layers[n].txt>0:layers[n].poly>0));
+    c.sort((a,b)=>kind==='txt'?layers[b].txt-layers[a].txt:layers[b].len-layers[a].len);r[k]=c[0]||''});
+  // por contenido: progresivas, nombres de calle y ejes con progresivas
+  const reSt=/^(PI:\s*)?\d+\+\d{3}(\.\d+)?$/,reNom=/^(CA|CALLE|C|JR|JIRON|AV|AVENIDA|PSJE|PJE|PASAJE|PROL|MALECON|CARRETERA)\.?\s+\S/i;
+  const cS={},cN={};PL.ents.forEach(e=>{if(e.text==null)return;const s=e.text.trim();if(reSt.test(s)&&!/^PI/i.test(s))cS[e.ly]=(cS[e.ly]||0)+1;else if(reNom.test(s))cN[e.ly]=(cN[e.ly]||0)+1});
+  const best=o=>Object.entries(o).sort((a,b)=>b[1]-a[1])[0];
+  const bS=best(cS);if(bS&&bS[1]>=3)r.PRG=bS[0];
+  const bN=best(cN);if(bN&&bN[1]>=2&&(!r.NOM||(cN[r.NOM]||0)<bN[1]))r.NOM=bN[0];
+  if(r.PRG){const zs=PL.ents.filter(e=>e.ly===r.PRG&&e.text!=null&&/^\d+\+0{3}(\.0+)?$/.test(e.text.trim()));
+    const sc={};PL.ents.forEach(e=>{if(!e.raw||!e.pts||e.len<10)return;const a=e.pts[0],b=e.pts[e.pts.length-1];if(zs.some(z=>Math.min(dist(a,[z.x,z.y]),dist(b,[z.x,z.y]))<4))sc[e.ly]=(sc[e.ly]||0)+1});
+    const bE=best(sc);if(bE&&bE[1]>=1&&(sc[r.eje]||0)<bE[1])r.eje=bE[0]}
+  return r}
+function renderRoles(){const lays=PL.layers,names=Object.keys(lays).sort();
+  $('#roles').innerHTML=ROLES.map(([k,lab,re,kind])=>`<label for="r-${k}">${lab}</label><select id="r-${k}" data-r="${k}"><option value="">(ninguna)</option>${names.filter(n=>kind==='txt'?lays[n].txt:lays[n].poly).map(n=>`<option value="${esc(n)}" ${PL.roles[k]===n?'selected':''}>${esc(n)} · ${kind==='txt'?lays[n].txt+' txt':lays[n].poly+' líneas'}</option>`).join('')}</select>`).join('');
+  $('#roles').querySelectorAll('[data-r]').forEach(s=>s.onchange=()=>PL.roles[s.dataset.r]=s.value);
+  $('#rolesBox').hidden=false}
+function stat(id,lines){$(id).innerHTML=lines.map(([c,t])=>`<span class="${c}">${t}</span>`).join('')}
+async function readFile(f){const buf=await f.arrayBuffer();let t=new TextDecoder('utf-8',{fatal:false}).decode(buf);if(t.includes('\uFFFD'))t=new TextDecoder('windows-1252').decode(buf);return t}
+async function loadPlanta(f){
+  if(!/\.dxf$/i.test(f.name))return stat('#stP',[['warn','El archivo debe ser .dxf. En AutoCAD: Guardar como → DXF.']]);
+  stat('#stP',[['info','Leyendo '+esc(f.name)+'…']]);await new Promise(r=>setTimeout(r,30));
+  const t=await readFile(f);
+  if(t.slice(0,22).includes('AutoCAD Binary DXF'))return stat('#stP',[['warn','Es un DXF binario. Guárdalo como DXF de texto (ASCII).']]);
+  PL=parseDXF(t);PL.name=f.name;PL.roles=autoRoles(PL.layers);
+  const nl=Object.keys(PL.layers).length;
+  stat('#stP',[['ok',`${esc(f.name)}: ${PL.ents.length.toLocaleString('es-PE')} objetos en ${nl} capas.`],[PL.roles.eje?'ok':'warn',PL.roles.eje?'Eje detectado en la capa '+esc(PL.roles.eje)+'.':'No encontré la capa de ejes: elígela en el paso 2.']]);
+  renderRoles();
+}
+function procesarPlanta(){
+  const R=PL.roles,step=num($('#iStep').value)||20,HALF=num($('#iHalf').value)||14;
+  if(!R.eje)return stat('#stP',[['warn','Elige la capa de ejes antes de procesar.']]);
+  const KEYS=['VRD','SAR','CNT','CNTD','MZ','MRT'],CS=10,G=new Map();
+  PL.ents.forEach(e=>{if(!e.pts)return;const k=KEYS.find(k=>R[k]&&R[k]===e.ly);if(!k)return;
+    for(let j=0;j<e.pts.length-1;j++){const a=e.pts[j],b=e.pts[j+1];
+      for(let gx=Math.floor(Math.min(a[0],b[0])/CS);gx<=Math.floor(Math.max(a[0],b[0])/CS);gx++)for(let gy=Math.floor(Math.min(a[1],b[1])/CS);gy<=Math.floor(Math.max(a[1],b[1])/CS);gy++){const key=gx+','+gy;let c=G.get(key);if(!c)G.set(key,c=[]);c.push([k,a,b])}}});
+  let names=R.NOM?PL.ents.filter(e=>e.ly===R.NOM&&e.text):[];{const re=/^(CA|C|CALLE|JR|JIRON|AV|AVENIDA|PSJE|PJE|PASAJE|PROL|MALECON|CARRETERA)\.?\s/i,v=names.filter(e=>re.test(e.text));if(v.length)names=v}
+  const stl=R.PRG?PL.ents.filter(e=>e.ly===R.PRG&&e.text&&/\d\+\d/.test(e.text)&&!/^\s*PI/i.test(e.text)):[];
+  const zeros=stl.filter(e=>pst(e.text)===0);
+  // ejes: polilíneas de la capa (sin duplicados); si hay progresivas, se aceptan ejes cortos que tengan su 0+000
+  const seenE=new Set(),ejes=PL.ents.filter(e=>{if(e.ly!==R.eje||!e.pts||!e.raw||e.len<5)return false;
+    const k=e.len.toFixed(2)+'|'+e.pts[0].map(v=>v.toFixed(2))+'|'+e.pts[e.pts.length-1].map(v=>v.toFixed(2));const k2=e.len.toFixed(2)+'|'+e.pts[e.pts.length-1].map(v=>v.toFixed(2))+'|'+e.pts[0].map(v=>v.toFixed(2));
+    if(seenE.has(k)||seenE.has(k2))return false;seenE.add(k);
+    if(e.len>25)return true;return zeros.some(z=>Math.min(dist(e.pts[0],[z.x,z.y]),dist(e.pts[e.pts.length-1],[z.x,z.y]))<4)});
+  const segD=(p,a,b)=>{const dx=b[0]-a[0],dy=b[1]-a[1],L=dx*dx+dy*dy;const t=L?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/L)):0;return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)};
+  const out=[];
+  ejes.forEach((e,ai)=>{let q=e.pts.slice();
+    if(zeros.length){const d0=Math.min(...zeros.map(z=>dist(q[0],[z.x,z.y]))),d1=Math.min(...zeros.map(z=>dist(q[q.length-1],[z.x,z.y])));if(d1<d0)q.reverse()}
+    const ch=[0];for(let j=1;j<q.length;j++)ch.push(ch[j-1]+dist(q[j-1],q[j]));const Ltot=ch[ch.length-1];
+    const cnt={},near={};names.forEach(t=>{let dm=1e9,jm=0;for(let j=0;j<q.length-1;j++){const d=segD([t.x,t.y],q[j],q[j+1]);if(d<dm){dm=d;jm=j}}
+      if(dm>25)return;const sa=Math.atan2(q[jm+1][1]-q[jm][1],q[jm+1][0]-q[jm][0]);let da=Math.abs(((t.ang||0)-sa)%Math.PI);da=Math.min(da,Math.PI-da);
+      if(da<0.35)cnt[t.text]=(cnt[t.text]||0)+1/(1+dm/10);else if(dm<12)near[t.text]=(near[t.text]||0)+0.1/(1+dm)});
+    if(!Object.keys(cnt).length)Object.assign(cnt,near);
+    const nm=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+    const sts=[];for(let s=0;s<=Ltot+1e-6;s+=step)sts.push(s);if(Ltot-sts[sts.length-1]>0.5)sts.push(Ltot);
+    const rows=sts.map(st=>{let j=ch.findIndex(c=>c>=st);j=Math.max(0,Math.min(q.length-2,(j<0?q.length-1:j)-1));
+      const t=ch[j+1]>ch[j]?(st-ch[j])/(ch[j+1]-ch[j]):0,px=q[j][0]+t*(q[j+1][0]-q[j][0]),py=q[j][1]+t*(q[j+1][1]-q[j][1]);
+      let dx=q[j+1][0]-q[j][0],dy=q[j+1][1]-q[j][1];const nn=Math.hypot(dx,dy)||1;dx/=nn;dy/=nn;const nx=-dy,ny=dx;
+      const A=[px-nx*HALF,py-ny*HALF],B=[px+nx*HALF,py+ny*HALF],hits={},seen=new Set(),cells=new Set();
+      for(let k=0;k<=Math.ceil(2*HALF);k++){const xx=A[0]+(B[0]-A[0])*k/Math.ceil(2*HALF),yy=A[1]+(B[1]-A[1])*k/Math.ceil(2*HALF);for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++)cells.add((Math.floor(xx/CS)+ox)+','+(Math.floor(yy/CS)+oy))}
+      cells.forEach(c=>(G.get(c)||[]).forEach(sg=>{if(seen.has(sg))return;seen.add(sg);const [k,a,b]=sg;
+        const r0=B[0]-A[0],r1=B[1]-A[1],s0=b[0]-a[0],s1=b[1]-a[1],den=r0*s1-r1*s0;if(Math.abs(den)<1e-12)return;
+        const tt=((a[0]-A[0])*s1-(a[1]-A[1])*s0)/den,u=((a[0]-A[0])*r1-(a[1]-A[1])*r0)/den;
+        if(tt>=0&&tt<=1&&u>=0&&u<=1)(hits[k]||(hits[k]=new Set())).add(Math.round((tt*2*HALF-HALF)*100)/100)}));
+      const h={};Object.entries(hits).forEach(([k,v])=>h[k]=[...v].sort((a,b)=>a-b));
+      return {st:Math.round(st*100)/100,x:px,y:py,h}});
+    out.push({name:nm.length?nm[0][0]:'EJE '+(ai+1),alt:nm.slice(1,3).map(x=>x[0]),L:Ltot,axis:q.filter((_,j)=>j%4===0||j===q.length-1).map(p=>[+p[0].toFixed(2),+p[1].toFixed(2)]),rows});
+  });
+  // nombres repetidos
+  const seenN={};out.forEach(o=>{seenN[o.name]=(seenN[o.name]||0)+1;if(seenN[o.name]>1)o.name+=' ('+seenN[o.name]+')'});
+  const data=out.map((o,id)=>{const sts=o.rows.map(r=>{const L=sideval(side(r.h,1)),Rr=sideval(side(r.h,-1));const [s,m]=status(L,Rr,r);return {st:r.st,x:+r.x.toFixed(2),y:+r.y.toFixed(2),L,R:Rr,s,m}});
+    return {id,name:o.name,alt:o.alt,L:o.L,axis:o.axis,sts}});
+  loadData(data,PL.name);
+  stat('#stP',[['ok',`${esc(PL.name)} procesado: ${data.length} ejes, ${data.reduce((a,d)=>a+d.sts.length,0)} progresivas cada ${step} m.`],
+    ...(stl.length?[]:[['info','Sin textos de progresiva: el sentido de cada eje es el del dibujo. Usa "Invertir sentido" si hace falta.']]),
+    ...(names.length?[]:[['info','Sin capa de nombres: los ejes se llaman EJE 1, EJE 2… Usa "Renombrar".']])]);
+}
+function side(h,s){
+  const g=k=>(h[k]||[]).filter(v=>v*s>0.05).map(Math.abs).sort((a,b)=>a-b);
+  const cnt=g('CNT'),cnd=g('CNTD'),sar=g('SAR'),vrd=g('VRD'),mz=g('MZ'),mrt=g('MRT'),o={};
+  if(cnt.length>=2)o.cun=['A',cnt[0],cnt[cnt.length-1]];else if(cnd.length>=2)o.cun=['C',cnd[0],cnd[cnd.length-1]];
+  if(sar.length>=2)o.sar=[sar[0],sar[sar.length-1]];
+  const edge=o.cun?o.cun[1]:(o.sar?o.sar[0]:null);o.calz=edge;
+  const after=o.cun?o.cun[2]:(o.sar?o.sar[1]:null);
+  if(vrd.length&&after!=null){const out=vrd[vrd.length-1],inner=vrd.length>=2&&vrd[vrd.length-2]-after>0.3?vrd[vrd.length-2]:after;if(out>after)o.ver=[inner,out];if(inner-after>0.3)o.fr=[after,inner]}
+  if(mz.length&&edge!=null){const m=mz.filter(x=>x>edge);if(m.length)o.lim=m[0]}
+  if(mrt.length)o.mrt=true;return o}
+function sideval(o){if(!o||o.calz==null)return null;const r=v=>Math.round(v*20)/20;
+  const v={calz:r(o.calz),cun:o.cun?(o.cun[0]==='A'?'abierta':'cerrada'):'ninguna',cunA:o.cun?r(o.cun[2]-o.cun[1]):0,sar:o.sar?r(o.sar[1]-o.sar[0]):0,fr:o.fr?r(o.fr[1]-o.fr[0]):0,ver:o.ver?r(o.ver[1]-o.ver[0]):0};
+  if(o.lim!=null)v.lim=Math.round(o.lim*100)/100;if(o.mrt)v.mrt=true;return v}
+function status(L,R){
+  if(!L&&!R)return ['sin','Sin elementos de proyecto'];
+  if((L&&L.mrt)||(R&&R.mrt))return ['int','Martillo / intersección'];
+  if((L&&L.cun==='cerrada')||(R&&R.cun==='cerrada'))return ['cruce','Cuneta tapada'];
+  const m=[];[['izq',L],['der',R]].forEach(([s,v])=>{if(!v){m.push('lado '+s+' sin elementos');return}if(v.cunA>1)m.push('cuneta '+s+' '+v.cunA.toFixed(2)+' m: lectura dudosa');if(v.ver>2.5)m.push('vereda '+s+' '+v.ver.toFixed(2)+' m: lectura dudosa')});
+  return m.length?['rev',m.join('; ')]:['ok','']}
+
+// =====================================================================
+// PASO 3: SECCIONES DEL CIVIL (marco, datum y escalas)
+// =====================================================================
+// Lee las vistas de sección exportadas del Civil 3D: título con progresiva, columnas de cotas y fila de distancias.
+function leerSecciones(dx){
+  const T=dx.ents.filter(e=>e.text!=null);
+  const isNum=s=>/^[-+]?\d+(?:[.,]\d+)?$/.test(s.trim()),val=s=>+s.trim().replace(',','.');
+  const reSt=/(\d+)\s*\+\s*(\d{3}(?:[.,]\d+)?)/;
+  // títulos: textos con progresiva que no son números sueltos; si un texto empieza con ST/PROG/SECC se prefiere
+  let tit=T.filter(t=>reSt.test(t.text)&&t.text.length<60);
+  const pref=tit.filter(t=>/^(ST|PROG|SECC|SEC|KM|EST)/i.test(t.text.trim()));if(pref.length>=3)tit=pref;
+  if(!tit.length)return {views:[],log:{tit:0}};
+  // el título está en la capa de la vista; usamos esa capa para la cuadrícula
+  const vly=Object.entries(tit.reduce((a,t)=>(a[t.ly]=(a[t.ly]||0)+1,a),{})).sort((a,b)=>b[1]-a[1])[0][0];
+  tit=tit.filter(t=>t.ly===vly);
+  const nums=T.filter(t=>t.ly===vly&&isNum(t.text));
+  // índice espacial de números
+  const CS=20,NG=new Map();nums.forEach(n=>{const k=Math.floor(n.x/CS)+','+Math.floor(n.y/CS);(NG.get(k)||NG.set(k,[]).get(k)).push(n)});
+  const near=(x0,x1,y0,y1)=>{const o=[];for(let gx=Math.floor(x0/CS);gx<=Math.floor(x1/CS);gx++)for(let gy=Math.floor(y0/CS);gy<=Math.floor(y1/CS);gy++)(NG.get(gx+','+gy)||[]).forEach(n=>{if(n.x>=x0&&n.x<=x1&&n.y>=y0&&n.y<=y1)o.push(n)});return o};
+  // separación entre títulos vecinos
+  const views=[];
+  const below=(()=>{ // ¿el título va encima del marco? se mira el título más alto
+    const top=tit.reduce((a,t)=>t.y>a.y?t:a,tit[0]);return near(top.x-15,top.x+15,top.y-30,top.y-0.2).length>=near(top.x-15,top.x+15,top.y+0.2,top.y+30).length})();
+  tit.forEach(t=>{
+    let dxn=60,dyn=80;tit.forEach(o=>{if(o===t)return;const ddx=Math.abs(o.x-t.x),ddy=below?t.y-o.y:o.y-t.y;
+      if(Math.abs(o.y-t.y)<dyn&&ddx>1)dxn=Math.min(dxn,ddx);if(ddx<1&&ddy>0.5)dyn=Math.min(dyn,ddy)});
+    const hx=dxn/2,y0=below?t.y-dyn+0.3:t.y+0.1,y1=below?t.y-0.1:t.y+dyn-0.3;
+    const ns=near(t.x-hx,t.x+hx,y0,y1);if(ns.length<4)return;
+    // columnas (misma x) = cotas; filas (misma y) = distancias
+    const byX={},byY={};ns.forEach(n=>{(byX[n.x.toFixed(2)]||(byX[n.x.toFixed(2)]=[])).push(n);(byY[n.y.toFixed(2)]||(byY[n.y.toFixed(2)]=[])).push(n)});
+    const cols=Object.values(byX).filter(c=>c.length>=2&&new Set(c.map(n=>n.y.toFixed(2))).size>=2);
+    const rows=Object.values(byY).filter(r=>r.length>=3&&r.some(n=>val(n.text)<0)&&r.some(n=>val(n.text)>0)).sort((a,b)=>b.length-a.length);
+    const fit=pairs=>{const n=pairs.length;if(n<2)return null;let sx=0,sy=0,sxx=0,sxy=0;pairs.forEach(([v,c])=>{sx+=v;sy+=c;sxx+=v*v;sxy+=v*c});const d=n*sxx-sx*sx;if(Math.abs(d)<1e-9)return null;const a=(n*sxy-sx*sy)/d;return {a,b:(sy-a*sx)/n}};
+    const elP=[];cols.forEach(c=>c.forEach(n=>elP.push([val(n.text),n.y])));const fy=fit(elP);
+    const of=rows[0]?rows[0].map(n=>[val(n.text),n.x]):[];const fx=fit(of);
+    if(!fy||fy.a<=0)return;
+    const els=elP.map(p=>p[0]),offs=of.map(p=>p[0]);
+    const ax=fx&&fx.a>0?fx.a:fy.a,bx=fx&&fx.a>0?fx.b:t.x;
+    const xl=offs.length?bx+ax*Math.min(...offs):t.x-hx*0.8,xr=offs.length?bx+ax*Math.max(...offs):t.x+hx*0.8;
+    const zmin=Math.min(...els),zmax=Math.max(...els);
+    const m=t.text.match(reSt),st=Number(m[1])*1000+Number(m[2].replace(',','.'));
+    views.push({st,tx:t.x,ty:t.y,ax,bx,ay:fy.a,by:fy.b,zmin,zmax,frame:{x0:xl,x1:xr,y0:fy.a*zmin+fy.b,y1:fy.a*zmax+fy.b},off:[offs.length?Math.min(...offs):null,offs.length?Math.max(...offs):null]});
+  });
+  // marco del Civil (cuadrícula y textos) para el plano final
+  const GL=dx.ents.filter(e=>e.ly===vly&&e.pts),GT=T.filter(t=>t.ly===vly),GG=new Map();
+  [...GL,...GT].forEach(e=>{const x=e.pts?e.pts[0][0]:e.x,y=e.pts?e.pts[0][1]:e.y,k=Math.floor(x/CS)+','+Math.floor(y/CS);(GG.get(k)||GG.set(k,[]).get(k)).push(e)});
+  views.forEach(v=>{const f=v.frame,X0=f.x0-4,X1=f.x1+4,Y0=f.y0-3,Y1=Math.max(f.y1,v.ty)+2,lines=[],texts=[];
+    for(let gx=Math.floor(X0/CS);gx<=Math.floor(X1/CS);gx++)for(let gy=Math.floor(Y0/CS);gy<=Math.floor(Y1/CS);gy++)(GG.get(gx+','+gy)||[]).forEach(e=>{
+      if(e.pts){if(e.pts.every(p=>p[0]>=X0&&p[0]<=X1&&p[1]>=Y0&&p[1]<=Y1))lines.push(e.pts.map(p=>[+p[0].toFixed(3),+p[1].toFixed(3)]))}else if(e.x>=X0&&e.x<=X1&&e.y>=Y0&&e.y<=Y1)texts.push({x:+e.x.toFixed(3),y:+e.y.toFixed(3),h:e.h,t:e.text,al:e.att})});
+    v.grid={lines,texts}});
+  // líneas dentro de cada marco (sin la cuadrícula)
+  const P=dx.ents.filter(e=>e.pts&&e.ly!==vly),PG=new Map();
+  P.forEach(e=>{const xs=e.pts.map(p=>p[0]),ys=e.pts.map(p=>p[1]),bb=[Math.min(...xs),Math.max(...xs),Math.min(...ys),Math.max(...ys)];e.bb=bb;const k=Math.floor((bb[0]+bb[1])/2/CS)+','+Math.floor((bb[2]+bb[3])/2/CS);(PG.get(k)||PG.set(k,[]).get(k)).push(e)});
+  views.forEach(v=>{const f=v.frame,o=[],tol=0.05;for(let gx=Math.floor(f.x0/CS)-1;gx<=Math.floor(f.x1/CS)+1;gx++)for(let gy=Math.floor(f.y0/CS)-1;gy<=Math.floor(f.y1/CS)+1;gy++)(PG.get(gx+','+gy)||[]).forEach(e=>{const b=e.bb;if(b[0]>=f.x0-tol&&b[1]<=f.x1+tol&&b[2]>=f.y0-tol&&b[3]<=f.y1+tol)o.push({ly:e.ly,pts:e.pts})});v.polys=o});
+  // grupos: secciones vecinas en el dibujo, ordenadas por progresiva
+  const md=(()=>{const d=views.map(v=>Math.min(...views.filter(w=>w!==v).map(w=>Math.hypot(w.tx-v.tx,w.ty-v.ty))));d.sort((a,b)=>a-b);return d[Math.floor(d.length/2)]||30})();
+  const par=views.map((_,i)=>i),fd=i=>par[i]===i?i:(par[i]=fd(par[i]));
+  for(let i=0;i<views.length;i++)for(let j=i+1;j<views.length;j++)if(Math.hypot(views[i].tx-views[j].tx,views[i].ty-views[j].ty)<md*3.2)par[fd(i)]=fd(j);
+  const G={};views.forEach((v,i)=>(G[fd(i)]||(G[fd(i)]=[])).push(v));
+  // un grupo con dos 0+000 se parte por cercanía de progresivas consecutivas
+  let groups=[];Object.values(G).forEach(g=>{g.sort((a,b)=>a.st-b.st);const z=g.filter(v=>v.st<0.01);if(z.length<=1){groups.push(g);return}
+    // separar asignando cada vista al 0+000 más cercano de su cadena
+    const chains=z.map(v=>[v]);g.filter(v=>v.st>=0.01).forEach(v=>{let best=null,bd=1e9;chains.forEach(c=>{const l=c[c.length-1];const d=Math.hypot(l.tx-v.tx,l.ty-v.ty);if(v.st>l.st&&d<bd){bd=d;best=c}});(best||chains[0]).push(v)});groups.push(...chains)});
+  // encadenar láminas: la que empieza en la progresiva siguiente al final de otra, la más cercana en el dibujo
+  let cl=groups.map(g=>({views:g,ini:g[0].st,fin:g[g.length-1].st,next:null,prev:null}));
+  const steps=[];cl.forEach(c=>{for(let i=1;i<c.views.length;i++)steps.push(c.views[i].st-c.views[i-1].st)});steps.sort((x,y)=>x-y);const stp=steps[Math.floor(steps.length/2)]||20;
+  const pairs=[];cl.forEach(B=>{if(B.ini<0.01)return;cl.forEach(A=>{if(A===B)return;const g=B.ini-A.fin;if(g>0.01&&g<=stp*1.05+0.01){const la=A.views[A.views.length-1],fb=B.views[0];pairs.push([Math.hypot(la.tx-fb.tx,la.ty-fb.ty),A,B])}})});
+  pairs.sort((x,y)=>x[0]-y[0]).forEach(([d,A,B])=>{if(A.next||B.prev)return;let h=A;while(h.prev)h=h.prev;if(h===B)return;A.next=B;B.prev=A});
+  groups=cl.filter(c=>!c.prev).map(h=>{const vs=[];let c=h;while(c){vs.push(...c.views);c=c.next}return {views:vs,ini:vs[0].st,fin:vs[vs.length-1].st,n:vs.length,cx:vs[0].tx,cy:vs[0].ty}}).sort((a,b)=>b.n-a.n);
+  return {groups,log:{tit:tit.length,views:views.length,ly:vly}};
+}
+// cota (m) de la capa ly a una distancia 'off' del eje dentro del marco (la línea más alta que cruza)
+function zAt(fr,ly,off){if(!fr.ay||!fr.polys)return null;const X=fr.bx+off*fr.ax,lys=Array.isArray(ly)?ly:[ly];let best=null;
+  fr.polys.forEach(p=>{if(!lys.includes(p.ly))return;for(let i=0;i<p.pts.length-1;i++){const a=p.pts[i],b=p.pts[i+1];if(a[0]===b[0]||(X-a[0])*(X-b[0])>0)continue;const y=a[1]+(b[1]-a[1])*(X-a[0])/(b[0]-a[0]);if(best==null||y>best)best=y}});
+  return best==null?null:(best-fr.by)/fr.ay}
+let SECC=null;
+function asignarGrupos(){
+  // empareja cada grupo con la calle de largo parecido (última progresiva) y mismas progresivas
+  const used=new Set();
+  SECC.groups.forEach(g=>{let best=null,bd=1e9;DATA.forEach(c=>{if(used.has(c.id))return;const d=Math.abs(c.L-g.fin)+(g.ini>0.01?5:0);if(d<bd){bd=d;best=c}});g.calle=best&&bd<2.5?best.id:'';if(g.calle!=='')used.add(g.calle)});
+}
+function renderGrupos(){
+  const opts=c=>`<option value="">(no usar)</option>`+DATA.map(d=>`<option value="${d.id}" ${String(d.id)===String(c)?'selected':''}>${esc(d.name)} · ${d.L.toFixed(2)} m</option>`).join('');
+  $('#grupos').innerHTML=SECC.groups.map((g,i)=>`<label for="gr-${i}">${g.n} secc. · ${fst(g.ini)} – ${fst(g.fin)}</label><select id="gr-${i}" data-gr="${i}">${opts(g.calle)}</select>`).join('');
+  $('#grupos').querySelectorAll('[data-gr]').forEach(s=>s.onchange=()=>{SECC.groups[+s.dataset.gr].calle=s.value===''?'':num(s.value)});
+  $('#grBox').hidden=false;
+}
+function aplicarGrupos(){let n=0,nc=0;const miss=[];
+  Object.values(S.streets).forEach(sd=>sd.st.forEach(x=>delete x.fr));
+  SECC.groups.forEach(g=>{if(g.calle==='')return;const sd=S.streets[g.calle];if(!sd)return;nc++;
+    sd.st.forEach(x=>{const v=g.views.find(v=>Math.abs(v.st-x.st)<0.06);if(v){x.fr=v;n++}else miss.push(DATA.find(d=>d.id===g.calle).name+' '+fst(x.st))})});
+  // capas candidatas a rasante
+  const score={},cover={};SECC.groups.forEach(g=>g.views.forEach(fr=>{const seen=new Set();fr.polys.forEach(p=>{if(seen.has(p.ly))return;if(zAt(fr,p.ly,0)!=null){seen.add(p.ly);score[p.ly]=(score[p.ly]||0)+1;
+      const xs=fr.polys.filter(q=>q.ly===p.ly).flatMap(q=>q.pts.map(r=>r[0]));(cover[p.ly]||(cover[p.ly]=[])).push((Math.max(...xs)-Math.min(...xs))/Math.max(1e-6,fr.frame.x1-fr.frame.x0))}})}));
+  const med=a=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.floor(s.length/2)]};
+  const ra=/RASANT|FG|FINISH|PAVIM|CORRID|CORR|SCTN|LINK|SHAP|DISE|PROY/i,rb=/TERR|TOPO|EG|EXIST|NATUR|GROUND/i;
+  const rank=l=>(rb.test(l)?2:0)+(med(cover[l])>0.92?1:0)-(ra.test(l)?1:0);
+  const cand=Object.keys(score).sort((a,b)=>rank(a)-rank(b)||score[b]-score[a]);
+  window.TERLY=cand.filter(l=>rb.test(l)||med(cover[l])>0.92);
+  Object.values(S.streets).forEach(sd=>sd.st.forEach(x=>{if(x.fr&&x.fr.polys)x.fr.ter=x.fr.polys.filter(p=>window.TERLY.includes(p.ly)).map(p=>p.pts.map(q=>[+q[0].toFixed(3),+q[1].toFixed(3)]))}));
+  $('#rasLy').innerHTML=cand.map((l,i)=>{const ter=rb.test(l)||med(cover[l])>0.92;return `<label style="display:flex;gap:6px;align-items:center;color:var(--ink)"><input type="checkbox" value="${esc(l)}" ${ter?'':'checked'}> ${esc(l)} <span class="note">· en ${score[l]} secciones${ter?' · parece terreno':''}</span></label>`}).join('')||'<div class="note">No hay líneas que crucen el eje.</div>';
+  $('#rasBox').hidden=!cand.length;
+  stat('#stS2',[[n?'ok':'warn',`${n} progresivas de ${nc} calles quedaron con su marco del Civil.`],...(miss.length?[['info','Sin sección en el Civil: '+miss.slice(0,6).join(', ')+(miss.length>6?'…':'')]]:[])]);
+  renderAll();
+}
+function copiarRasante(){const msg0=$('#stS2').innerHTML;const ly=[...document.querySelectorAll('#rasLy input:checked')].map(i=>i.value);if(!ly.length)return stat('#stS2',[['warn','Marca al menos una capa de rasante.']]);let n=0,nb=0;
+  Object.values(S.streets).forEach(sd=>{sd.st.forEach(x=>{if(!x.fr)return;const ze=zAt(x.fr,ly,0);if(ze==null)return;x.zc=x.zc||{};
+    const put=(k,v)=>{if(v==null)return;if(x.z[k]!=null&&!x.zc[k])return;x.z[k]=Math.round(v*1000)/1000;x.zc[k]=1};
+    put('eje',ze);n++;['L','R'].forEach(s=>{if(!x[s])return;const sg=s==='L'?-1:1,v=zAt(x.fr,ly,sg*Math.max(0,x[s].calz-0.05));if(v!=null){put('b'+s,v);nb++}})});sd.rasLy=ly});
+  $('#stS2').innerHTML=msg0;$('#stS2').insertAdjacentHTML('beforeend',`<span class="ok">Cota de rasante copiada en ${n} progresivas (${nb} bordes de calzada) desde ${esc(ly.join(', '))}.</span>`);renderAll();save2local()}
+async function loadSecciones(f){
+  if(!/\.dxf$/i.test(f.name))return stat('#stS',[['warn','El archivo debe ser .dxf.']]);
+  stat('#stS',[['info','Leyendo '+esc(f.name)+'…']]);$('#grBox').hidden=true;$('#rasBox').hidden=true;stat('#stS2',[]);await new Promise(r=>setTimeout(r,30));
+  const dx=parseDXF(await readFile(f));SECC=leerSecciones(dx);
+  if(!SECC.groups||!SECC.groups.length){
+    return stat('#stS',[['warn',`${esc(f.name)} no tiene vistas de sección legibles: no encontré títulos con progresiva y cotas al costado.`],['info','En Civil 3D las vistas de sección se pierden al guardar como DXF. Primero usa Salida → Exportar a AutoCAD y guarda ese archivo como DXF.'],...(dx.layers['EJE DE VIA']||dx.layers['C-ROAD']?[['info','Si este archivo es tu planta, cárgalo en el paso 1.']]:[])]);}
+  asignarGrupos();
+  stat('#stS',[['ok',`${esc(f.name)}: ${SECC.log.views} secciones en ${SECC.groups.length} grupos (capa ${esc(SECC.log.ly)}).`],['info','Ya se aplicaron los marcos y la cota de rasante. Si un grupo quedó en otra calle, cámbialo y vuelve a aplicar.']]);
+  renderGrupos();aplicarGrupos();if(document.querySelector('#rasLy input:checked'))copiarRasante();
+}
+
+// =====================================================================
+// ESTADO
+// =====================================================================
+let DATA=[];const S={cur:0,sel:0,exag:1,streets:{},src:''};
+function newStreet(c){return {tip:{bomb:2,hv:0.20,prof:0.40,tc:0.10,ev:0.10,us:0.30},pav:{tipo:'rigido',e1:0.20,e2:0.20,e3:0.00},
+  st:c.sts.map(s=>({st:s.st,s:s.s,m:s.m,x:s.x,y:s.y,gen:!(s.s==='sin'||s.s==='int'),read:{L:s.L?{...s.L}:null,R:s.R?{...s.R}:null},L:s.L?{...s.L}:null,R:s.R?{...s.R}:null,z:{},muro:{L:null,R:null},bl:[]}))}}
+function loadData(data,src){DATA=data;S.streets={};DATA.forEach(c=>S.streets[c.id]=newStreet(c));S.src=src;S.cur=DATA[0]?DATA[0].id:0;S.sel=firstOk();renderSecCalle();renderAll();save2local()}
+function firstOk(){const sd=S.streets[S.cur];if(!sd)return 0;const i=sd.st.findIndex(x=>x.s==='ok');return i<0?0:i}
+const street=()=>DATA.find(d=>d.id===S.cur),SD=()=>S.streets[S.cur],STN=()=>SD().st[S.sel];
+function renderSecCalle(){}
+
+// =====================================================================
+// GEOMETRÍA (misma para vista y DXF)
+// =====================================================================
+function build(sd,stn){
+  const tip=sd.tip,pav=sd.pav,z=stn.z,P=[],T=[],info={};
+  const eje=num(z.eje)??(stn.fr&&stn.fr.zmin!=null?Math.round(((stn.fr.zmin+stn.fr.zmax)/2)*100)/100:0);info.rel=num(z.eje)==null;info.eje=eje;
+  const pk=[pav.e1||0,pav.e2||0,pav.e3||0],sides={};
+  ['L','R'].forEach(s=>{const v=stn[s];if(!v)return;const sg=s==='L'?-1:1,X=d=>sg*d,xe=v.calz,zb=num(z['b'+s])??(eje-tip.bomb/100*xe);
+    const hasCun=v.cun!=='ninguna'&&v.cunA>0,zv=num(z['v'+s])??(zb+tip.hv),surf=[[0,eje],[xe,zb]];
+    // con jardín, el sardinel/cuneta conserva su altura típica y el jardín toma la pendiente hasta la vereda
+    const zs=v.fr>0?zb+tip.hv:zv;
+    const lys=['SEC-PAVIMENTO','SEC-BASE','SEC-SUBBASE'];let acc=0;
+    pk.forEach((e,k)=>{if(e<=0)return;const a=acc,b=acc+e;P.push({ly:lys[k],closed:true,fill:['asphalt','base','subbase'][k],pts:[[X(0),eje-a],[X(xe),zb-a],[X(xe),zb-b],[X(0),eje-b]]});acc=b});
+    P.push({ly:'SEC-SUBRASANTE',pts:[[X(0),eje-acc],[X(xe),zb-acc]]});
+    let x=xe;info['b'+s]=zb;info['v'+s]=zv;
+    if(hasCun){const w=v.cunA,t=Math.min(tip.tc,w/3),zf=num(z['f'+s])??(zb-tip.prof);info['f'+s]=zf;
+      P.push({ly:'SEC-CUNETA',closed:true,fill:'concrete',pts:[[X(x),zb],[X(x+t),zb],[X(x+t),zf],[X(x+w-t),zf],[X(x+w-t),zs],[X(x+w),zs],[X(x+w),zf-t],[X(x),zf-t]]});
+      if(v.cun==='cerrada')P.push({ly:'SEC-CUNETA',closed:true,fill:'cruce',pts:[[X(x+t),zb],[X(x+w-t),zb],[X(x+w-t),zb-0.10],[X(x+t),zb-0.10]]});
+      surf.push([x+t,zb],[x+t,zf],[x+w-t,zf],[x+w-t,zs],[x+w,zs]);x+=w}
+    else if(v.sar>0){P.push({ly:'SEC-SARDINEL',closed:true,fill:'concrete',pts:[[X(x),zb],[X(x),zs],[X(x+v.sar),zs],[X(x+v.sar),zb-tip.us],[X(x),zb-tip.us]]});surf.push([x,zs],[x+v.sar,zs]);x+=v.sar}
+    if(v.fr>0){P.push({ly:'SEC-JARDIN',closed:true,fill:'grass',pts:[[X(x),zs],[X(x+v.fr),zv],[X(x+v.fr),zv-0.15],[X(x),zs-0.15]]});surf.push([x+v.fr,zv]);
+      info['j'+s]={x:x+v.fr/2,z:(zs+zv)/2,p:(zv-zs)/v.fr*100};x+=v.fr}
+    if(v.ver>0){P.push({ly:'SEC-VEREDA',closed:true,fill:'concrete',pts:[[X(x),zv],[X(x+v.ver),zv],[X(x+v.ver),zv-tip.ev],[X(x),zv-tip.ev]]});surf.push([x+v.ver,zv]);x+=v.ver}
+    sides[s]={end:x,zv,surf,sub:eje-acc};
+    if(v.lim)P.push({ly:'SEC-LIMITE',dash:true,pts:[[X(v.lim),zv+1.2],[X(v.lim),zv-0.6]]});
+    const m=stn.muro[s];
+    if(m){const xm=m.pos==='offset'&&num(m.off)!=null?num(m.off):(m.pos==='lim'&&v.lim?v.lim:x);
+      const zc=num(m.zc)??zv,H=num(m.zb)!=null?Math.max(0.1,zc-num(m.zb)):(num(m.H)||1.5),zbse=zc-H,c=num(m.c)||0.30,B=num(m.B)||1.0;
+      if(m.tipo==='gravedad')P.push({ly:'SEC-MURO',closed:true,fill:'wall',pts:[[X(xm),zc],[X(xm+c),zc],[X(xm+B),zbse],[X(xm),zbse]]});
+      else if(m.tipo==='voladizo'){const p=num(m.p)||0.3,hz=num(m.hz)||0.4,e=c;P.push({ly:'SEC-MURO',closed:true,fill:'wall',pts:[[X(xm),zc],[X(xm+e),zc],[X(xm+e),zbse+hz],[X(xm+B-p),zbse+hz],[X(xm+B-p),zbse],[X(xm-p),zbse],[X(xm-p),zbse+hz],[X(xm),zbse+hz]]})}
+      else P.push({ly:'SEC-MURO',closed:true,fill:'wall',block:(m.nombre||'MURO_PROPIO').toUpperCase(),pts:[[X(xm),zc],[X(xm+B),zc],[X(xm+B),zbse],[X(xm),zbse]]});
+      T.push({ly:'SEC-TEXTO',x:X(xm+B/2),z:zbse-0.35,t:(m.tipo==='propio'?(m.nombre||'MURO_PROPIO'):'MURO')+' H='+H.toFixed(2)});info['m'+s]={zc,zbse}}});
+  const surfZ=(s,d)=>{const q=sides[s];if(!q)return eje;const p=q.surf;for(let i=0;i<p.length-1;i++)if(d>=p[i][0]&&d<=p[i+1][0]){const a=p[i],b=p[i+1];return b[0]===a[0]?Math.max(a[1],b[1]):a[1]+(b[1]-a[1])*(d-a[0])/(b[0]-a[0])}return q.zv};
+  stn.bl.forEach(b=>{const s=b.lado,off=num(b.off)??2,sg=s==='L'?-1:1,zz=surfZ(s,off),def=BLK[b.tipo]||{w:num(b.w)||1,h:num(b.h)||1};
+    P.push({ly:'SEC-BLOQUES',insert:b.tipo==='PROPIO'?(b.nombre||'BLOQUE_PROPIO').toUpperCase():'SEC_'+b.tipo,x:sg*off,z:zz,w:def.w,h:def.h,kind:b.tipo})});
+  info.sides=sides;return {P,T,info}}
+function blockShape(kind,w,h){const r=(x0,y0,x1,y1)=>[[x0,y0],[x1,y0],[x1,y1],[x0,y1]];
+  if(kind==='AUTO'||kind==='CAMIONETA')return [r(-w/2,0.3,w/2,h*0.55),[[-w*0.38,h*0.55],[w*0.38,h*0.55],[w*0.3,h],[-w*0.3,h]],r(-w/2+0.05,0,-w/2+0.3,0.35),r(w/2-0.3,0,w/2-0.05,0.35)];
+  if(kind==='MOTOTAXI')return [r(-w/2,0.25,w/2,h*0.7),[[-w/2,h*0.7],[w/2,h*0.7],[w/2-0.1,h],[-w/2+0.1,h]],r(-0.08,0,0.08,0.3)];
+  if(kind==='MOTO')return [r(-0.08,0,0.08,0.55),r(-w/2,0.55,w/2,0.7),r(-0.18,0.7,0.18,h-0.25),r(-0.12,h-0.25,0.12,h)];
+  if(kind==='PERSONA')return [r(-0.12,0,0.12,0.85),r(-w/2,0.85,w/2,1.5),r(-0.11,1.52,0.11,h)];
+  if(kind==='POSTE')return [r(-w/2,0,w/2,h),[[-1.2,h-0.6],[1.2,h-0.6],[1.2,h-0.5],[-1.2,h-0.5]]];
+  if(kind==='ARBOL')return [r(-0.12,0,0.12,h*0.45),[[0,h],[w/2,h*0.62],[w*0.3,h*0.42],[-w*0.3,h*0.42],[-w/2,h*0.62]]];
+  return [r(-w/2,0,w/2,h)]}
+
+// =====================================================================
+// VISTAS
+// =====================================================================
+function renderCalles(){const nav=$('#calles');nav.querySelectorAll('.calle,.note').forEach(n=>n.remove());
+  if(!DATA.length){nav.insertAdjacentHTML('beforeend','<div class="note" style="padding:6px 10px">Carga una planta para ver sus calles.</div>');return}
+  DATA.forEach(c=>{const b=document.createElement('button');b.className='calle'+(c.id===S.cur?' on':'');b.id='calle-'+c.id;
+    const sd=S.streets[c.id],g=sd.st.filter(x=>x.gen).length,zc=sd.st.filter(x=>x.gen&&num(x.z.eje)!=null).length,fr=sd.st.filter(x=>x.fr).length;
+    b.innerHTML=`<span class="n">${esc(c.name)}</span><span class="m">${c.L.toFixed(0)} m · ${g} secc. · cotas ${zc}/${g}${fr?' · marcos '+fr:''}</span>`;
+    b.onclick=()=>{S.cur=c.id;S.sel=firstOk();renderAll()};nav.appendChild(b)})}
+function renderPlanta(){const c=street(),sd=SD(),pts=c.axis,xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys),W=1000,pad=36,sc=Math.min((W-2*pad)/Math.max(x1-x0,1),(300-2*pad)/Math.max(y1-y0,1)),H=Math.max(150,(y1-y0)*sc+2*pad);
+  const X=x=>pad+(x-x0)*sc+((W-2*pad)-(x1-x0)*sc)/2,Y=y=>H-pad-(y-y0)*sc,svg=$('#planta');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const line=pts.map(p=>X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join(' ');
+  let h=`<polyline points="${line}" fill="none" stroke="var(--asphalt)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".22"/><polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="8 5"/>`;
+  sd.st.forEach((s,i)=>{const on=i===S.sel;h+=`<circle data-i="${i}" cx="${X(s.x).toFixed(1)}" cy="${Y(s.y).toFixed(1)}" r="${on?8:4.5}" fill="${s.gen?`var(--${s.s})`:'var(--panel)'}" stroke="${s.gen?'var(--panel)':`var(--${s.s})`}" stroke-width="${s.gen?1.5:2}" style="cursor:pointer"><title>${fst(s.st)} · ${ST[s.s]}</title></circle>`;
+    if(on||i%(sd.st.length>30?5:2)===0||i===sd.st.length-1)h+=`<text x="${(X(s.x)+9).toFixed(1)}" y="${(Y(s.y)-9).toFixed(1)}" font-family="JetBrains Mono,monospace" font-size="11" fill="${on?'var(--ink)':'var(--muted)'}">${fst(s.st)}</text>`});
+  svg.innerHTML=h;svg.querySelectorAll('circle').forEach(n=>n.onclick=()=>{S.sel=+n.dataset.i;renderStation()})}
+function sideTxt(v,r){if(!v)return '—';const ch=k=>r&&r[k]!==v[k];const cun=v.cun==='ninguna'?(v.sar?'sard. '+f2(v.sar):'—'):(v.cun==='abierta'?'abierta ':'tapada ')+f2(v.cunA);
+  return `<span class="${ch('calz')?'ed':''}">${f2(v.calz)}</span> | <span class="${ch('cun')||ch('cunA')||ch('sar')?'ed':''}">${cun}</span> | <span class="${ch('fr')?'ed':''}">${f2(v.fr)}</span> | <span class="${ch('ver')?'ed':''}">${f2(v.ver)}</span>`}
+function renderTabla(){const sd=SD();
+  let h=`<thead><tr><th class="l">Gen.</th><th class="l">Progresiva</th><th class="l">Estado</th><th class="bl">Izq: calz | cuneta | franja | vereda</th><th class="bl">Der: calz | cuneta | franja | vereda</th><th class="bl">Cota eje</th><th class="l">Extras</th></tr></thead><tbody>`;
+  sd.st.forEach((s,i)=>{const nz=['eje','bL','bR','vL','vR','fL','fR'].filter(k=>num(s.z[k])!=null).length;
+    h+=`<tr data-i="${i}" class="${i===S.sel?'sel':''} ${s.gen?'':'off'}"><td class="l"><input type="checkbox" data-g="${i}" ${s.gen?'checked':''} aria-label="Generar ${fst(s.st)}"></td><td class="l mono">${fst(s.st)}</td><td class="l"><span class="chip c-${s.s}">${ST[s.s]}</span></td><td class="bl mono">${sideTxt(s.L,s.read.L)}</td><td class="bl mono">${sideTxt(s.R,s.read.R)}</td><td class="bl mono">${num(s.z.eje)!=null?f3(s.z.eje)+(nz>1?` <span class="tag on">+${nz-1}</span>`:''):'<span class="note">—</span>'}</td><td class="l">${s.fr?'<span class="tag on">marco</span>':''}${s.zc&&s.zc.eje?'<span class="tag on">rasante Civil</span>':''}${s.muro.L||s.muro.R?'<span class="tag on">muro</span>':''}${s.bl.length?`<span class="tag on">${s.bl.length} bloq.</span>`:''}</td></tr>`});
+  $('#tbl').innerHTML=h+'</tbody>';
+  $('#tbl').querySelectorAll('tbody tr').forEach(r=>r.onclick=e=>{if(e.target.dataset.g!=null)return;S.sel=+r.dataset.i;renderStation()});
+  $('#tbl').querySelectorAll('input[data-g]').forEach(c=>c.onchange=()=>{sd.st[+c.dataset.g].gen=c.checked;renderTabla();renderPlanta();renderCalles();save2local()});
+  $('#genCount').textContent=sd.st.filter(x=>x.gen).length+' de '+sd.st.length+' progresivas se generan'}
+
+const FILL={asphalt:'var(--asphalt)',base:'var(--base)',subbase:'var(--subbase)',concrete:'var(--concrete)',grass:'var(--grass)',wall:'var(--wall)',cruce:'var(--cruce)'};
+// Vista con escala FIJA: el ancho se fija con la calle completa y la altura con el marco del Civil (o una ventana fija alrededor del eje)
+function drawSeccion(){const sd=SD(),stn=STN(),{P,T,info}=build(sd,stn),ex=S.exag,W=1000;
+  let half=4;sd.st.forEach(x=>['L','R'].forEach(s=>{const v=x[s];if(v)half=Math.max(half,v.calz+(v.cun!=='ninguna'?v.cunA:v.sar)+v.fr+v.ver+0.6,v.lim&&v.lim<14?v.lim+0.6:0)}));
+  ['L','R'].forEach(s=>{if(stn.muro[s])half=Math.max(half,info.sides[s]?info.sides[s].end+2:0)});
+  const fr=stn.fr&&stn.fr.zmin!=null?stn.fr:null;
+  let zTop,zBot;if(fr){zTop=fr.zmax;zBot=fr.zmin}else{zTop=info.eje+2.2;zBot=info.eje-2.8}
+  // con marco del Civil: mismo rango de distancias y misma proporción que el marco (igual que en AutoCAD)
+  const rgv=fr?rangoMarco(fr,P):null,oL=rgv?rgv.o0:-half,oR=rgv?rgv.o1:half;
+  const m=fr?1.6:0,sx=(W-120)/(oR-oL+2*m),sy=sx*(fr?fr.ay/fr.ax:1)*ex,H=Math.min(1500,Math.max(260,(zTop-zBot)*sy+100)),syy=(H-100)/(zTop-zBot);
+  const X=x=>60+(x-(oL-m))*sx,Y=z=>40+(zTop-z)*syy;
+  const svg=$('#seccion');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  let h=`<rect x="${X(oL)}" y="${Y(zTop)}" width="${X(oR)-X(oL)}" height="${Y(zBot)-Y(zTop)}" fill="none" stroke="var(--muted)" stroke-opacity=".6" stroke-width="1.2"/>`;
+  if(fr)for(let o=Math.ceil(oL/2)*2;o<=oR+1e-6;o+=2)h+=`<line x1="${X(o)}" y1="${Y(zTop)}" x2="${X(o)}" y2="${Y(zBot)}" stroke="var(--line)" stroke-width=".6"/><text x="${X(o)}" y="${Y(zBot)+13}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10" fill="var(--muted)">${o.toFixed(1)}</text>`;
+  // cuadrícula de cotas
+  const stepZ=[0.5,1,2,5].find(s=>(zTop-zBot)/s<=8)||10;
+  for(let z=Math.ceil(zBot/stepZ)*stepZ;z<=zTop+1e-6;z+=stepZ){h+=`<line x1="${X(oL)}" y1="${Y(z)}" x2="${X(oR)}" y2="${Y(z)}" stroke="var(--line)" stroke-width=".6"/><text x="${X(oL)-6}" y="${Y(z)+4}" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="10" fill="var(--muted)">${info.rel&&!fr?(z-info.eje>=0?'+':'')+(z-info.eje).toFixed(1):z.toFixed(2)}</text>`}
+  h+=`<line x1="${X(0)}" y1="${Y(zTop)-14}" x2="${X(0)}" y2="${Y(zBot)}" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="6 4"/><text x="${X(0)}" y="${Y(zTop)-18}" text-anchor="middle" font-family="Barlow Semi Condensed,sans-serif" font-size="13" font-weight="700" fill="var(--ink)">EJE ${fst(stn.st)}${fr?' · marco del Civil':''}</text>`;
+  h+=`<clipPath id="clipF"><rect x="${X(oL-m)}" y="${Y(zTop)}" width="${X(oR+m)-X(oL-m)}" height="${Y(zBot)-Y(zTop)}"/></clipPath><g clip-path="url(#clipF)">`;
+  if(fr&&!fr.polys&&fr.ter)fr.ter.forEach(p=>{h+=`<polyline points="${p.map(([x,y])=>X((x-fr.bx)/fr.ax).toFixed(1)+','+Y((y-fr.by)/fr.ay).toFixed(1)).join(' ')}" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/>`});
+  if(fr&&fr.polys){const rl=[].concat(SD().rasLy||[]);fr.polys.forEach(p=>{const isR=rl.includes(p.ly);if(isR&&!$('#verCiv').checked)return;h+=`<polyline points="${p.pts.map(([x,y])=>X((x-fr.bx)/fr.ax).toFixed(1)+','+Y((y-fr.by)/fr.ay).toFixed(1)).join(' ')}" fill="none" stroke="${isR?'var(--int)':'var(--muted)'}" stroke-width="${isR?1.6:1}" stroke-opacity="${isR?.9:.6}" ${isR?'':'stroke-dasharray="3 3"'}><title>${esc(p.ly)} (Civil)</title></polyline>`})}
+  P.forEach(p=>{if(p.insert){blockShape(p.kind,p.w,p.h).forEach(poly=>h+=`<polygon points="${poly.map(([a,b])=>X(p.x+a).toFixed(1)+','+Y(p.z+b).toFixed(1)).join(' ')}" fill="none" stroke="var(--int)" stroke-width="1.2"/>`);
+      h+=`<text x="${X(p.x)}" y="${Y(p.z+p.h)-5}" text-anchor="middle" font-size="10.5" font-family="Barlow,sans-serif" fill="var(--int)">${esc(p.insert.replace('SEC_',''))}</text>`;return}
+    const pts=p.pts.map(([x,z])=>X(x).toFixed(1)+','+Y(z).toFixed(1)).join(' ');
+    if(p.closed)h+=`<polygon points="${pts}" fill="${FILL[p.fill]||'none'}" fill-opacity="${p.fill==='cruce'?.7:.9}" stroke="var(--ink)" stroke-opacity=".45" stroke-width=".8"/>`;
+    else h+=`<polyline points="${pts}" fill="none" stroke="${p.ly==='SEC-LIMITE'||p.ly==='SEC-SUBRASANTE'?'var(--rev)':'var(--ink)'}" stroke-width="${p.ly==='SEC-SUBRASANTE'?1.4:1}" ${p.dash||p.ly==='SEC-SUBRASANTE'?'stroke-dasharray="5 3"':''}/>`;
+    if(p.block)h+=`<text x="${X((p.pts[0][0]+p.pts[1][0])/2)}" y="${Y(p.pts[0][1])-5}" text-anchor="middle" font-size="10.5" font-family="Barlow,sans-serif" fill="var(--ink)">${esc(p.block)}</text>`});
+  T.forEach(t=>h+=`<text x="${X(t.x)}" y="${Y(t.z)+4}" text-anchor="middle" font-size="10.5" font-family="Barlow,sans-serif" fill="var(--muted)">${esc(t.t)}</text>`);
+  const zl=v=>info.rel?(v-info.eje>=0?'+':'')+(v-info.eje).toFixed(3):v.toFixed(3),lab=(x,z,t,dy,col)=>h+=`<text x="${X(x)}" y="${Y(z)+dy}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="${col}">${t}</text>`;
+  lab(0,info.eje,info.rel?(fr?'eje ≈'+info.eje.toFixed(2)+' (sin cota)':'eje ±0.000'):'eje '+info.eje.toFixed(3),-12,'var(--ink)');
+  ['L','R'].forEach(s=>{const v=stn[s];if(!v)return;const sg=s==='L'?-1:1,man=k=>num(stn.z[k+s])!=null,col=k=>man(k)?'var(--ink)':'var(--muted)';
+    lab(sg*v.calz,info['b'+s],zl(info['b'+s]),-10,col('b'));if(info['f'+s]!=null)lab(sg*(v.calz+v.cunA/2),info['f'+s],zl(info['f'+s]),16,col('f'));
+    const q=info.sides[s];lab(sg*(q.end-0.4),q.zv,zl(q.zv),-10,col('v'));
+    const j=info['j'+s];if(j&&Math.abs(j.p)>0.05)lab(sg*j.x,j.z,'jardín '+(j.p>0?'+':'')+j.p.toFixed(1)+'%',-14,'var(--ok)')});
+  h+='</g>';
+  // cadena de anchos bajo el marco
+  ['L','R'].forEach(s=>{const v=stn[s];if(!v)return;const sg=s==='L'?-1:1;let xx=0;const dims=[v.calz];if(v.cun!=='ninguna'&&v.cunA>0)dims.push(v.cunA);else if(v.sar>0)dims.push(v.sar);if(v.fr>0)dims.push(v.fr);if(v.ver>0)dims.push(v.ver);
+    const yy=Y(zBot)+(fr?36:22);dims.forEach(w=>{const a=X(sg*xx),b=X(sg*(xx+w));h+=`<line x1="${a}" y1="${yy}" x2="${b}" y2="${yy}" stroke="var(--muted)" stroke-width=".8"/><line x1="${a}" y1="${yy-4}" x2="${a}" y2="${yy+4}" stroke="var(--muted)"/><line x1="${b}" y1="${yy-4}" x2="${b}" y2="${yy+4}" stroke="var(--muted)"/>`;
+      if(Math.abs(b-a)>26)h+=`<text x="${(a+b)/2}" y="${yy-5}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="var(--ink)">${w.toFixed(2)}</text>`;xx+=w})});
+  if(!stn.L&&!stn.R)h+=`<text x="${W/2}" y="${H/2}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="14" fill="var(--muted)">Sin elementos leídos. Complétalos en "Anchos" o copia desde otra progresiva.</text>`;
+  h+=`<text x="12" y="${H-8}" font-family="Barlow,sans-serif" font-size="11.5" fill="var(--muted)">${fr?(rgv&&rgv.amp?`Marco ampliado a ±${rgv.o1.toFixed(0)} m (Civil: ±${rgv.o1c.toFixed(0)}) para que la sección quepa. `:'Marco del Civil. ')+'Azul: rasante del Civil; punteado: sus otras líneas.':(info.rel?'SIN COTA: esta progresiva no tiene marco del Civil. Carga las secciones en el paso 3 o escribe la cota del eje.':'Ventana fija de 5 m alrededor del eje.')} Escala vertical ×${ex}</text>`;
+  svg.innerHTML=h}
+
+// fichas (anchos, cotas, muro, bloques, típica)
+const AF=[['calz','Calzada','n'],['cun','Cuneta','s'],['cunA','Ancho cuneta','n'],['sar','Sardinel','n'],['fr','Franja / jardín','n'],['ver','Vereda','n'],['lim','Lím. propiedad','n']];
+const blank=()=>({calz:3,cun:'ninguna',cunA:0,sar:0.15,fr:0,ver:1.2});
+function renderAnchos(){const stn=STN();let h='<span></span><span class="h">Izq.</span><span class="h">Der.</span>';
+  AF.forEach(([k,lab,ty])=>{h+=`<label for="a-L-${k}">${lab}</label>`;['L','R'].forEach(s=>{const v=stn[s]||{},r=(stn.read[s]||{})[k],val=v[k],ch=stn[s]&&r!==val;
+    h+=ty==='s'?`<select id="a-${s}-${k}" data-s="${s}" data-k="${k}" ${!stn[s]?'disabled':''}>${['ninguna','abierta','cerrada'].map(o=>`<option value="${o}" ${val===o?'selected':''}>${o==='cerrada'?'tapada':o}</option>`).join('')}</select>`
+      :`<input id="a-${s}-${k}" data-s="${s}" data-k="${k}" type="number" step="0.05" value="${val==null?'':Number(val).toFixed(2)}" ${!stn[s]?'disabled':''} style="${ch?'color:var(--accent-ink);font-weight:600':''}">`})});
+  h+=`<span></span>`+['L','R'].map(s=>stn[s]?`<button class="sm" data-clr="${s}">Quitar lado</button>`:`<button class="sm" data-add="${s}">Agregar lado</button>`).join('')+`<span></span><button class="sm" id="aReset" style="grid-column:span 2">Volver a lo leído de la planta</button>`;
+  $('#anchos').innerHTML=h;
+  $('#anchos').querySelectorAll('[data-k]').forEach(el=>el.onchange=()=>{STN()[el.dataset.s][el.dataset.k]=el.tagName==='SELECT'?el.value:num(el.value);refresh()});
+  $('#anchos').querySelectorAll('[data-clr]').forEach(b=>b.onclick=()=>{STN()[b.dataset.clr]=null;refresh(true)});
+  $('#anchos').querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const o=b.dataset.add==='L'?'R':'L';STN()[b.dataset.add]=STN()[o]?{...STN()[o],lim:undefined}:blank();refresh(true)});
+  $('#aReset').onclick=()=>{const s=STN();s.L=s.read.L?{...s.read.L}:null;s.R=s.read.R?{...s.read.R}:null;refresh(true)}}
+const ZF=[['eje','Eje / rasante',1],['b','Borde calzada'],['v','Cota de vereda'],['f','Fondo cuneta'],['mc','Corona del muro',0,1],['mb','Base del muro',0,1]];
+function renderCotas(){const sd=SD(),stn=STN(),{info}=build(sd,stn);let h='<span></span><span class="h">Izq.</span><span class="h">Der.</span>';
+  ZF.forEach(([k,lab,one,mu])=>{h+=`<label for="z-${one?'eje':k+'L'}">${lab}</label>`;
+    if(one){h+=`<input id="z-eje" data-z="eje" type="number" step="0.001" ${stn.zc&&stn.zc.eje?'title="Copiada del Civil" style="grid-column:span 2;color:var(--int)"':''} value="${f3(stn.z.eje)}" placeholder="${stn.fr&&stn.fr.zmin!=null?'marco '+stn.fr.zmin.toFixed(2)+' – '+stn.fr.zmax.toFixed(2):'escribe la cota, ej. 152.350'}" style="grid-column:span 2">`;return}
+    if(mu){['L','R'].forEach(s=>{const m=stn.muro[s],key=k==='mc'?'zc':'zb',im=info['m'+s],calc=im?(k==='mc'?im.zc:im.zbse):null;
+      h+=m?`<input id="z-${k}${s}" data-mz="${s}" data-k="${key}" type="number" step="0.001" class="${num(m[key])!=null?'':'calc'}" value="${num(m[key])!=null?f3(m[key]):''}" placeholder="${calc!=null&&!info.rel?calc.toFixed(3):'calc.'}">`:`<button class="sm" data-madd2="${s}">Agregar muro</button>`});return}
+    ['L','R'].forEach(s=>{const key=k+s,man=num(stn.z[key])!=null,calc=info[key];
+      h+=`<input id="z-${key}" data-z="${key}" type="number" step="0.001" class="${man?'':'calc'}" ${stn.zc&&stn.zc[key]?'title="Copiada del Civil" style="color:var(--int)"':''} value="${man?f3(stn.z[key]):''}" placeholder="${calc!=null&&!info.rel?calc.toFixed(3):(calc!=null?'calc.':'—')}" ${!stn[s]||(k==='f'&&stn[s].cun==='ninguna')?'disabled':''}>`})});
+  $('#cotas').innerHTML=h;
+  $('#cotas').querySelectorAll('[data-z]').forEach(el=>el.onchange=()=>{const v=num(el.value),s=STN();if(s.zc)delete s.zc[el.dataset.z];if(v==null)delete s.z[el.dataset.z];else s.z[el.dataset.z]=v;refresh()});
+  $('#cotas').querySelectorAll('[data-mz]').forEach(el=>el.onchange=()=>{STN().muro[el.dataset.mz][el.dataset.k]=num(el.value);refresh(true)});
+  $('#cotas').querySelectorAll('[data-madd2]').forEach(b=>b.onclick=()=>{STN().muro[b.dataset.madd2]={tipo:'gravedad',pos:'fin',H:1.5,c:0.30,B:1.0};refresh(true)})}
+function renderMuro(){const stn=STN();let h='';
+  ['L','R'].forEach(s=>{const m=stn.muro[s];
+    h+=`<div style="display:flex;flex-direction:column;gap:6px;${s==='R'?'margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)':''}"><div class="btns" style="justify-content:space-between"><b style="font-size:13px">${s==='L'?'Lado izquierdo':'Lado derecho'}</b>${m?`<button class="sm" data-mdel="${s}">Quitar</button>`:`<button class="sm" data-madd="${s}">Agregar muro</button>`}</div>`;
+    if(m){const Hc=num(m.zb)!=null?((num(m.zc)??(build(SD(),stn).info.sides[s]||{}).zv??0)-num(m.zb)).toFixed(2):(m.H??'');
+      h+=`<div class="f2"><label>Tipo<select data-m="${s}" data-k="tipo"><option value="gravedad" ${m.tipo==='gravedad'?'selected':''}>Gravedad</option><option value="voladizo" ${m.tipo==='voladizo'?'selected':''}>Voladizo (L)</option><option value="propio" ${m.tipo==='propio'?'selected':''}>Bloque propio</option></select></label>
+      <label>Ubicación<select data-m="${s}" data-k="pos"><option value="fin" ${m.pos==='fin'?'selected':''}>Tras la vereda</option><option value="lim" ${m.pos==='lim'?'selected':''}>En lím. propiedad</option><option value="offset" ${m.pos==='offset'?'selected':''}>A distancia del eje</option></select></label>
+      <label>Dist. eje (m)<input data-m="${s}" data-k="off" type="number" step="0.05" value="${m.off??''}" ${m.pos!=='offset'?'disabled':''}></label>
+      <label>Altura H<input data-m="${s}" data-k="H" type="number" step="0.05" value="${Hc}" ${num(m.zb)!=null?'disabled title="Sale de cota corona − cota base"':''}></label>
+      <label>${m.tipo==='voladizo'?'Pantalla':'Corona'}<input data-m="${s}" data-k="c" type="number" step="0.05" value="${m.c??''}"></label>
+      <label>Base B<input data-m="${s}" data-k="B" type="number" step="0.05" value="${m.B??''}"></label>
+      ${m.tipo==='voladizo'?`<label>Puntera<input data-m="${s}" data-k="p" type="number" step="0.05" value="${m.p??''}"></label><label>Esp. zapata<input data-m="${s}" data-k="hz" type="number" step="0.05" value="${m.hz??''}"></label>`:''}
+      ${m.tipo==='propio'?`<label style="grid-column:span 2">Nombre del bloque<input data-m="${s}" data-k="nombre" value="${esc(m.nombre||'')}" placeholder="MURO_TIPO_1"></label>`:''}
+      <label>Cota corona<input data-m="${s}" data-k="zc" type="number" step="0.001" value="${m.zc??''}" placeholder="= vereda"></label><label>Cota base<input data-m="${s}" data-k="zb" type="number" step="0.001" value="${m.zb??''}" placeholder="= corona − H"></label></div>
+      <div class="range">Copiar este muro a <input data-mr="${s}" data-k="de" placeholder="0+000"> – <input data-mr="${s}" data-k="ha" placeholder="0+100"><button class="sm" data-mcopy="${s}">Copiar</button></div>`}
+    h+='</div>'});
+  $('#muro').innerHTML=h;
+  $('#muro').querySelectorAll('[data-madd]').forEach(b=>b.onclick=()=>{STN().muro[b.dataset.madd]={tipo:'gravedad',pos:'fin',H:1.5,c:0.30,B:1.0};refresh(true)});
+  $('#muro').querySelectorAll('[data-mdel]').forEach(b=>b.onclick=()=>{STN().muro[b.dataset.mdel]=null;refresh(true)});
+  $('#muro').querySelectorAll('[data-m]').forEach(el=>el.onchange=()=>{const m=STN().muro[el.dataset.m],k=el.dataset.k;m[k]=['tipo','pos','nombre'].includes(k)?el.value:num(el.value);refresh(['tipo','pos','zb','zc'].includes(k))});
+  $('#muro').querySelectorAll('[data-mcopy]').forEach(b=>b.onclick=()=>{const s=b.dataset.mcopy,de=pst($(`[data-mr="${s}"][data-k="de"]`).value),ha=pst($(`[data-mr="${s}"][data-k="ha"]`).value);
+    if(de==null||ha==null)return toast('Escribe progresiva inicial y final, por ejemplo 0+040 y 0+120.');let n=0;SD().st.forEach(x=>{if(x.st>=Math.min(de,ha)-0.01&&x.st<=Math.max(de,ha)+0.01&&x!==STN()){x.muro[s]={...STN().muro[s]};n++}});toast(`Muro copiado a ${n} progresivas.`);refresh()})}
+function renderBloques(){const stn=STN();let h=stn.bl.length?'<div class="note">Tipo · lado · distancia al eje (m). Se apoyan solos sobre la superficie.</div>':'<div class="note">Sin bloques en esta progresiva.</div>';
+  stn.bl.forEach((b,i)=>{h+=`<div class="bl-row"><select data-b="${i}" data-k="tipo">${Object.entries(BLK).map(([k,v])=>`<option value="${k}" ${b.tipo===k?'selected':''}>${v.n}</option>`).join('')}<option value="PROPIO" ${b.tipo==='PROPIO'?'selected':''}>Bloque propio…</option></select>
+    <select data-b="${i}" data-k="lado"><option value="L" ${b.lado==='L'?'selected':''}>Izq.</option><option value="R" ${b.lado==='R'?'selected':''}>Der.</option></select>
+    <input data-b="${i}" data-k="off" type="number" step="0.1" value="${b.off}" aria-label="Distancia al eje (m)"><button class="sm" data-bdel="${i}" aria-label="Quitar bloque">✕</button>
+    ${b.tipo==='PROPIO'?`<input data-b="${i}" data-k="nombre" value="${esc(b.nombre||'')}" placeholder="Nombre del bloque" style="grid-column:1/3"><input data-b="${i}" data-k="w" type="number" step="0.1" value="${b.w??1}" title="Ancho (m)"><input data-b="${i}" data-k="h" type="number" step="0.1" value="${b.h??1}" title="Alto (m)">`:''}</div>`});
+  $('#bloques').innerHTML=h;
+  $('#bloques').querySelectorAll('[data-b]').forEach(el=>el.onchange=()=>{const b=STN().bl[+el.dataset.b],k=el.dataset.k;b[k]=['tipo','lado','nombre'].includes(k)?el.value:num(el.value);refresh(k==='tipo')});
+  $('#bloques').querySelectorAll('[data-bdel]').forEach(el=>el.onclick=()=>{STN().bl.splice(+el.dataset.bdel,1);refresh(true)})}
+function renderTipica(){const sd=SD();
+  [['t-bomb','bomb'],['t-hv','hv'],['t-prof','prof'],['t-tc','tc'],['t-ev','ev'],['t-us','us']].forEach(([id,k])=>{const el=$('#'+id);el.value=sd.tip[k];el.onchange=()=>{const v=num(el.value);if(v!=null)sd.tip[k]=v;refresh()}});
+  $('#p-tipo').value=sd.pav.tipo;$('#p-l1').firstChild.textContent={rigido:'Losa (m)',flexible:'Carpeta (m)',adoquin:'Adoquín + arena (m)'}[sd.pav.tipo];
+  $('#p-tipo').onchange=()=>{sd.pav.tipo=$('#p-tipo').value;renderTipica();drawSeccion();save2local()};
+  [['p-e1','e1'],['p-e2','e2'],['p-e3','e3']].forEach(([id,k])=>{const el=$('#'+id);el.value=sd.pav[k];el.onchange=()=>{sd.pav[k]=num(el.value)??0;refresh()}})}
+function toast(m,id='#toast'){$(id).textContent=m;clearTimeout(toast[id]);toast[id]=setTimeout(()=>$(id).textContent='',5000)}
+function refresh(full){if(full){renderAnchos();renderMuro();renderBloques()}renderCotas();drawSeccion();renderTabla();renderCalles();save2local()}
+function renderStation(){const stn=STN();$('#secTitle').textContent='Sección · '+street().name+' · '+fst(stn.st)+(stn.m?' · '+stn.m:'');
+  $('#gen').checked=stn.gen;renderPlanta();renderTabla();renderAnchos();renderCotas();renderMuro();renderBloques();drawSeccion();
+  const r=$('#tbl tbody tr.sel');if(r&&r.scrollIntoView)r.scrollIntoView({block:'nearest'})}
+function renderBanner(){const fromEx=S.src==='ejemplo';
+  $('#banner').innerHTML=fromEx?'Mostrando el <b>ejemplo de Contamana</b>. Carga tu planta en el paso 1 para empezar un proyecto nuevo.':`Proyecto: <b>${esc(S.src)}</b> · ${DATA.length} calles · ${Object.values(S.streets).reduce((a,s)=>a+s.st.filter(x=>x.fr).length,0)} secciones con marco del Civil.`;
+  $('#xNote').textContent='El DXF se guarda en tu carpeta Descargas y sale completo y en las coordenadas del Civil: marco con cuadrícula y cotas (CIVIL-MARCO), terreno (CIVIL-TERRENO), rasante y subrasante continuas de borde a borde (SEC-RASANTE, SEC-SUBRASANTE), cada elemento con su contorno (SEC-*) y su relleno de color (SEC-RELLENO). Listo para el programa de cortes y rellenos. Las secciones sin marco del Civil salen en una cuadrícula aparte.'}
+function renderAll(){if(!DATA.length)return;const c=street();
+  $('#cName').textContent=c.name;$('#cAlt').textContent=(c.alt&&c.alt.length?'También rotulada como '+c.alt.join(', ')+' · ':'')+c.L.toFixed(2)+' m · '+SD().st.length+' progresivas';
+  renderBanner();renderCalles();renderTipica();renderStation()}
+
+// eventos generales
+$('#gen').onchange=()=>{STN().gen=$('#gen').checked;renderTabla();renderPlanta();renderCalles();save2local()};
+$('#verCiv').onchange=()=>drawSeccion();$('#exag').onchange=()=>{S.exag=Number($('#exag').value);drawSeccion()};
+$('#bAdd').onclick=()=>{STN().bl.push({tipo:'AUTO',lado:'R',off:1.5});refresh(true)};
+$('#bCopy').onclick=()=>{const de=pst($('#bDe').value),ha=pst($('#bHa').value);if(de==null||ha==null)return toast('Escribe progresiva inicial y final.');let n=0;SD().st.forEach(x=>{if(x.st>=Math.min(de,ha)-0.01&&x.st<=Math.max(de,ha)+0.01&&x!==STN()){x.bl=STN().bl.map(b=>({...b}));n++}});toast(`Bloques copiados a ${n} progresivas.`);refresh()};
+$('#aCopy').onclick=()=>{const de=pst($('#aDe').value),ha=pst($('#aHa').value);if(de==null||ha==null)return toast('Escribe progresiva inicial y final.');let n=0;SD().st.forEach(x=>{if(x.st>=Math.min(de,ha)-0.01&&x.st<=Math.max(de,ha)+0.01&&x!==STN()){['L','R'].forEach(s=>{x[s]=STN()[s]?{...STN()[s],lim:x[s]?x[s].lim:undefined}:null});n++}});toast(`Anchos copiados a ${n} progresivas (cada una conserva su límite de propiedad).`);refresh()};
+$('#pasteBtn').onclick=()=>{const sd=SD(),keys=['eje','bL','bR','vL','vR','fL','fR'];let ok=0,bad=[];
+  $('#paste').value.split(/\r?\n/).forEach(line=>{if(!line.trim())return;const c=line.split(/\t|;/),p=pst(c[0]),stn=p==null?null:sd.st.find(x=>Math.abs(x.st-p)<0.05);if(!stn){if(!/prog/i.test(c[0]))bad.push(c[0].trim());return}
+    keys.forEach((k,i)=>{const v=num((c[i+1]||'').trim().replace(',','.'));if(v!=null)stn.z[k]=v});
+    [['L','zc',8],['R','zc',9],['L','zb',10],['R','zb',11]].forEach(([s,k,i])=>{const v=num((c[i]||'').trim().replace(',','.'));if(v==null)return;if(!stn.muro[s])stn.muro[s]={tipo:'gravedad',pos:'fin',H:1.5,c:0.30,B:1.0};stn.muro[s][k]=v});ok++});
+  toast(`Cotas cargadas en ${ok} progresivas.`+(bad.length?` No encontré: ${bad.slice(0,5).join(', ')}${bad.length>5?'…':''}.`:''));refresh(true)};
+$('#bInv').onclick=()=>{const c=street(),sd=SD(),L=c.L;
+  c.axis.reverse();c.sts=c.sts.map(s=>({...s,st:Math.round((L-s.st)*100)/100,L:s.R,R:s.L})).reverse();
+  sd.st=sd.st.map(s=>({...s,st:Math.round((L-s.st)*100)/100,L:s.R,R:s.L,read:{L:s.read.R,R:s.read.L},muro:{L:s.muro.R,R:s.muro.L},bl:s.bl.map(b=>({...b,lado:b.lado==='L'?'R':'L'})),z:Object.fromEntries(Object.entries(s.z).map(([k,v])=>[k.endsWith('L')?k.slice(0,-1)+'R':k.endsWith('R')?k.slice(0,-1)+'L':k,v])),fr:undefined})).reverse();
+  S.sel=sd.st.length-1-S.sel;toast('Sentido invertido: progresivas y lados cambiados. Vuelve a cargar las secciones del Civil de esta calle.');renderAll();save2local()};
+$('#bRen').onclick=()=>{const box=$('#cName'),c=street();box.innerHTML=`<input id="renIn" value="${esc(c.name)}" style="font-family:var(--f-display);font-size:20px;max-width:360px">`;const i=$('#renIn');i.focus();i.select();
+  const done=()=>{const v=i.value.trim();if(v)c.name=v;renderSecCalle();renderAll();save2local()};i.onkeydown=e=>{if(e.key==='Enter')done();if(e.key==='Escape')renderAll()};i.onblur=done};
+
+// archivos
+function wireDrop(dropId,inputId,fn){const d=$(dropId),i=$(inputId);i.onchange=()=>{if(i.files[0])fn(i.files[0]);i.value=''};
+  d.ondragover=e=>{e.preventDefault();d.classList.add('over')};d.ondragleave=()=>d.classList.remove('over');d.ondrop=e=>{e.preventDefault();d.classList.remove('over');if(e.dataTransfer.files[0])fn(e.dataTransfer.files[0])}}
+wireDrop('#dropP','#fPlanta',f=>loadPlanta(f).catch(err=>stat('#stP',[['warn','No pude leer el archivo: '+esc(err.message)]])));
+$('#rasBtn').onclick=copiarRasante;$('#grBtn').onclick=aplicarGrupos;
+wireDrop('#dropS','#fSecc',f=>{if(!DATA.length||S.src==='ejemplo'&&false)return stat('#stS',[['warn','Primero carga y procesa la planta.']]);loadSecciones(f).catch(err=>stat('#stS',[['warn','No pude leer el archivo: '+esc(err.message)]]))});
+$('#bProc').onclick=()=>{stat('#stP',[['info','Procesando…']]);setTimeout(()=>{try{procesarPlanta()}catch(err){stat('#stP',[['warn','Error al procesar: '+esc(err.message)]])}},30)};
+
+// proyecto
+function projectJSON(){return JSON.stringify({v:3,src:S.src,DATA,streets:S.streets},(k,v)=>k==='polys'?undefined:v)}
+function save2local(){try{localStorage.setItem('zen-proyecto',projectJSON())}catch(e){}}
+function openProject(o){if(!o||!o.DATA||!o.streets)throw new Error('no es un proyecto válido');DATA=o.DATA;S.streets=o.streets;S.src=o.src||'proyecto';S.cur=DATA[0].id;S.sel=firstOk();renderSecCalle();renderAll()}
+$('#pSave').onclick=()=>save('Proyecto_secciones.json',projectJSON(),'#stP');
+$('#pOpen').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{openProject(JSON.parse(await f.text()));save2local();stat('#stP',[['ok','Proyecto abierto: '+esc(f.name)]])}catch(err){stat('#stP',[['warn','No pude abrir el proyecto: '+esc(err.message)]])}e.target.value=''};
+
+// =====================================================================
+// DXF DE SALIDA
+// =====================================================================
+const LAYERS={'CIVIL-MARCO':8,'CIVIL-TERRENO':1,'CIVIL-OTROS':6,'SEC-RASANTE':4,'SEC-RELLENO':9,'SEC-EJE':2,'SEC-PAVIMENTO':8,'SEC-BASE':33,'SEC-SUBBASE':43,'SEC-SUBRASANTE':1,'SEC-CUNETA':4,'SEC-SARDINEL':4,'SEC-VEREDA':4,'SEC-JARDIN':3,'SEC-MURO':6,'SEC-BLOQUES':5,'SEC-LIMITE':1,'SEC-TEXTO':7,'SEC-COTAS':7,'SEC-MARCO':9};
+const ascii=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\x20-\x7E]/g,'');
+function DX(){this.o=[]}
+DX.prototype.pl=function(ly,pts,closed){this.o.push(`0\nPOLYLINE\n8\n${ly}\n66\n1\n10\n0.0\n20\n0.0\n30\n0.0\n70\n${closed?1:0}\n`);pts.forEach(([x,y])=>this.o.push(`0\nVERTEX\n8\n${ly}\n10\n${x.toFixed(4)}\n20\n${y.toFixed(4)}\n30\n0.0\n`));this.o.push(`0\nSEQEND\n8\n${ly}\n`)};
+DX.prototype.tx=function(ly,x,y,h,t,al){t=ascii(t);this.o.push(`0\nTEXT\n8\n${ly}\n10\n${x.toFixed(4)}\n20\n${y.toFixed(4)}\n30\n0.0\n40\n${h}\n1\n${t}\n`+(al?`72\n${al}\n11\n${x.toFixed(4)}\n21\n${y.toFixed(4)}\n31\n0.0\n`:''))};
+DX.prototype.ins=function(ly,name,x,y,sx=1,sy=1){this.o.push(`0\nINSERT\n8\n${ly}\n2\n${ascii(name)}\n10\n${x.toFixed(4)}\n20\n${y.toFixed(4)}\n30\n0.0\n41\n${sx}\n42\n${sy}\n`)};
+// ---------- exportación completa: marco + terreno + secciones con relleno ----------
+const FILLC={asphalt:250,base:42,subbase:51,concrete:253,grass:92,wall:8,cruce:200};
+function triang(pts){ // triangulación por orejas (polígono simple)
+  let P=pts.slice();if(P.length>3&&Math.hypot(P[0][0]-P[P.length-1][0],P[0][1]-P[P.length-1][1])<1e-9)P.pop();
+  let A=0;for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length];A+=a[0]*b[1]-b[0]*a[1]}if(A<0)P.reverse();
+  const T=[],cr=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);let guard=0;
+  while(P.length>3&&guard++<500){let ok=false;for(let i=0;i<P.length;i++){const a=P[(i+P.length-1)%P.length],b=P[i],c=P[(i+1)%P.length];if(cr(a,b,c)<=1e-12)continue;
+      if(P.some(p=>p!==a&&p!==b&&p!==c&&cr(a,b,p)>=0&&cr(b,c,p)>=0&&cr(c,a,p)>=0))continue;T.push([a,b,c]);P.splice(i,1);ok=true;break}if(!ok)break}
+  if(P.length===3)T.push(P);return T}
+DX.prototype.solid=function(tri,color){const [a,b,c]=tri;this.o.push(`0\nSOLID\n8\nSEC-RELLENO\n62\n${color}\n10\n${a[0].toFixed(4)}\n20\n${a[1].toFixed(4)}\n30\n0.0\n11\n${b[0].toFixed(4)}\n21\n${b[1].toFixed(4)}\n31\n0.0\n12\n${c[0].toFixed(4)}\n22\n${c[1].toFixed(4)}\n32\n0.0\n13\n${c[0].toFixed(4)}\n23\n${c[1].toFixed(4)}\n33\n0.0\n`)};
+DX.prototype.txa=function(ly,x,y,h,t,h72,v73){this.o.push(`0\nTEXT\n8\n${ly}\n10\n${x.toFixed(4)}\n20\n${y.toFixed(4)}\n30\n0.0\n40\n${h}\n1\n${ascii(t).replace(/\s+/g,' ').trim()}\n72\n${h72}\n73\n${v73}\n11\n${x.toFixed(4)}\n21\n${y.toFixed(4)}\n31\n0.0\n`)};
+// rango del marco: el del Civil, o ampliado (centrado en el eje, de 2 en 2 m, misma escala) si la sección llega al borde
+function rangoMarco(f,P){const o0=f.off&&f.off[0]!=null?f.off[0]:(f.frame.x0-f.bx)/f.ax,o1=f.off&&f.off[1]!=null?f.off[1]:(f.frame.x1-f.bx)/f.ax;
+  let ext=0;(P||[]).forEach(p=>{if(p.ly==='SEC-LIMITE')return;if(p.insert){ext=Math.max(ext,Math.abs(p.x)+p.w/2);return}p.pts.forEach(q=>ext=Math.max(ext,Math.abs(q[0])))});
+  const need=ext+0.3;if(need<=Math.min(-o0,o1))return {o0,o1,amp:false};
+  const half=Math.max(-o0,o1,Math.ceil(need/2)*2);return {o0:-half,o1:half,amp:true,o0c:o0,o1c:o1}}
+function marcoCivil(E,f,st,rg){ // original si está en memoria; si no, reconstruido con la misma escala
+  if(f.grid&&!(rg&&rg.amp)){f.grid.lines.forEach(p=>E.pl('CIVIL-MARCO',p,false));
+    f.grid.texts.forEach(t=>{const A={1:[0,3],2:[1,3],3:[2,3],4:[0,2],5:[1,2],6:[2,2],7:[0,1],8:[1,1],9:[2,1]}[t.al]||[0,0];E.txa('CIVIL-MARCO',t.x,t.y,t.h||0.2,t.t,A[0],A[1])});return}
+  const o0=rg?rg.o0:(f.off&&f.off[0]!=null?f.off[0]:(f.frame.x0-f.bx)/f.ax),o1=rg?rg.o1:(f.off&&f.off[1]!=null?f.off[1]:(f.frame.x1-f.bx)/f.ax);
+  const X=o=>f.bx+o*f.ax,Y=z=>f.ay*z+f.by,z0=f.zmin,z1=f.zmax;
+  const tn=f.grid?f.grid.texts.filter(t=>/^[-+]?\d+(?:[.,]\d+)?$/.test(t.t.trim())):[],h=tn.length?tn[0].h:Math.max(0.15,0.2*Math.min(f.ax,f.ay));
+  E.pl('CIVIL-MARCO',[[X(o0),Y(z0)],[X(o1),Y(z0)],[X(o1),Y(z1)],[X(o0),Y(z1)]],true);
+  // marcas cada 0.5 m en los bordes (como el Civil)
+  for(let z=Math.ceil(z0*2)/2;z<=z1+1e-6;z+=0.5){E.pl('CIVIL-MARCO',[[X(o0),Y(z)],[X(o0)+0.12*f.ax,Y(z)]],false);E.pl('CIVIL-MARCO',[[X(o1),Y(z)],[X(o1)-0.12*f.ax,Y(z)]],false)}
+  for(let o=Math.ceil(o0*2)/2;o<=o1+1e-6;o+=0.5){E.pl('CIVIL-MARCO',[[X(o),Y(z0)],[X(o),Y(z0)+0.12*f.ay]],false);E.pl('CIVIL-MARCO',[[X(o),Y(z1)],[X(o),Y(z1)-0.12*f.ay]],false)}
+  for(let o=Math.ceil(o0/2)*2;o<=o1+1e-6;o+=2){E.pl('CIVIL-MARCO',[[X(o),Y(z0)],[X(o),Y(z1)]],false);E.txa('CIVIL-MARCO',X(o),Y(z0)-0.15,h,o.toFixed(1),1,3)}
+  for(let z=Math.ceil(z0/2)*2;z<=z1+1e-6;z+=2){E.pl('CIVIL-MARCO',[[X(o0),Y(z)],[X(o1),Y(z)]],false);E.txa('CIVIL-MARCO',X(o0)-0.15,Y(z),h,z.toFixed(1),2,2);E.txa('CIVIL-MARCO',X(o1)+0.15,Y(z),h,z.toFixed(1),0,2)}
+  // rótulos: los originales del Civil si están (título, EJE, Cota), ubicados respecto al marco nuevo
+  const orig=f.grid?f.grid.texts.filter(t=>!/^[-+]?\d+(?:[.,]\d+)?$/.test(t.t.trim())&&t.t.trim()):[];
+  const tit=orig.find(t=>/\d\+\d/.test(t.t)),eje=orig.find(t=>/^EJE$/i.test(t.t.trim())),cot=orig.find(t=>/cota/i.test(t.t));
+  E.txa('CIVIL-MARCO',X(0),tit?tit.y:Y(z1)+0.5,tit?tit.h:h*1.2,tit?tit.t:'ST - '+fst(st).replace(/^(\d+\+\d{3})$/,'$1.00'),1,tit?1:1);
+  E.txa('CIVIL-MARCO',X(0),eje?eje.y:Y(z1)-(z1-z0)*f.ay*0.2,eje?eje.h:h,'EJE',1,1);
+  E.txa('CIVIL-MARCO',X(o0)-(cot&&f.off&&f.off[0]!=null?(X(f.off[0])-cot.x):0.9),cot?cot.y:Y((z0+z1)/2),cot?cot.h:h,cot?cot.t:'Cota (msnm)',cot?2:2,2)}
+function buildDXF(ids){const E=new DX(),blocks={};let oy=0,nF=0,nG=0,nSkip=0,nM=0,nT=0,nRec=0,nAmp=0,nBig=0;
+  let minY=Infinity;ids.forEach(id=>S.streets[id].st.forEach(x=>{if(x.fr)minY=Math.min(minY,x.fr.frame.y0)}));if(isFinite(minY))oy=minY-40;
+  ids.forEach(id=>{const c=DATA.find(d=>d.id===id),sd=S.streets[id],rl=[].concat(sd.rasLy||[]);
+    // marcos y terreno de todas las progresivas con sección del Civil
+    sd.st.forEach(x=>{const f=x.fr;if(!f||!f.ay)return;nM++;if(!f.grid)nRec++;const rg=x.gen?rangoMarco(f,build(sd,x).P):null;if(rg&&rg.amp){nAmp++;if(rg.o1>11)nBig++}marcoCivil(E,f,x.st,rg);
+      const ter=f.ter||(f.polys||[]).filter(p=>(window.TERLY||[]).includes(p.ly)).map(p=>p.pts);if(ter.length)nT++;ter.forEach(p=>E.pl('CIVIL-TERRENO',p,false));
+      (f.polys||[]).forEach(p=>{if(rl.includes(p.ly)||(window.TERLY||[]).includes(p.ly))return;E.pl('CIVIL-OTROS',p.pts,false)})});
+    const gens=sd.st.filter(x=>x.gen);if(!gens.length)return;
+    const grid=gens.filter(x=>!(x.fr&&x.fr.ay));const COLS=3,CW=30,RH=16;if(grid.length)E.tx('SEC-TEXTO',0,oy+6,1.2,'SECCIONES TRANSVERSALES - '+c.name);
+    let k=0;
+    gens.forEach(stn=>{const {P,T,info}=build(sd,stn);let tr,base,cx;
+      if(stn.fr&&stn.fr.ay){if(info.rel){nSkip++;return}const f=stn.fr;tr=([x,z])=>[f.bx+x*f.ax,f.ay*z+f.by];nF++}
+      else{const col=k%COLS,row=Math.floor(k/COLS);k++;cx=col*CW+CW/2;base=oy-row*RH;let zmin=Infinity;P.forEach(p=>(p.pts||[[0,p.z]]).forEach(q=>zmin=Math.min(zmin,q[1])));if(!isFinite(zmin))zmin=info.eje-1;
+        const datum=Math.floor(zmin-0.5);tr=([x,z])=>[cx+x,base-9+(z-datum)];nG++;
+        E.pl('SEC-MARCO',[[cx-CW/2+0.5,base],[cx+CW/2-0.5,base],[cx+CW/2-0.5,base-RH+0.6],[cx-CW/2+0.5,base-RH+0.6]],true);
+        E.pl('SEC-COTAS',[[cx-CW/2+1.5,base-12],[cx+CW/2-1.5,base-12]],false);E.tx('SEC-COTAS',cx-CW/2+1.5,base-11.8,0.2,'N.R. '+datum.toFixed(2)+(info.rel?' (RELATIVO)':''));
+        E.tx('SEC-TEXTO',cx,base-14.3,0.4,'SECCION '+fst(stn.st),2)}
+      const [ex0,ey0]=tr([0,info.eje+1.6]),[ex1,ey1]=tr([0,info.eje-1.5]);E.pl('SEC-EJE',[[ex0,ey0],[ex1,ey1]],false);
+      // relleno de color (SOLID) y contornos
+      P.forEach(p=>{if(p.insert||!p.closed)return;const pts=p.pts.map(tr);triang(pts).forEach(t=>E.solid(t,FILLC[p.fill]||9))});
+      P.forEach(p=>{if(p.insert){blocks[p.insert]={kind:p.kind,w:p.w,h:p.h};const [X,Y]=tr([p.x,p.z]);E.ins('SEC-BLOQUES',p.insert,X,Y,stn.fr&&stn.fr.ax?stn.fr.ax:1,stn.fr&&stn.fr.ay?stn.fr.ay:1);return}
+        if(p.ly==='SEC-SUBRASANTE')return;E.pl(p.ly,p.pts.map(tr),!!p.closed);
+        if(p.block){blocks[p.block]={kind:'PROPIO',w:Math.abs(p.pts[1][0]-p.pts[0][0]),h:Math.abs(p.pts[0][1]-p.pts[2][1]),base:true};const [X,Y]=tr([Math.min(p.pts[0][0],p.pts[1][0]),p.pts[2][1]]);E.ins('SEC-BLOQUES',p.block,X,Y,stn.fr&&stn.fr.ax?stn.fr.ax:1,stn.fr&&stn.fr.ay?stn.fr.ay:1)}});
+      // líneas continuas para cortes y rellenos: rasante (superficie terminada) y subrasante, de borde a borde
+      const L=info.sides.L,R=info.sides.R;
+      if(L||R){const sl=L?L.surf.slice().reverse().map(([d,z])=>[-d,z]):[[0,info.eje]],sr=R?R.surf.map(([d,z])=>[d,z]):[[0,info.eje]];
+        const ras=sl.concat(sr.slice(1));E.pl('SEC-RASANTE',ras.map(tr),false);
+        const sub=[];if(L){const v=stn.L;sub.push([-v.calz,info.bL-(sd.pav.e1+sd.pav.e2+sd.pav.e3)])}sub.push([0,(L||R).sub]);if(R){const v=stn.R;sub.push([v.calz,info.bR-(sd.pav.e1+sd.pav.e2+sd.pav.e3)])}
+        E.pl('SEC-SUBRASANTE',sub.map(tr),false)}
+      T.forEach(t=>{const [X,Y]=tr([t.x,t.z]);E.tx('SEC-TEXTO',X,Y,0.18,t.t,1)})});
+    if(grid.length)oy-=Math.ceil(grid.length/COLS)*RH+12});
+  let B='';Object.entries(blocks).forEach(([name,b])=>{const d=new DX();if(b.base){d.pl('0',[[0,0],[b.w,0],[b.w,b.h],[0,b.h]],true);d.tx('0',b.w/2,b.h/2,0.15,name,2)}else blockShape(b.kind,b.w,b.h).forEach(poly=>d.pl('0',poly,true));
+    B+=`0\nBLOCK\n8\n0\n2\n${ascii(name)}\n70\n0\n10\n0.0\n20\n0.0\n30\n0.0\n3\n${ascii(name)}\n`+d.o.join('')+'0\nENDBLK\n8\n0\n'});
+  const Ls=Object.entries(LAYERS).map(([n,c])=>`0\nLAYER\n2\n${n}\n70\n0\n62\n${c}\n6\nCONTINUOUS\n`).join('');
+  return {txt:`0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$INSUNITS\n70\n6\n9\n$FILLMODE\n70\n1\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLTYPE\n70\n1\n0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n73\n0\n40\n0.0\n0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n${Object.keys(LAYERS).length+1}\n0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nCONTINUOUS\n${Ls}0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nBLOCKS\n${B}0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${E.o.join('')}0\nENDSEC\n0\nEOF\n`,nF,nG,nSkip,nM,nT,nRec,nAmp,nBig}}
+
+function buildCSV(ids){const rows=[['Calle','Progresiva','Generar','Calz izq','Cuneta izq','Ancho cun izq','Sard izq','Franja izq','Vereda izq','Calz der','Cuneta der','Ancho cun der','Sard der','Franja der','Vereda der','Cota eje','Borde izq','Borde der','Vereda izq','Vereda der','Fondo cun izq','Fondo cun der','Muro izq','Muro der','Bloques']];
+  ids.forEach(id=>{const c=DATA.find(d=>d.id===id),sd=S.streets[id];sd.st.forEach(s=>{const {info}=build(sd,s),r=[c.name,fst(s.st),s.gen?'SI':'NO'];
+    ['L','R'].forEach(k=>{const v=s[k];r.push(...(v?[v.calz,v.cun,v.cunA,v.sar,v.fr,v.ver].map(x=>typeof x==='number'?x.toFixed(2):x):['','','','','','']))});
+    r.push(num(s.z.eje)!=null?f3(s.z.eje):'');['bL','bR','vL','vR','fL','fR'].forEach(k=>r.push(info.rel||info[k]==null?'':info[k].toFixed(3)));
+    ['L','R'].forEach(k=>{const m=s.muro[k];r.push(m?(m.tipo==='propio'?m.nombre||'propio':m.tipo)+' H='+(m.H??''):'')});r.push(s.bl.map(b=>(b.tipo==='PROPIO'?b.nombre:b.tipo)+'@'+b.lado+b.off).join(' '));rows.push(r)})});
+  return '﻿'+rows.map(r=>r.map(x=>/[;"\n]/.test(String(x))?'"'+String(x).replace(/"/g,'""')+'"':x).join(';')).join('\r\n')}
+const slug=s=>ascii(s).replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'');
+async function save(filename,data,msgId='#xMsg'){const dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null;
+  if(!dl){try{const blob=data instanceof Blob?data:new Blob([data],{type:'application/octet-stream'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast('Guardado en Descargas: '+filename,msgId);return true}catch(e){toast('No se pudo guardar el archivo: '+e.message,msgId);return false}}
+  try{await dl.save({filename,data});toast('Archivo listo: '+filename,msgId);return true}catch(e){toast(e&&e.code==='declined'?'Descarga cancelada.':'No se pudo descargar ('+(e&&e.code||'error')+').',msgId);return false}}
+async function zipDXF(ids,name){const r=buildDXF(ids);if(r.nF+r.nG===0)return toast(r.nSkip?`Hay ${r.nSkip} secciones con marco pero sin cota de eje: ingrésala para dibujarlas dentro del marco.`:'No hay secciones marcadas para generar.','#xMsg');
+  const ok=await save(name+'.dxf',r.txt);
+  if(ok)toast(`${name}.dxf (en Descargas): ${r.nM} marcos del Civil (${r.nT} con terreno), ${r.nF} secciones dentro de su marco${r.nG?`, ${r.nG} en cuadrícula aparte`:''}${r.nSkip?`, ${r.nSkip} omitidas por falta de cota de eje`:''}${r.nAmp?`, ${r.nAmp} marcos ampliados para que la sección quepa`:''}.${r.nBig?` Ojo: ${r.nBig} marcos quedaron más anchos que ±11 m y podrían montarse sobre el vecino.`:''}${r.nT<r.nM||r.nRec?' Faltan datos del Civil en algunos marcos (terreno o rótulos): vuelve a cargar el archivo de secciones del Civil y exporta de nuevo.':''}`,'#xMsg')}
+$('#xCalle').onclick=()=>zipDXF([S.cur],'Secciones_'+slug(street().name));
+$('#xTodo').onclick=()=>zipDXF(DATA.map(d=>d.id),'Secciones_todas');
+$('#xCsv').onclick=()=>save('Anchos_y_cotas_'+slug(street().name)+'.csv',buildCSV([S.cur]));
+
+// arranque: proyecto guardado en este navegador, o el ejemplo
+(function(){let o=null;try{o=JSON.parse(localStorage.getItem('zen-proyecto')||'null')}catch(e){}
+  if(o&&o.DATA&&o.DATA.length){try{openProject(o);stat('#stP',[['info','Se abrió tu último proyecto guardado en este navegador.']]);return}catch(e){}}
+  loadData(EJEMPLO.map(c=>({id:c.id,name:c.name,alt:c.alt,L:c.L,axis:c.axis,sts:c.sts})),'ejemplo');
+  stat('#stP',[['info','Aún no cargas una planta. Se muestra el ejemplo de Contamana.']]);stat('#stS',[['info','Opcional. Sin secciones del Civil, las secciones salen en una cuadrícula aparte.']])})();
+// SHA-256 / HMAC compactos (sin dependencias) y esquema de licencia de Zen Secciones
+function zsSha256(bytes){const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  let H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const l=bytes.length,n=((l+9+63)>>6)<<6,m=new Uint8Array(n);m.set(bytes);m[l]=0x80;const bl=l*8;for(let i=0;i<8;i++)m[n-1-i]=Math.floor(bl/Math.pow(2,8*i))&255;
+  const w=new Array(64),r=(x,s)=>(x>>>s)|(x<<(32-s));
+  for(let o=0;o<n;o+=64){for(let i=0;i<16;i++)w[i]=(m[o+4*i]<<24)|(m[o+4*i+1]<<16)|(m[o+4*i+2]<<8)|m[o+4*i+3];
+    for(let i=16;i<64;i++){const s0=r(w[i-15],7)^r(w[i-15],18)^(w[i-15]>>>3),s1=r(w[i-2],17)^r(w[i-2],19)^(w[i-2]>>>10);w[i]=(w[i-16]+s0+w[i-7]+s1)|0}
+    let [a,b,c,d,e,f,g,h]=H;
+    for(let i=0;i<64;i++){const S1=r(e,6)^r(e,11)^r(e,25),ch=(e&f)^(~e&g),t1=(h+S1+ch+K[i]+w[i])|0,S0=r(a,2)^r(a,13)^r(a,22),mj=(a&b)^(a&c)^(b&c),t2=(S0+mj)|0;h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0}
+    H=[H[0]+a,H[1]+b,H[2]+c,H[3]+d,H[4]+e,H[5]+f,H[6]+g,H[7]+h].map(x=>x|0)}
+  const out=new Uint8Array(32);H.forEach((x,i)=>{out[4*i]=(x>>>24)&255;out[4*i+1]=(x>>>16)&255;out[4*i+2]=(x>>>8)&255;out[4*i+3]=x&255});return out}
+const zsUtf8=s=>new TextEncoder().encode(s);
+function zsHmac(key,msg){let k=zsUtf8(key);if(k.length>64)k=zsSha256(k);const kp=new Uint8Array(64);kp.set(k);const ip=kp.map(b=>b^0x36),op=kp.map(b=>b^0x5c);
+  const inner=zsSha256(new Uint8Array([...ip,...zsUtf8(msg)]));return zsSha256(new Uint8Array([...op,...inner]))}
+function zsClave(sec,codigo){const c=String(codigo).toUpperCase().replace(/[^0-9A-F]/g,'');const h=zsHmac(sec,'ZENSECCIONES|'+c);
+  const A='23456789ABCDEFGHJKLMNPQRSTUVWXYZ';let s='';for(let i=0;i<16;i++)s+=A[h[i]&31];return s.match(/.{4}/g).join('-')}
+
+
+const _zk=[17,3,93,126,48,58,5,71,24,191,162,170,200,215,136,248,183,214,142,207,54,110,46,21,75,11,34,45,63,81,94,75,182,243,250,145,213,143,244,234,236,220,197,152,57,112,38,18];const _zs=()=>_zk.map((v,i)=>String.fromCharCode(v^((37+i*11)%256))).join('');
+(function(){
+  const m=(location.hash.match(/m=([0-9A-F-]{14})/i)||[])[1];
+  const box=document.createElement('div');box.id='zsGate';
+  box.style.cssText='position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px';
+  const card=(inner)=>`<div class="panel" style="max-width:460px;width:100%;padding:24px;display:flex;flex-direction:column;gap:14px"><h1 style="font-size:28px"><span class="stripe"></span>Zen Secciones</h1>${inner}</div>`;
+  const ok=k=>m&&String(k||'').toUpperCase().trim()===zsClave(_zs(),m);
+  let saved=null;try{saved=localStorage.getItem('zen-licencia')}catch(e){}
+  if(ok(saved))return;
+  if(!m){box.innerHTML=card('<p style="margin:0">Abre Zen Secciones desde su acceso directo del escritorio o del menú Inicio.</p><p class="note" style="margin:0">Si no lo tienes, ejecuta otra vez Instalar.cmd.</p>');document.body.appendChild(box);return}
+  box.innerHTML=card(`<p style="margin:0">Para activar el programa en este equipo, envía este <b>código de equipo</b> a tu proveedor y escribe la clave que te dé.</p>
+    <div style="display:flex;gap:8px;align-items:center"><code style="font-family:var(--f-mono);font-size:20px;letter-spacing:.06em;padding:8px 12px;background:var(--soft);border-radius:4px;user-select:all" id="zsCode">${m}</code><button class="sm" id="zsCopy">Copiar</button></div>
+    <label class="note" style="display:flex;flex-direction:column;gap:4px">Clave de activación<input id="zsKey" placeholder="XXXX-XXXX-XXXX-XXXX" style="font-size:16px;letter-spacing:.05em;text-transform:uppercase"></label>
+    <div class="btns"><button class="pri" id="zsAct">Activar</button></div><div class="note" id="zsMsg" role="status"></div>`);
+  document.body.appendChild(box);
+  document.getElementById('zsCopy').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(m).then(()=>{document.getElementById('zsMsg').textContent='Código copiado.'},()=>{})};
+  const act=()=>{const k=document.getElementById('zsKey').value;if(ok(k)){try{localStorage.setItem('zen-licencia',k.toUpperCase().trim())}catch(e){}box.remove()}else{const e=document.getElementById('zsMsg');e.style.color='var(--rev)';e.textContent='La clave no corresponde a este código de equipo. Revísala y vuelve a intentar.'}};
+  document.getElementById('zsAct').onclick=act;document.getElementById('zsKey').onkeydown=e=>{if(e.key==='Enter')act()};
+})();
+</script>

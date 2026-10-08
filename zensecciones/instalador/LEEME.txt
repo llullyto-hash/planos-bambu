@@ -1,0 +1,17 @@
+ZEN SECCIONES - Instalacion
+===========================
+
+Requisitos: Windows 10 u 11 con Microsoft Edge (viene instalado) o Google Chrome.
+
+1. Descomprime este .zip en cualquier carpeta (clic derecho > Extraer todo).
+   No lo ejecutes desde dentro del .zip.
+2. Haz doble clic en "Instalar.cmd".
+   Si Windows muestra "Windows protegio su PC", elige "Mas informacion" > "Ejecutar de todas formas".
+3. Al terminar se abre Zen Secciones y aparece el CODIGO DE EQUIPO (por ejemplo 3F9A-0C21-B7E4).
+   Envialo a tu proveedor y escribe la CLAVE que te devuelva. Se activa una sola vez por equipo.
+4. Desde entonces abre el programa con el acceso directo "Zen Secciones" del escritorio o del menu Inicio.
+
+Los DXF que exportes se guardan en tu carpeta Descargas.
+El proyecto se guarda solo en el equipo; con "Guardar proyecto" puedes llevarlo a otra PC.
+
+Para desinstalar: %LOCALAPPDATA%\ZenSecciones\Desinstalar.cmd
