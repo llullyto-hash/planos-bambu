@@ -137,3 +137,61 @@ def _csv(tmp_path, pts):
         for p in pts:
             fh.write(f"{p.num},{p.n},{p.e},{p.z},{p.desc}\n")
     return str(ruta)
+
+
+def _plano_base(tmp_path):
+    """Dos manzanas (FACHADA cerrada) separadas por una calle de 8 m, con lotes dentro."""
+    import ezdxf
+
+    doc = ezdxf.new("R2018")
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(0, 0), (40, 0), (40, 30), (0, 30)], close=True, dxfattribs={"layer": "FACHADA"})
+    msp.add_lwpolyline([(0, -38), (40, -38), (40, -8), (0, -8)], close=True, dxfattribs={"layer": "FACHADA"})
+    for x in range(5, 40, 5):
+        msp.add_lwpolyline([(x, 0), (x, 30)], dxfattribs={"layer": "lotes"})
+    ruta = tmp_path / "base.dxf"
+    doc.saveas(ruta)
+    return str(ruta)
+
+
+def test_veredas_pegadas_al_limite_y_sin_cruzar_la_calle(tmp_path):
+    import ezdxf
+
+    from ortofoto import base as basemod
+
+    ruta_base = _plano_base(tmp_path)
+    pts = []
+    for k, x in enumerate(np.arange(2, 39, 6)):
+        # Vereda de la manzana norte (fachada y=0): puntos a 0.2 m y 1.8 m de la fachada
+        pts += [Punto(f"n{k}a", x, -0.2, 0, "VER"), Punto(f"n{k}b", x + 0.3, -1.8, 0, "VER")]
+        # Vereda de la manzana sur (fachada y=-8): puntos a 0.2 m y 1.5 m
+        pts += [Punto(f"s{k}a", x + 1, -7.8, 0, "VER"), Punto(f"s{k}b", x + 1.2, -6.5, 0, "VER")]
+    _, met, _ = procesar(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s"), plano_base=ruta_base),
+                         avisar=lambda *a: None)
+    base = basemod.leer_base(ruta_base)
+    veredas = [a for a in met.areas if a.codigo == "VER"]
+    assert len(veredas) == 2
+    for a in veredas:
+        # pegada a la fachada de su manzana y sin entrar a ninguna manzana
+        assert min(l.distance(a.poligono) for l in base.limites) < 1e-6
+        assert a.poligono.intersection(base.union_manzanas()).area < 1e-6
+        # no cruza la calle: todo el area esta a menos de 2 m de una sola fachada
+        ys = [y for _, y in a.poligono.exterior.coords]
+        assert max(ys) - min(ys) < 2.2
+    # El resultado conserva el plano original (lotes) y agrega las areas
+    doc = ezdxf.readfile(tmp_path / "s" / "resultado.dxf")
+    assert len(doc.modelspace().query('LWPOLYLINE[layer=="lotes"]')) == 7
+    assert len(doc.modelspace().query('HATCH[layer=="Vereda a demoler"]')) == 2
+
+
+def test_union_no_junta_manzanas_distintas(tmp_path):
+    from ortofoto import base as basemod
+
+    base = basemod.leer_base(_plano_base(tmp_path))
+    codigos, alias = unir.cargar_codigos(CODIGOS_DEFECTO)
+    # Bordes de sardinel enfrentados a 3 m, cada uno de una manzana distinta
+    pts = [Punto(f"a{k}", x, -2.5, 0, "SAR") for k, x in enumerate(range(2, 30, 6))]
+    pts += [Punto(f"b{k}", x + 3, -5.5, 0, "SAR") for k, x in enumerate(range(2, 30, 6))]
+    res, _ = unir.unir_todo(pts, codigos, None, alias=alias, avisar=lambda *a: None, base=base)
+    r = [r for r in res if r.codigo == "SAR"][0]
+    assert r.uniones and all(abs(r.puntos[u.i].n - r.puntos[u.j].n) < 0.1 for u in r.uniones)

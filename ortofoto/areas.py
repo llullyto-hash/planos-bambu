@@ -227,8 +227,12 @@ def _franjas_por_secciones(res, referencias):
     return areas, bordes, usados
 
 
-def cerrar_areas(resultados):
-    """Devuelve Metrado con areas (sin superposiciones) y lineas."""
+def cerrar_areas(resultados, base=None):
+    """Devuelve Metrado con areas (sin superposiciones) y lineas.
+
+    base: PlanoBase con los limites de propiedad (fachadas) del plano del proyecto.
+    """
+    con_base = base is not None and not base.vacio
     met = Metrado()
     candidatas = []
     lineas_por_codigo = {}
@@ -237,8 +241,12 @@ def cerrar_areas(resultados):
     for res in resultados:
         conf = res.conf
         if conf.tipo == "franja" and conf.referencia:
-            refs = [ln for cod in conf.referencia for ln in lineas_por_codigo.get(cod, [])]
-            ars, bordes, usados = _franjas_por_secciones(res, refs)
+            if con_base:
+                # El borde interior es el limite de propiedad dibujado en el plano
+                ars, bordes, usados = _franjas_contra_limite(res, base)
+            else:
+                refs = [ln for cod in conf.referencia for ln in lineas_por_codigo.get(cod, [])]
+                ars, bordes, usados = _franjas_por_secciones(res, refs)
             resto = [i for i in range(len(res.puntos)) if i not in usados]
             ars2, bordes2, usados2 = _franjas_por_estaciones(res, resto, res.barreras)
             candidatas += ars + ars2
@@ -276,6 +284,15 @@ def cerrar_areas(resultados):
             met.lineas += [Linea(res.codigo, conf, ln) for ln in abiertos]
             met.lineas += [Linea(res.codigo, conf, LineString(xy)) for xy in cerrados]
 
+    if con_base:
+        # Ningun area entra a los lotes
+        recortadas = []
+        for ar in candidatas:
+            pol = base.recortar(ar.poligono)
+            if isinstance(pol, Polygon) and pol.area >= AREA_MIN:
+                ar.poligono = pol
+                recortadas.append(ar)
+        candidatas = recortadas
     # Sin superposiciones: primero las mas confiables (contornos, luego franjas grandes)
     candidatas.sort(key=lambda a: (a.revisar, a.origen != "contorno", -a.area))
     ocupado = None
@@ -294,6 +311,82 @@ def cerrar_areas(resultados):
         ocupado = ar.poligono if ocupado is None else unary_union([ocupado, ar.poligono])
     _numerar(met)
     return met
+
+
+def _tramo_de_limite(ref, s0, s1):
+    """Tramo del limite entre las posiciones s0 y s1 (si el limite es cerrado, puede pasar por el inicio)."""
+    largo = ref.length
+    if s0 <= s1:
+        return list(substring(ref, s0, s1).coords)
+    return list(substring(ref, s0, largo).coords) + list(substring(ref, 0, s1).coords)[1:]
+
+
+def _franjas_contra_limite(res, base):
+    """Veredas pegadas al limite de propiedad del plano base.
+
+    Cada punto se asigna al limite (manzana) mas cercano. A lo largo de ese
+    limite se agrupan en tramos (se corta donde no hay puntos en mas de
+    separacion_max) y en cada zona se toma el punto mas alejado del limite como
+    borde exterior (sardinel). El area es: limite de propiedad -> borde exterior.
+    """
+    conf = res.conf
+    xy = np.array([(p.e, p.n) for p in res.puntos])
+    por_limite = {}
+    for i, (x, y) in enumerate(xy):
+        k = base.limite_de(x, y, dist=conf.ancho_max + 1.0)
+        if k >= 0:
+            ref = base.limites[k]
+            p = Point(x, y)
+            por_limite.setdefault(k, []).append((ref.project(p), ref.distance(p), i))
+    areas, bordes, usados = [], [], set()
+    tol = max(0.3, conf.ancho_min * 0.5)
+    ventana = max(4.0, conf.separacion_max / 2)
+    for k, lista in por_limite.items():
+        ref = base.limites[k]
+        largo = ref.length
+        cerrado = ref.is_closed
+        s = np.array([v[0] for v in lista])
+        d = np.array([v[1] for v in lista])
+        idx = np.array([v[2] for v in lista])
+        # En un limite cerrado, empezar a contar despues del mayor hueco sin puntos
+        corte = 0.0
+        if cerrado and len(s) > 1:
+            orden = np.sort(s)
+            huecos = np.diff(np.r_[orden, orden[0] + largo])
+            corte = orden[(np.argmax(huecos) + 1) % len(orden)]
+        sr = (s - corte) % largo if cerrado else s
+        o = np.argsort(sr)
+        sr, d, idx, s = sr[o], d[o], idx[o], s[o]
+        cortes = np.where(np.diff(sr) > conf.separacion_max)[0]
+        ini = 0
+        for fin in list(cortes) + [len(sr) - 1]:
+            sel = slice(ini, fin + 1)
+            ini = fin + 1
+            ss, dd, ii, s_real = sr[sel], d[sel], idx[sel], s[sel]
+            exterior = []
+            for j in range(len(ss)):
+                cerca = np.abs(ss - ss[j]) <= ventana
+                if dd[j] >= conf.ancho_min * 0.8 and dd[j] >= dd[cerca].max() - tol:
+                    exterior.append(j)
+            if len(exterior) < 2 or ss[exterior[-1]] - ss[exterior[0]] < TRAMO_MIN:
+                continue
+            ce = [tuple(xy[ii[j]]) for j in exterior]
+            ci = _tramo_de_limite(ref, s_real[exterior[0]], s_real[exterior[-1]])
+            if len(ci) < 2:
+                continue
+            pol = _poligono_valido(ci + ce[::-1])
+            if pol.is_empty or pol.area < AREA_MIN:
+                continue
+            largo_tramo = LineString(ci).length
+            ancho = pol.area / max(largo_tramo, 1e-6)
+            if ancho > conf.ancho_max * 1.2:
+                continue
+            anchos = dd[exterior]
+            revisar = (not Polygon(ci + ce[::-1]).is_valid) or (anchos.max() - anchos.min() > conf.ancho_max * 0.6)
+            areas.append(Area(res.codigo, conf, pol, "limite", float(np.median(anchos)), largo_tramo, revisar))
+            bordes.append(LineString(ce))
+            usados.update(int(i) for i in ii)
+    return areas, bordes, usados
 
 
 def _franjas_por_estaciones(res, indices, barreras=None):
@@ -348,6 +441,10 @@ def _franjas_por_estaciones(res, indices, barreras=None):
         return [], [], set()
 
     centros = np.array([s_[2] for s_ in secciones])
+    zona_sec = None
+    if getattr(res, "zonas", None) is not None:
+        zona_sec = [int(np.bincount(np.asarray(res.zonas)[[indices[m] for m in s_[5]]] + 1).argmax()) - 1
+                    for s_ in secciones]
     arbol_c = cKDTree(centros)
     cand = []
     for i, j in arbol_c.query_pairs(conf.separacion_max * 1.25):
@@ -357,6 +454,10 @@ def _franjas_por_estaciones(res, indices, barreras=None):
         ci, cj = abs(np.dot(secciones[i][3], u)), abs(np.dot(secciones[j][3], u))
         ratio = max(secciones[i][4], secciones[j][4]) / min(secciones[i][4], secciones[j][4])
         if ci < 0.5 and cj < 0.5 and ratio < 2.5:
+            if zona_sec is not None and zona_sec[i] != zona_sec[j]:
+                continue  # secciones de manzanas distintas
+            if barreras is not None and barreras.cruza(centros[i], centros[j]):
+                continue  # cruzaria un limite de propiedad u otra union
             cand.append((largo * (1 + ci + cj + 0.3 * (ratio - 1)), i, j))
     cand.sort()
     grafo = unir._Grafo(centros, barreras or unir.Barreras())
@@ -404,7 +505,8 @@ def _unir_sobrantes(res, usados):
     if len(resto) < 2:
         return
     xy = np.array([(res.puntos[i].e, res.puntos[i].n) for i in resto])
-    uniones = unir._candidatos(xy, res.conf)
+    zonas = None if getattr(res, "zonas", None) is None else np.asarray(res.zonas)[resto]
+    uniones = unir._candidatos(xy, res.conf, zonas=zonas)
     if res.orto is not None:
         for u in uniones:
             u.apoyo = unir.apoyo_imagen(res.orto, xy[u.i], xy[u.j])

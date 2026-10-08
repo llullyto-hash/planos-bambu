@@ -49,6 +49,7 @@ class Codigo:
     escala_patron: float = 0.5
     nombre: str = ""  # descripcion legible para la ventana
     referencia: list = field(default_factory=list)  # franja: codigos del borde interior (fachada, lote)
+    misma_manzana: bool = False  # con plano base: solo une puntos de la misma manzana
 
 
 def cargar_codigos(ruta):
@@ -98,6 +99,7 @@ class Resultado:
     barreras: object = None
     orto: object = None
     completar: bool = True
+    zonas: object = None  # manzana de cada punto (con plano base)
 
     def xy(self, cadena):
         return np.array([(self.puntos[i].e, self.puntos[i].n) for i in cadena])
@@ -225,7 +227,8 @@ class _Grafo:
         return res
 
 
-def _candidatos(xy, conf, vecinos=6):
+def _candidatos(xy, conf, vecinos=6, zonas=None):
+    """Uniones posibles entre vecinos. `zonas`: manzana de cada punto (-1 = ninguna)."""
     if len(xy) < 2:
         return []
     arbol = cKDTree(xy)
@@ -235,6 +238,8 @@ def _candidatos(xy, conf, vecinos=6):
     for i in range(len(xy)):
         for d, j in zip(np.atleast_1d(dist[i])[1:], np.atleast_1d(idx[i])[1:]):
             if 1e-3 < d <= conf.separacion_max:
+                if zonas is not None and zonas[i] != zonas[j]:
+                    continue  # puntos de manzanas distintas (p.ej. veredas de cuadras opuestas)
                 cand[(min(i, j), max(i, j))] = d
     return [Union(i, j, d) for (i, j), d in cand.items()]
 
@@ -298,7 +303,12 @@ def agrupar(puntos, codigos, alias=None):
     return grupos, sin_conf
 
 
-def unir_todo(puntos, codigos, orto=None, solo=None, alias=None, avisar=print, completar=True):
+def zonas_de(xy, base):
+    """Manzana (indice de limite) mas cercana de cada punto, o -1."""
+    return np.array([base.limite_de(x, y) for x, y in xy], int)
+
+
+def unir_todo(puntos, codigos, orto=None, solo=None, alias=None, avisar=print, completar=True, base=None):
     """Une todos los codigos activos. Devuelve (resultados, {codigo_sin_configurar: n})."""
     grupos, sin_conf = agrupar(puntos, codigos, alias)
     preparados = []
@@ -307,8 +317,11 @@ def unir_todo(puntos, codigos, orto=None, solo=None, alias=None, avisar=print, c
         if (solo and cod not in solo) or not conf.activo:
             continue
         xy = np.array([(p.e, p.n) for p in pts], float)
-        uniones = _candidatos(xy, conf) if conf.tipo != "punto" else []
-        preparados.append((Resultado(cod, pts, conf), xy, uniones))
+        zonas = zonas_de(xy, base) if base is not None and not base.vacio and conf.misma_manzana else None
+        uniones = _candidatos(xy, conf, zonas=zonas) if conf.tipo != "punto" else []
+        res = Resultado(cod, pts, conf)
+        res.zonas = zonas
+        preparados.append((res, xy, uniones))
 
     if orto is not None:
         # Apoyo de la foto para todas las uniones, recorriendo la foto por bloques
@@ -324,6 +337,12 @@ def unir_todo(puntos, codigos, orto=None, solo=None, alias=None, avisar=print, c
     orden = {"contorno": 0, "linea": 1, "franja": 2, "punto": 3}
     preparados.sort(key=lambda t: (orden.get(t[0].conf.tipo, 9), t[0].codigo))
     barreras = Barreras()
+    if base is not None:
+        # Ninguna union puede cruzar un limite de propiedad
+        for ln in base.limites:
+            c = np.asarray(ln.coords)
+            for a, b in zip(c[:-1], c[1:]):
+                barreras.agregar(a, b)
     resultados = []
     for res, xy, uniones in preparados:
         if res.conf.tipo != "punto" and not (res.conf.tipo == "franja" and res.conf.referencia):

@@ -50,7 +50,9 @@ class App(tk.Tk):
         self.ruta_codigos = str(CODIGOS_DEFECTO)
         self.conteo = {}
         self.apagar = set()
-        self.var = {k: tk.StringVar() for k in ("puntos", "orto", "calce_dxf", "control", "plantilla", "salida")}
+        self.var = {k: tk.StringVar() for k in ("puntos", "orto", "calce_dxf", "control", "plantilla", "salida",
+                                                "plano_base")}
+        self.capas_limite = tk.StringVar(value="FACHADA")
         self.var["salida"].set(str(Path.home() / "Documents" / "resultado_topografia"))
         self.calce = tk.StringVar(value="foto")
         self.calce_auto = tk.BooleanVar(value=True)
@@ -86,6 +88,11 @@ class App(tk.Tk):
                 self.var[clave].set(r)
                 if clave == "puntos":
                     self._contar_puntos()
+                # El plano de Civil 3D sirve para el calce y como plano base (lotes, fachadas)
+                if clave == "calce_dxf" and not self.var["plano_base"].get():
+                    self.var["plano_base"].set(r)
+                if clave == "plano_base" and not self.var["calce_dxf"].get():
+                    self.var["calce_dxf"].set(r)
 
         ttk.Button(padre, text="Examinar...", command=elegir).grid(row=fila, column=2)
         if ayuda:
@@ -97,6 +104,17 @@ class App(tk.Tk):
         self._fila_archivo(f, 0, "Puntos topograficos *", "puntos",
                            [("Puntos PNEZD", "*.csv *.txt"), ("DXF con puntos COGO", "*.dxf"), ("Todos", "*.*")],
                            ayuda="Civil 3D: Points > Export Points > PNEZD (comma delimited)")
+        base = ttk.LabelFrame(f, text="Plano del proyecto (recomendado)", padding=8)
+        base.grid(row=10, column=0, columnspan=3, sticky="we", pady=8)
+        base.columnconfigure(1, weight=1)
+        self._fila_archivo(base, 0, "Plano base (DXF)", "plano_base", [("DXF", "*.dxf")],
+                           ayuda="Con lotes y fachadas: las veredas se pegan al limite de propiedad, nunca entran a "
+                                 "los lotes ni se unen con la otra cuadra. El resultado se agrega sobre una copia.")
+        fila_c = ttk.Frame(base)
+        fila_c.grid(row=2, column=0, columnspan=3, sticky="w")
+        ttk.Label(fila_c, text="Capas del limite de propiedad:").pack(side="left")
+        ttk.Entry(fila_c, textvariable=self.capas_limite, width=40).pack(side="left", padx=4)
+        ttk.Label(fila_c, text="(separadas por coma, p.ej. FACHADA, LINEA DE LOTE)", foreground="#666").pack(side="left")
         self._fila_archivo(f, 2, "Ortofoto (opcional)", "orto",
                            [("Imagenes", "*.tif *.tiff *.jpg *.jpeg *.png *.ecw"), ("Todos", "*.*")],
                            ayuda="Sin foto, une solo por geometria. Con foto, sigue los bordes reales.")
@@ -311,6 +329,8 @@ class App(tk.Tk):
             calce_auto=self.calce_auto.get(), radio_calce=float(self.radio.get().replace(",", ".") or 3),
             resolucion=float(self.resolucion.get().replace(",", ".") or 0) / 100,
             plantilla=self.var["plantilla"].get(), capas_apagadas=capas_apagadas, completar=self.completar.get(),
+            plano_base=self.var["plano_base"].get(),
+            capas_limite=tuple(c.strip() for c in self.capas_limite.get().split(",") if c.strip()) or ("FACHADA",),
             codigos_editados=(copy.deepcopy(self.codigos), dict(self.alias)))
 
     def _procesar(self):

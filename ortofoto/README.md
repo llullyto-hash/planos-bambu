@@ -30,6 +30,13 @@ La ortofoto se lee **en su PC**: no importa que pese varios GB.
   caigan sobre los bordes de la foto (solo la mueve si la mejora es clara).
 - **Resolución de trabajo:** 0 = la de la foto. Con poca memoria use 6–8 cm.
 - **Plantilla de capas (opcional):** un DXF del cual copiar colores, tipos de línea y grosores.
+- **Plano del proyecto (recomendado):** el DXF de Civil 3D con los lotes y las fachadas
+  (se llena solo con el mismo DXF del calce). Con él:
+  - el borde interior de cada vereda es la línea de **FACHADA** (límite de propiedad);
+  - ningún área entra a los lotes y ninguna unión cruza un límite;
+  - cada punto pertenece a la manzana de la fachada más cercana: nunca se une con la vereda de la otra cuadra;
+  - `resultado.dxf` es una **copia de su plano** con todo lo original (lotes, fachadas, foto) más las capas nuevas.
+  - En *Capas del límite de propiedad* indique qué capas son el límite (por defecto `FACHADA`).
 
 **2. Códigos y capas**
 
@@ -78,7 +85,8 @@ Capas para revisar a mano:
 | `REVISAR AREA` | áreas con forma corregida o ancho muy variable |
 | `REVISAR BORDE SIN CERRAR` | bordes de vereda/cuneta que no encontraron su pareja: cerrarlos a mano |
 
-Las veredas se arman de tres formas, en este orden:
+Las veredas se arman de estas formas, en este orden:
+0. **Contra el límite de propiedad del plano base** (si lo eligió): fachada → punto VER más alejado (sardinel).
 1. **Por secciones con referencia:** puntos levantados de la fachada al sardinel, cada cierta distancia (Bambú).
 2. **Por secciones sin referencia:** pares de puntos que cruzan la vereda, sin fachada cerca (PETRO).
 3. **Borde por borde:** puntos que siguen cada borde de forma continua.

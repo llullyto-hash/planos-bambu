@@ -30,13 +30,19 @@ def _capa(doc, nombre, color=7, tipo_linea="Continuous", plantilla=None, apagada
 
 
 def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=None, plantilla=None,
-                capas_apagadas=()):
+                capas_apagadas=(), base_dxf=None):
+    """Guarda el resultado. Con `base_dxf` se trabaja sobre una copia del plano del proyecto:
+    se conserva todo lo original (lotes, fachadas, ortofoto) y se agregan las capas nuevas."""
     import ezdxf
-    from ezdxf.enums import TextEntityAlignment
 
     alias = alias or {}
-    doc = ezdxf.new("R2018", setup=True)
-    doc.header["$INSUNITS"] = 6  # metros
+    if base_dxf:
+        from ezdxf import recover
+
+        doc, _ = recover.readfile(base_dxf)
+    else:
+        doc = ezdxf.new("R2018", setup=True)
+        doc.header["$INSUNITS"] = 6  # metros
     tpl = None
     if plantilla:
         from ezdxf import recover
@@ -108,8 +114,9 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
         if ar.revisar:
             msp.add_lwpolyline(exterior, close=True, dxfattribs={"layer": CAPA_REVISAR_AREA, "lineweight": 50})
 
-    # Ortofoto de fondo: el archivo original, con el calce corregido (no se copia)
-    if orto is not None and orto.origen is not None:
+    # Ortofoto de fondo: el archivo original, con el calce corregido (no se copia).
+    # Si se trabaja sobre el plano del proyecto, la foto ya esta insertada ahi.
+    if orto is not None and orto.origen is not None and not base_dxf:
         _capa(doc, CAPA_ORTOFOTO, 7)
         w, h = orto.origen["tam"]
         a, b, c, d, e, f = orto.origen["afin"]

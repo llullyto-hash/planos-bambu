@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import areas, calce, exportar, topografia, unir
+from . import areas, base as basemod, calce, exportar, topografia, unir
 from .imagen import Ortofoto, afin_desde_dxf
 
 CODIGOS_DEFECTO = Path(__file__).with_name("codigos.json")
@@ -43,6 +43,8 @@ class Opciones:
     desactivados: set = field(default_factory=set)  # codigos que no se procesan
     capas_apagadas: set = field(default_factory=set)  # capas que salen apagadas en el DXF
     completar: bool = True  # con foto: unir tambien lo que la foto no confirma (queda para revisar)
+    plano_base: str = ""  # DXF del proyecto (lotes, fachadas): el resultado se agrega sobre una copia
+    capas_limite: tuple = basemod.CAPAS_LIMITE  # capas del limite de propiedad en el plano base
     codigos_editados: tuple = None  # (codigos, alias) ya cargados desde la ventana
 
 
@@ -67,6 +69,15 @@ def procesar(op, avisar=print):
     zona = (min(xs) - 20, min(ys) - 20, max(xs) + 20, max(ys) + 20)
 
     orto, log = None, []
+    base = None
+    if op.plano_base:
+        avisar("Leyendo el plano base (limites de propiedad)...")
+        base = basemod.leer_base(op.plano_base, op.capas_limite)
+        log.append(f"Plano base {Path(op.plano_base).name}: {len(base.limites)} limites de propiedad "
+                   f"({len(base.manzanas)} manzanas cerradas) en capas {', '.join(op.capas_limite)}")
+        if base.vacio:
+            log.append("  AVISO: no se encontraron limites en esas capas; las veredas se arman sin limite")
+        avisar(log[-1])
     if op.orto:
         avisar("Leyendo la ortofoto (solo la zona de los puntos)...")
         if op.control:
@@ -97,13 +108,13 @@ def procesar(op, avisar=print):
 
     avisar("Uniendo puntos...")
     resultados, sin_conf = unir.unir_todo(puntos, codigos, orto, alias=alias, avisar=avisar,
-                                         completar=op.completar)
+                                         completar=op.completar, base=base)
     avisar("Cerrando areas y calculando metrados...")
-    met = areas.cerrar_areas(resultados)
+    met = areas.cerrar_areas(resultados, base)
     resumen = areas.guardar_metrado(met, out / "metrado.xlsx", out / "metrado.csv")
     avisar("Guardando DXF...")
     exportar.guardar_dxf(out / "resultado.dxf", puntos, resultados, met, codigos, alias, orto,
-                         op.plantilla or None, op.capas_apagadas)
+                         op.plantilla or None, op.capas_apagadas, base_dxf=op.plano_base or None)
     exportar.guardar_vista(resultados, out / "vista.png", orto, metrado=met,
                            ventana=(min(xs) - 5, min(ys) - 5, max(xs) + 5, max(ys) + 5))
 
@@ -142,6 +153,10 @@ def main(argv=None):
     ap.add_argument("--resolucion", type=float, default=0.0, help="Pixel de trabajo en m (0 = original)")
     ap.add_argument("--codigos", default=str(CODIGOS_DEFECTO), help="Configuracion de codigos y capas")
     ap.add_argument("--plantilla", default="", help="DXF del cual copiar colores/tipos de linea de las capas")
+    ap.add_argument("--plano-base", default="",
+                    help="DXF del proyecto con lotes/fachadas: veredas pegadas al limite y resultado sobre una copia")
+    ap.add_argument("--capas-limite", nargs="*", default=list(basemod.CAPAS_LIMITE),
+                    help="Capas del limite de propiedad en el plano base (por defecto FACHADA)")
     ap.add_argument("--desactivar", nargs="*", default=[], help="Codigos que no se procesan (p.ej. PTA CNTA)")
     ap.add_argument("--apagar", nargs="*", default=[], help="Capas que salen apagadas en el DXF")
     ap.add_argument("--solo-confirmadas", action="store_true",
@@ -153,7 +168,8 @@ def main(argv=None):
                   calce_auto=not a.sin_calce_auto, radio_calce=a.radio_calce, resolucion=a.resolucion,
                   codigos=a.codigos, plantilla=a.plantilla, ventana=tuple(a.ventana) if a.ventana else None,
                   desactivados={c.upper() for c in a.desactivar}, capas_apagadas=set(a.apagar),
-                  completar=not a.solo_confirmadas)
+                  completar=not a.solo_confirmadas, plano_base=a.plano_base,
+                  capas_limite=tuple(a.capas_limite))
     return procesar(op)
 
 
