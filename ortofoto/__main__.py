@@ -48,6 +48,23 @@ class Opciones:
     codigos_editados: tuple = None  # (codigos, alias) ya cargados desde la ventana
 
 
+def ruta_libre(ruta, avisar=print):
+    """Si el archivo esta abierto en otro programa (AutoCAD, Excel), usa nombre_2, nombre_3..."""
+    ruta = Path(ruta)
+    candidata, n = ruta, 1
+    while True:
+        try:
+            if candidata.exists():
+                with open(candidata, "a+b"):
+                    pass
+            if candidata != ruta:
+                avisar(f"AVISO: {ruta.name} esta abierto en otro programa; se guarda como {candidata.name}")
+            return candidata
+        except PermissionError:
+            n += 1
+            candidata = ruta.with_name(f"{ruta.stem}_{n}{ruta.suffix}")
+
+
 def procesar(op, avisar=print):
     t0 = time.time()
     out = Path(op.salida)
@@ -111,11 +128,11 @@ def procesar(op, avisar=print):
                                          completar=op.completar, base=base)
     avisar("Cerrando areas y calculando metrados...")
     met = areas.cerrar_areas(resultados, base)
-    resumen = areas.guardar_metrado(met, out / "metrado.xlsx", out / "metrado.csv")
+    resumen = areas.guardar_metrado(met, ruta_libre(out / "metrado.xlsx", avisar), ruta_libre(out / "metrado.csv", avisar))
     avisar("Guardando DXF...")
-    exportar.guardar_dxf(out / "resultado.dxf", puntos, resultados, met, codigos, alias, orto,
+    exportar.guardar_dxf(ruta_libre(out / "resultado.dxf", avisar), puntos, resultados, met, codigos, alias, orto,
                          op.plantilla or None, op.capas_apagadas, base_dxf=op.plano_base or None)
-    exportar.guardar_vista(resultados, out / "vista.png", orto, metrado=met,
+    exportar.guardar_vista(resultados, ruta_libre(out / "vista.png", avisar), orto, metrado=met,
                            ventana=(min(xs) - 5, min(ys) - 5, max(xs) + 5, max(ys) + 5))
 
     lineas = ["# Resultado: topografia -> polilineas, areas y metrado", ""] + [f"- {l}" for l in log]
@@ -136,7 +153,7 @@ def procesar(op, avisar=print):
                    ", ".join(f"{k or '(vacio)'} ({v})" for k, v in sorted(sin_conf.items(), key=lambda x: -x[1]))]
     lineas.append(f"\nTiempo: {time.time() - t0:.0f} s")
     texto = "\n".join(lineas) + "\n"
-    (out / "resumen.md").write_text(texto, encoding="utf-8")
+    ruta_libre(out / "resumen.md", avisar).write_text(texto, encoding="utf-8")
     avisar(texto)
     return resultados, met, orto
 

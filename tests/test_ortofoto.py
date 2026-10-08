@@ -195,3 +195,21 @@ def test_union_no_junta_manzanas_distintas(tmp_path):
     res, _ = unir.unir_todo(pts, codigos, None, alias=alias, avisar=lambda *a: None, base=base)
     r = [r for r in res if r.codigo == "SAR"][0]
     assert r.uniones and all(abs(r.puntos[u.i].n - r.puntos[u.j].n) < 0.1 for u in r.uniones)
+
+
+def test_archivo_abierto_se_guarda_con_otro_nombre(tmp_path, monkeypatch):
+    from ortofoto import __main__ as m
+
+    bloqueado = tmp_path / "resultado.dxf"
+    bloqueado.write_text("abierto en AutoCAD")
+    real_open = open
+
+    def open_falso(ruta, *a, **k):
+        if str(ruta) == str(bloqueado):
+            raise PermissionError(13, "Permission denied")
+        return real_open(ruta, *a, **k)
+
+    monkeypatch.setattr("builtins.open", open_falso)
+    avisos = []
+    assert m.ruta_libre(bloqueado, avisos.append) == tmp_path / "resultado_2.dxf"
+    assert avisos and "resultado_2.dxf" in avisos[0]
