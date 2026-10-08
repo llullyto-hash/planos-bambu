@@ -1,0 +1,30 @@
+{
+  "_comentario": "codigo de campo -> capa destino. tipo: linea | contorno | punto. alias: el codigo se une con los puntos de otro codigo. separacion_max en metros. Colores/tipos de linea tomados del plano PETRO.",
+  "codigos": {
+    "VER":    {"capa": "VEREDA EXIS.",                     "tipo": "linea",    "separacion_max": 15, "color": 10},
+    "LP":     {"capa": "LINEA DE LOTE",                    "tipo": "linea",    "separacion_max": 40, "color": 210, "tipo_linea": "DASHED"},
+    "ESQ":    {"alias": "LP"},
+    "PARQ":   {"capa": "LINEA DE LOTE",                    "tipo": "linea",    "separacion_max": 40, "color": 210, "tipo_linea": "DASHED"},
+    "MAR":    {"capa": "MARTILLO",                         "tipo": "contorno", "separacion_max": 8,  "color": 31},
+    "VERMA":  {"alias": "MAR"},
+    "ACC":    {"capa": "ACCESOS",                          "tipo": "contorno", "separacion_max": 8,  "color": 11},
+    "PAV":    {"capa": "PAVIMENTO TAHIZ",                  "tipo": "linea",    "separacion_max": 25, "color": 8},
+    "CA":     {"capa": "CANALETA EXISTENTE",               "tipo": "linea",    "separacion_max": 15, "color": 140},
+    "SAR":    {"capa": "SARDINEL PP",                      "tipo": "linea",    "separacion_max": 15, "color": 50},
+    "ALC":    {"capa": "ALCANTARILLA TUBULAR DE CONCRETO", "tipo": "linea",    "separacion_max": 10, "color": 10},
+    "CERCO":  {"capa": "CERCO",                            "tipo": "linea",    "separacion_max": 30, "color": 30},
+    "F":      {"capa": "FACHADA",                          "tipo": "linea",    "separacion_max": 20, "color": 5},
+    "ARB":    {"capa": "ARBOLES",              "tipo": "punto", "color": 100},
+    "CDA":    {"capa": "CAJA DE AGUA Y DESAGUE", "tipo": "punto", "color": 150},
+    "CDD":    {"capa": "CAJA DE AGUA Y DESAGUE", "tipo": "punto", "color": 150},
+    "BZ":     {"capa": "BUZON",                "tipo": "punto", "color": 160},
+    "PL":     {"capa": "POSTE DE LUZ",         "tipo": "punto", "color": 40},
+    "MD":     {"capa": "MEDIDOR",              "tipo": "punto", "color": 50},
+    "VALVULA":{"capa": "VALVULAS",             "tipo": "punto", "color": 4},
+    "VA":     {"capa": "VALVULAS",             "tipo": "punto", "color": 4},
+    "HIDRA":  {"capa": "HIDRANTE",             "tipo": "punto", "color": 142},
+    "COLUNA": {"capa": "COLUMNAS DE CONCRETO", "tipo": "punto", "color": 5},
+    "BM":     {"capa": "BM",                   "tipo": "punto", "color": 1},
+    "E":      {"capa": "PUNTO ESTACION",       "tipo": "punto", "color": 5}
+  }
+}
