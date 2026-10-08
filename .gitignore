@@ -1,0 +1,5 @@
+__pycache__/
+salida_analisis/
+*.dxf
+*.dwg
+*.zip
