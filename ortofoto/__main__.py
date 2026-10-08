@@ -65,6 +65,29 @@ def ruta_libre(ruta, avisar=print):
             candidata = ruta.with_name(f"{ruta.stem}_{n}{ruta.suffix}")
 
 
+def guardar_muestra(orto, puntos, out, avisar=print, lado=150.0):
+    """Recorte de la ortofoto (lado x lado m, con world file) en la zona con mas veredas.
+
+    Sirve para enviar una muestra pequena de la foto real sin subir el archivo completo.
+    """
+    import numpy as np
+
+    ver = np.array([(p.e, p.n) for p in puntos if p.codigo == "VER"] or [(p.e, p.n) for p in puntos])
+    # Centro: la celda de lado x lado con mas puntos de vereda
+    celdas = {}
+    for x, y in ver:
+        k = (int(x // (lado / 2)), int(y // (lado / 2)))
+        celdas[k] = celdas.get(k, 0) + 1
+    kx, ky = max(celdas, key=celdas.get)
+    cx, cy = (kx + 1) * lado / 2, (ky + 1) * lado / 2
+    rec = orto.recortar(cx - lado / 2, cy - lado / 2, cx + lado / 2, cy + lado / 2)
+    Path(out).mkdir(parents=True, exist_ok=True)
+    ruta = ruta_libre(Path(out) / "muestra_ortofoto.jpg", avisar)
+    rec.guardar(ruta)
+    avisar(f"Muestra de la ortofoto guardada: {ruta.name} ({ruta.stat().st_size / 1e6:.1f} MB, "
+           f"{rec.rgb.shape[1]}x{rec.rgb.shape[0]} px, centro {cx:.0f} E, {cy:.0f} N)")
+
+
 def procesar(op, avisar=print):
     t0 = time.time()
     out = Path(op.salida)
@@ -110,6 +133,10 @@ def procesar(op, avisar=print):
             log.append("Calce tomado de la georreferencia de la foto")
         log.append(f"Ortofoto de trabajo: {orto.rgb.shape[1]}x{orto.rgb.shape[0]} px de {orto.tam_pixel * 100:.1f} cm")
         avisar(log[-1])
+        try:
+            guardar_muestra(orto, puntos, out, avisar)
+        except Exception as e:  # noqa: BLE001 - la muestra es opcional
+            avisar(f"(No se pudo guardar la muestra de la ortofoto: {e})")
         if op.calce_auto:
             avisar("Calce automatico...")
             borde = [p for p in puntos
