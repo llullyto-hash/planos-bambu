@@ -257,36 +257,60 @@ const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 // LECTOR DXF (ASCII)
 // =====================================================================
 function parseDXF(text){
-  const L=text.split(/\r?\n/),n=L.length-1,ents=[],layers={};
-  let i=0,sec=null;
-  const push=e=>{if(e.ps)return;ents.push(e);const c=layers[e.ly]||(layers[e.ly]={n:0,poly:0,txt:0,len:0});c.n++;if(e.pts){c.poly++;c.len+=e.len||0}if(e.text!=null)c.txt++};
+  const L=text.split(/\r?\n/),n=L.length-1,ents=[],layers={},blocks={};
+  let i=0,sec=null,blk=null;
+  const add=e=>{ents.push(e);const c=layers[e.ly]||(layers[e.ly]={n:0,poly:0,txt:0,len:0});c.n++;if(e.pts)c.poly++;if(e.text!=null)c.txt++};
+  // dentro de BLOCKS las entidades se guardan en su bloque; en ENTITIES van al modelo (sin espacio papel)
+  const push=e=>{if(blk){blk.ents.push(e);return}if(e.ps)return;add(e)};
   while(i<n){
     const code=L[i].trim(),val=L[i+1];
     if(code==='0'&&val.trim()==='SECTION'){sec=(L[i+3]||'').trim();i+=4;continue}
-    if(code==='0'&&val.trim()==='ENDSEC'){sec=null;i+=2;continue}
-    if(sec!=='ENTITIES'||code!=='0'){i+=2;continue}
+    if(code==='0'&&val.trim()==='ENDSEC'){sec=null;blk=null;i+=2;continue}
+    if((sec!=='ENTITIES'&&sec!=='BLOCKS')||code!=='0'){i+=2;continue}
     const type=val.trim();i+=2;
     const g=[];while(i<n&&L[i].trim()!=='0'){g.push([L[i].trim(),L[i+1]]);i+=2}
     const get=(c,d)=>{for(const [k,v] of g)if(k===c)return v;return d};
+    if(sec==='BLOCKS'){if(type==='BLOCK'){blk={name:(get('2','')||'').trim(),bx:+get('10',0),by:+get('20',0),ents:[]};blocks[blk.name]=blk;continue}if(type==='ENDBLK'){blk=null;continue}if(!blk)continue}
     const e={t:type,ly:(get('8','0')||'0').trim(),ps:get('67')&&get('67').trim()==='1'};
+    // extrusión (0,0,-1): objeto espejado (coordenadas OCS con X invertida)
+    const mir=+get('230',1)<0;
     if(type==='LWPOLYLINE'){const pts=[];let cur=null;for(const [k,v] of g){if(k==='10'){cur=[+v,0,0];pts.push(cur)}else if(k==='20'&&cur)cur[1]=+v;else if(k==='42'&&cur)cur[2]=+v}
+      if(mir)pts.forEach(p=>{p[0]=-p[0];p[2]=-p[2]});
       e.raw=pts;e.closed=(parseInt(get('70','0'))&1)===1;e.pts=dens(pts,e.closed);push(e)}
     else if(type==='POLYLINE'){const flags=parseInt(get('70','0'))||0;const vs=[];
       while(i<n){const c=L[i].trim(),v=L[i+1].trim();if(c!=='0'){i+=2;continue}
-        if(v==='VERTEX'){i+=2;let x=0,y=0,b=0;while(i<n&&L[i].trim()!=='0'){const k=L[i].trim();if(k==='10')x=+L[i+1];else if(k==='20')y=+L[i+1];else if(k==='42')b=+L[i+1];i+=2}vs.push([x,y,b]);continue}
+        if(v==='VERTEX'){i+=2;let x=0,y=0,b=0;while(i<n&&L[i].trim()!=='0'){const k=L[i].trim();if(k==='10')x=+L[i+1];else if(k==='20')y=+L[i+1];else if(k==='42')b=+L[i+1];i+=2}vs.push(mir?[-x,y,-b]:[x,y,b]);continue}
         if(v==='SEQEND'){i+=2;while(i<n&&L[i].trim()!=='0')i+=2}break}
       if(!(flags&16)&&!(flags&64)){e.raw=vs;e.closed=(flags&1)===1;e.pts=dens(vs,e.closed);push(e)}}
     else if(type==='LINE'){e.pts=[[+get('10',0),+get('20',0)],[+get('11',0),+get('21',0)]];push(e)}
-    else if(type==='ARC'){const cx=+get('10',0),cy=+get('20',0),r=+get('40',0);let a0=+get('50',0),a1=+get('51',0);if(a1<a0)a1+=360;const k=Math.max(4,Math.ceil((a1-a0)/5));e.pts=[];for(let j=0;j<=k;j++){const a=(a0+(a1-a0)*j/k)*Math.PI/180;e.pts.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}push(e)}
-    else if(type==='TEXT'||type==='MTEXT'){let s='';for(const [k,v] of g)if(k==='3')s+=v;s+=get('1','');
+    else if(type==='ARC'){let cx=+get('10',0);const cy=+get('20',0),r=+get('40',0);let a0=+get('50',0),a1=+get('51',0);if(mir){cx=-cx;[a0,a1]=[180-a1,180-a0]}if(a1<a0)a1+=360;const k=Math.max(4,Math.ceil((a1-a0)/5));e.pts=[];for(let j=0;j<=k;j++){const a=(a0+(a1-a0)*j/k)*Math.PI/180;e.pts.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}push(e)}
+    else if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'){if(type==='ATTRIB'&&(parseInt(get('70','0'))&1))continue;let s='';if(type==='MTEXT')for(const [k,v] of g)if(k==='3')s+=v;s+=get('1','');
       s=s.replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/\\P/g,' ').replace(/[{}]/g,'').trim();
       const ax=get('11'),ay=get('21'),jx=parseInt(get('72','0'))||0;
       {const dx=get('11'),dy=get('21'),r=get('50');e.ang=type==='MTEXT'?(dx!=null&&dy!=null?Math.atan2(+dy,+dx):(r!=null?+r:0)):(r!=null?+r*Math.PI/180:0)}
-      e.att=parseInt(get('71','0'))||0;e.text=s;e.x=+(type==='TEXT'&&ax!=null&&jx?ax:get('10',0));e.y=+(type==='TEXT'&&ay!=null&&jx?ay:get('20',0));e.h=+get('40',1);push(e)}
-    else if(type==='INSERT'){e.name=(get('2','')||'').trim();e.x=+get('10',0);e.y=+get('20',0);push(e)}
+      e.att=parseInt(get('71','0'))||0;e.text=s;e.x=+(type!=='MTEXT'&&ax!=null&&jx?ax:get('10',0));e.y=+(type!=='MTEXT'&&ay!=null&&jx?ay:get('20',0));e.h=+get('40',1);
+      if(mir&&type!=='MTEXT'){e.x=-e.x;e.ang=Math.PI-e.ang}push(e)}
+    else if(type==='INSERT'){e.name=(get('2','')||'').trim();e.x=+get('10',0);e.y=+get('20',0);e.sx=+get('41',1)||1;e.sy=+get('42',1)||1;e.rot=+get('50',0);
+      if(mir){e.x=-e.x;e.sx=-e.sx;e.rot=-e.rot}push(e)}
   }
+  // bloques: se explotan (en memoria) para leer veredas, martillos, tapas, etc. dibujados como bloque.
+  // Lo que está en la capa 0 del bloque toma la capa del INSERT (como en AutoCAD).
+  const mul=(A,B)=>[A[0]*B[0]+A[1]*B[3],A[0]*B[1]+A[1]*B[4],A[0]*B[2]+A[1]*B[5]+A[2],A[3]*B[0]+A[4]*B[3],A[3]*B[1]+A[4]*B[4],A[3]*B[2]+A[4]*B[5]+A[5]];
+  const xf=(M,p)=>[M[0]*p[0]+M[1]*p[1]+M[2],M[3]*p[0]+M[4]*p[1]+M[5]];
+  let budget=500000,nExp=0;
+  const expand=(ins,M0,ly0,depth,chain)=>{const B=blocks[ins.name];if(!B||depth>8)return;
+    const r=ins.rot*Math.PI/180,c=Math.cos(r),s=Math.sin(r),a=c*ins.sx,b=-s*ins.sy,d=s*ins.sx,f=c*ins.sy;
+    const M=mul(M0,[a,b,ins.x-(a*B.bx+b*B.by),d,f,ins.y-(d*B.bx+f*B.by)]),det=M[0]*M[4]-M[1]*M[3],sc=Math.sqrt(Math.abs(det));
+    for(const be of B.ents){if(budget<=0)return;const ly=be.ly==='0'?ly0:be.ly;
+      if(be.t==='INSERT'){expand(be,M,ly,depth+1,chain+'/'+be.name);continue}
+      const e={t:be.t,ly,blk:chain};
+      if(be.pts){e.pts=be.pts.map(p=>xf(M,p));if(be.raw)e.raw=be.raw.map(p=>{const q=xf(M,p);return [q[0],q[1],det<0?-p[2]:p[2]]});e.closed=be.closed}
+      else if(be.text!=null){const q=xf(M,[be.x,be.y]),ca=Math.cos(be.ang||0),sa=Math.sin(be.ang||0);e.x=q[0];e.y=q[1];e.text=be.text;e.att=be.att;e.h=be.h*sc;e.ang=Math.atan2(M[3]*ca+M[4]*sa,M[0]*ca+M[1]*sa)}
+      else continue;
+      budget--;nExp++;add(e)}};
+  ents.filter(e=>e.t==='INSERT').forEach(ins=>expand(ins,[1,0,0,0,1,0],ins.ly,0,ins.name));
   ents.forEach(e=>{if(e.pts&&!e.len){let s=0;for(let j=1;j<e.pts.length;j++)s+=dist(e.pts[j-1],e.pts[j]);e.len=s;if(layers[e.ly])layers[e.ly].len+=s}});
-  return {ents,layers};
+  return {ents,layers,nExp,nBlk:Object.keys(blocks).length};
 }
 function dens(p,closed,step=0.5){
   const P=closed&&p.length?p.concat([p[0]]):p,out=[];
@@ -307,8 +331,13 @@ const ROLES=[
   ['VRD','Vereda',/VRD|VEREDA/i,'poly',/DEMOL|EXIST|HTCH/i],
   ['SAR','Sardinel',/SARD/i,'poly',/HTCH/i],
   ['CNT','Cuneta abierta',/CNT|CUNETA/i,'poly',/DMT|DPV|TAPA|HTCH|ABT/i],
-  ['CNTD','Cuneta tapada',/CNT.?DMT|TAPA/i,'poly',/HTCH/i],
+  ['CNTD','Cuneta tapada / alcantarilla',/CNT.?DMT|TAPA|ALCANTAR/i,'poly',/HTCH/i],
+  ['PAV','Borde de pavimento / calzada',/PAVIM|CALZADA|BORDE.*(PAV|CALZ)/i,'poly',/EXIST|DEMOL|INTERSEC|HTCH|HAT\b|PINTURA|SE.ALIZ/i],
+  ['BER','Berma',/BERMA/i,'poly',/EXIST|DEMOL|HTCH/i],
+  ['JAR','Jardín / franja verde',/JARD|FRANJA|AREA.?VERDE|CESPED|GRASS/i,'poly',/EXIST|DEMOL|HTCH/i],
   ['MZ','Manzanas / lím. propiedad',/MANZANA|LOTE|LIM.*PROP/i,'poly'],
+  ['VRDE','Vereda existente (si no hay proyectada)',/(VEREDA|VRD).*EXIST|EXIST.*(VEREDA|VRD)/i,'poly',/DEMOL|HTCH|HAT\b/i],
+  ['CNTE','Cuneta / líneas existentes (opcional)',/(CUNETA|CNT).*EXIST|EXIST.*(CUNETA|CNT)|AREA.*EXIST/i,'poly',/VEREDA|VRD|DEMOL|PAV|HTCH|HAT\b/i],
   ['MRT','Martillos',/MRT|MARTILLO/i,'poly',/HTCH/i],
   ['NOM','Nombres de calle (texto)',/NCALLE|ETIQUETA|NOMBRE.*CALLE/i,'txt'],
   ['PRG','Progresivas (texto, opcional)',/STAN.*MAJR|PROGRES|STATION/i,'txt']
@@ -340,16 +369,17 @@ async function loadPlanta(f){
   if(t.slice(0,22).includes('AutoCAD Binary DXF'))return stat('#stP',[['warn','Es un DXF binario. Guárdalo como DXF de texto (ASCII).']]);
   PL=parseDXF(t);PL.name=f.name;PL.roles=autoRoles(PL.layers);
   const nl=Object.keys(PL.layers).length;
-  stat('#stP',[['ok',`${esc(f.name)}: ${PL.ents.length.toLocaleString('es-PE')} objetos en ${nl} capas.`],[PL.roles.eje?'ok':'warn',PL.roles.eje?'Eje detectado en la capa '+esc(PL.roles.eje)+'.':'No encontré la capa de ejes: elígela en el paso 2.']]);
+  stat('#stP',[['ok',`${esc(f.name)}: ${PL.ents.length.toLocaleString('es-PE')} objetos en ${nl} capas${PL.nExp?` (${PL.nExp.toLocaleString('es-PE')} leídos dentro de bloques)`:''}.`],[PL.roles.eje?'ok':'warn',PL.roles.eje?'Eje detectado en la capa '+esc(PL.roles.eje)+'.':'No encontré la capa de ejes: elígela en el paso 2.']]);
   renderRoles();
 }
 function procesarPlanta(){
   const R=PL.roles,step=num($('#iStep').value)||20,HALF=num($('#iHalf').value)||14;
   if(!R.eje)return stat('#stP',[['warn','Elige la capa de ejes antes de procesar.']]);
-  const KEYS=['VRD','SAR','CNT','CNTD','MZ','MRT'],CS=10,G=new Map();
-  PL.ents.forEach(e=>{if(!e.pts)return;const k=KEYS.find(k=>R[k]&&R[k]===e.ly);if(!k)return;
-    for(let j=0;j<e.pts.length-1;j++){const a=e.pts[j],b=e.pts[j+1];
-      for(let gx=Math.floor(Math.min(a[0],b[0])/CS);gx<=Math.floor(Math.max(a[0],b[0])/CS);gx++)for(let gy=Math.floor(Math.min(a[1],b[1])/CS);gy<=Math.floor(Math.max(a[1],b[1])/CS);gy++){const key=gx+','+gy;let c=G.get(key);if(!c)G.set(key,c=[]);c.push([k,a,b])}}});
+  const KEYS=['VRD','SAR','CNT','CNTD','MZ','MRT','PAV','BER','JAR','VRDE','CNTE'],CS=10,G=new Map();
+  PL.ents.forEach(e=>{if(!e.pts)return;let ks=KEYS.filter(k=>R[k]&&R[k]===e.ly);
+    if(e.blk&&/TAPA/i.test(e.blk)&&ks.includes('CNT'))ks=ks.filter(k=>k!=='CNT').concat(ks.includes('CNTD')?[]:['CNTD']);
+    ks.forEach(k=>{for(let j=0;j<e.pts.length-1;j++){const a=e.pts[j],b=e.pts[j+1];
+      for(let gx=Math.floor(Math.min(a[0],b[0])/CS);gx<=Math.floor(Math.max(a[0],b[0])/CS);gx++)for(let gy=Math.floor(Math.min(a[1],b[1])/CS);gy<=Math.floor(Math.max(a[1],b[1])/CS);gy++){const key=gx+','+gy;let c=G.get(key);if(!c)G.set(key,c=[]);c.push([k,a,b])}}})});
   let names=R.NOM?PL.ents.filter(e=>e.ly===R.NOM&&e.text):[];{const re=/^(CA|C|CALLE|JR|JIRON|AV|AVENIDA|PSJE|PJE|PASAJE|PROL|MALECON|CARRETERA)\.?\s/i,v=names.filter(e=>re.test(e.text));if(v.length)names=v}
   const stl=R.PRG?PL.ents.filter(e=>e.ly===R.PRG&&e.text&&/\d\+\d/.test(e.text)&&!/^\s*PI/i.test(e.text)):[];
   const zeros=stl.filter(e=>pst(e.text)===0);
@@ -391,25 +421,46 @@ function procesarPlanta(){
     ...(stl.length?[]:[['info','Sin textos de progresiva: el sentido de cada eje es el del dibujo. Usa "Invertir sentido" si hace falta.']]),
     ...(names.length?[]:[['info','Sin capa de nombres: los ejes se llaman EJE 1, EJE 2… Usa "Renombrar".']])]);
 }
+// tramo continuo: desde el primer valor, mientras los saltos sean menores que gap
+const band=(a,gap)=>{if(!a.length)return null;let j=0;while(j+1<a.length&&a[j+1]-a[j]<=gap)j++;return [a[0],a[j]]};
 function side(h,s){
   const g=k=>(h[k]||[]).filter(v=>v*s>0.05).map(Math.abs).sort((a,b)=>a-b);
-  const cnt=g('CNT'),cnd=g('CNTD'),sar=g('SAR'),vrd=g('VRD'),mz=g('MZ'),mrt=g('MRT'),o={};
-  if(cnt.length>=2)o.cun=['A',cnt[0],cnt[cnt.length-1]];else if(cnd.length>=2)o.cun=['C',cnd[0],cnd[cnd.length-1]];
-  if(sar.length>=2)o.sar=[sar[0],sar[sar.length-1]];
-  const edge=o.cun?o.cun[1]:(o.sar?o.sar[0]:null);o.calz=edge;
-  const after=o.cun?o.cun[2]:(o.sar?o.sar[1]:null);
-  if(vrd.length&&after!=null){const out=vrd[vrd.length-1],inner=vrd.length>=2&&vrd[vrd.length-2]-after>0.3?vrd[vrd.length-2]:after;if(out>after)o.ver=[inner,out];if(inner-after>0.3)o.fr=[after,inner]}
+  const cnt=g('CNT'),cnd=g('CNTD'),sar=g('SAR'),vrd=g('VRD'),mz=g('MZ'),mrt=g('MRT'),pav=g('PAV'),ber=g('BER'),jar=g('JAR'),vre=g('VRDE'),cne=g('CNTE'),o={};
+  // berma (entre el borde del pavimento y la cuneta)
+  {const b=band(ber,3.5);if(b&&b[1]-b[0]>0.2)o.ber=[b[0],b[1]]}
+  const from=o.ber?o.ber[1]-0.1:0,ge=a=>a.filter(v=>v>=from);
+  // cuneta: tramo continuo de líneas; si una tapa cae dentro, es cuneta tapada
+  {const c=ge(cnt);if(c.length>=2){let b=band(c,2);if(b[1]-b[0]<0.1)b=[c[0],c[1]];o.cun=['A',b[0],b[1]]}}
+  const cd=ge(cnd);
+  if(o.cun){if(cd.some(v=>v>=o.cun[1]-0.05&&v<=o.cun[2]+0.05))o.cun[0]='C'}
+  else if(cd.length>=2){const b=band(cd,2);o.cun=['C',b[0],b[1]>b[0]+0.1?b[1]:cd[cd.length-1]]}
+  if(!o.cun){const sr=ge(sar);if(sr.length>=2){const b=band(sr,0.6);o.sar=[b[0],b[1]>b[0]+0.05?b[1]:sr[1]]}}
+  // borde de calzada: inicio de berma, cuneta o sardinel; si no hay, la línea de pavimento
+  const pv=pav.filter(v=>v>1);
+  let edge=o.ber?o.ber[0]:o.cun?o.cun[1]:o.sar?o.sar[0]:(pv.length?pv[0]:null);
+  // sin nada de proyecto: el borde sale de la primera línea existente (se marca para revisar)
+  if(edge==null){const ce=cne.filter(v=>v>1);if(ce.length&&vre.some(v=>v>ce[0]+1)){edge=ce[0];o.calzE=true}}
+  o.calz=edge;
+  // cuneta existente (opcional): par de líneas pegado a la berma / borde de calzada
+  if(!o.cun&&!o.sar&&edge!=null){const ref=o.ber?o.ber[1]:edge,c=cne.filter(v=>v>=ref-0.1),b=band(c,0.8);if(b&&c[0]-ref<0.5&&b[1]-b[0]>=0.3&&b[1]-b[0]<=1.5){o.cun=['A',b[0],b[1]];o.cunE=true}}
+  const after=o.cun?o.cun[2]:(o.sar?o.sar[1]:(o.ber?o.ber[1]:edge));
   if(mz.length&&edge!=null){const m=mz.filter(x=>x>edge);if(m.length)o.lim=m[0]}
+  // vereda: tramo continuo de líneas tras la cuneta/sardinel (sin pasar el límite de propiedad); si no hay vereda proyectada, la existente
+  if(after!=null){const pick=a=>a.filter(v=>v>after-0.1&&(o.lim==null||v<=o.lim+1));let vs=pick(vrd);if(!vs.length&&vre.length){vs=pick(vre);if(vs.length)o.verE=true}
+    if(vs.length){let inner=after,out=vs[0];if(vs.length>=2){const b=band(vs,4);inner=b[0];out=b[1];if(inner-after<0.3)inner=after}
+      if(o.verE){const ex=cne.filter(v=>v>after);const lo=ex.filter(v=>v<inner&&inner-v<=0.15),hi=ex.filter(v=>v>out&&v-out<=0.15);if(lo.length)inner=Math.min(...lo);if(hi.length)out=Math.max(...hi)}
+      if(out>after+0.05)o.ver=[inner,out];if(inner-after>0.3)o.fr=[after,inner]}
+    else{const j=band(jar.filter(v=>v>after-0.1),4);if(j&&j[1]-after>0.3)o.fr=[after,j[1]]}}
   if(mrt.length)o.mrt=true;return o}
 function sideval(o){if(!o||o.calz==null)return null;const r=v=>Math.round(v*20)/20;
-  const v={calz:r(o.calz),cun:o.cun?(o.cun[0]==='A'?'abierta':'cerrada'):'ninguna',cunA:o.cun?r(o.cun[2]-o.cun[1]):0,sar:o.sar?r(o.sar[1]-o.sar[0]):0,fr:o.fr?r(o.fr[1]-o.fr[0]):0,ver:o.ver?r(o.ver[1]-o.ver[0]):0};
-  if(o.lim!=null)v.lim=Math.round(o.lim*100)/100;if(o.mrt)v.mrt=true;return v}
+  const v={calz:r(o.calz),ber:o.ber?r(o.ber[1]-o.ber[0]):0,cun:o.cun?(o.cun[0]==='A'?'abierta':'cerrada'):'ninguna',cunA:o.cun?r(o.cun[2]-o.cun[1]):0,sar:o.sar?r(o.sar[1]-o.sar[0]):0,fr:o.fr?r(o.fr[1]-o.fr[0]):0,ver:o.ver?r(o.ver[1]-o.ver[0]):0};
+  if(o.lim!=null)v.lim=Math.round(o.lim*100)/100;if(o.mrt)v.mrt=true;if(o.calzE)v.calzE=true;if(o.cunE)v.cunE=true;if(o.verE)v.verE=true;return v}
 function status(L,R){
   if(!L&&!R)return ['sin','Sin elementos de proyecto'];
   if((L&&L.mrt)||(R&&R.mrt))return ['int','Martillo / intersección'];
   if((L&&L.cun==='cerrada')||(R&&R.cun==='cerrada'))return ['cruce','Cuneta tapada'];
-  const m=[];[['izq',L],['der',R]].forEach(([s,v])=>{if(!v){m.push('lado '+s+' sin elementos');return}if(v.cunA>1)m.push('cuneta '+s+' '+v.cunA.toFixed(2)+' m: lectura dudosa');if(v.ver>2.5)m.push('vereda '+s+' '+v.ver.toFixed(2)+' m: lectura dudosa')});
-  return m.length?['rev',m.join('; ')]:['ok','']}
+  const m=[],nt=[];[['izq',L],['der',R]].forEach(([s,v])=>{if(!v){m.push('lado '+s+' sin elementos');return}if(v.calzE)m.push('lado '+s+' leído solo de elementos existentes');if(v.cunA>1)m.push('cuneta '+s+' '+v.cunA.toFixed(2)+' m: lectura dudosa');if(v.ver>2.5)m.push('vereda '+s+' '+v.ver.toFixed(2)+' m: lectura dudosa');if(v.cunE)nt.push('cuneta '+s+' existente');if(v.verE)nt.push('vereda '+s+' existente')});
+  return m.length?['rev',m.concat(nt).join('; ')]:['ok',nt.join('; ')]}
 
 // =====================================================================
 // PASO 3: SECCIONES DEL CIVIL (marco, datum y escalas)
@@ -551,18 +602,22 @@ function build(sd,stn){
   const eje=num(z.eje)??(stn.fr&&stn.fr.zmin!=null?Math.round(((stn.fr.zmin+stn.fr.zmax)/2)*100)/100:0);info.rel=num(z.eje)==null;info.eje=eje;
   const pk=[pav.e1||0,pav.e2||0,pav.e3||0],sides={};
   ['L','R'].forEach(s=>{const v=stn[s];if(!v)return;const sg=s==='L'?-1:1,X=d=>sg*d,xe=v.calz,zb=num(z['b'+s])??(eje-tip.bomb/100*xe);
-    const hasCun=v.cun!=='ninguna'&&v.cunA>0,zv=num(z['v'+s])??(zb+tip.hv),surf=[[0,eje],[xe,zb]];
+    // berma: sigue la pendiente de la calzada; cuneta, sardinel y vereda arrancan desde su borde
+    const ber=v.ber>0?v.ber:0,ze=zb-tip.bomb/100*ber;
+    const hasCun=v.cun!=='ninguna'&&v.cunA>0,zv=num(z['v'+s])??(ze+tip.hv),surf=[[0,eje],[xe,zb]];
     // con jardín, el sardinel/cuneta conserva su altura típica y el jardín toma la pendiente hasta la vereda
-    const zs=v.fr>0?zb+tip.hv:zv;
+    const zs=v.fr>0?ze+tip.hv:zv;
     const lys=['SEC-PAVIMENTO','SEC-BASE','SEC-SUBBASE'];let acc=0;
     pk.forEach((e,k)=>{if(e<=0)return;const a=acc,b=acc+e;P.push({ly:lys[k],closed:true,fill:['asphalt','base','subbase'][k],pts:[[X(0),eje-a],[X(xe),zb-a],[X(xe),zb-b],[X(0),eje-b]]});acc=b});
-    P.push({ly:'SEC-SUBRASANTE',pts:[[X(0),eje-acc],[X(xe),zb-acc]]});
-    let x=xe;info['b'+s]=zb;info['v'+s]=zv;
-    if(hasCun){const w=v.cunA,t=Math.min(tip.tc,w/3),zf=num(z['f'+s])??(zb-tip.prof);info['f'+s]=zf;
-      P.push({ly:'SEC-CUNETA',closed:true,fill:'concrete',pts:[[X(x),zb],[X(x+t),zb],[X(x+t),zf],[X(x+w-t),zf],[X(x+w-t),zs],[X(x+w),zs],[X(x+w),zf-t],[X(x),zf-t]]});
-      if(v.cun==='cerrada')P.push({ly:'SEC-CUNETA',closed:true,fill:'cruce',pts:[[X(x+t),zb],[X(x+w-t),zb],[X(x+w-t),zb-0.10],[X(x+t),zb-0.10]]});
-      surf.push([x+t,zb],[x+t,zf],[x+w-t,zf],[x+w-t,zs],[x+w,zs]);x+=w}
-    else if(v.sar>0){P.push({ly:'SEC-SARDINEL',closed:true,fill:'concrete',pts:[[X(x),zb],[X(x),zs],[X(x+v.sar),zs],[X(x+v.sar),zb-tip.us],[X(x),zb-tip.us]]});surf.push([x,zs],[x+v.sar,zs]);x+=v.sar}
+    const eb=acc>0?acc:0.20;
+    if(ber>0){P.push({ly:'SEC-BERMA',closed:true,fill:'base',pts:[[X(xe),zb],[X(xe+ber),ze],[X(xe+ber),ze-eb],[X(xe),zb-eb]]});surf.push([xe+ber,ze]);info['e'+s]=ze}
+    P.push({ly:'SEC-SUBRASANTE',pts:[[X(0),eje-acc],[X(xe),zb-acc]].concat(ber>0?[[X(xe+ber),ze-acc]]:[])});
+    let x=xe+ber;info['b'+s]=zb;info['v'+s]=zv;
+    if(hasCun){const w=v.cunA,t=Math.min(tip.tc,w/3),zf=num(z['f'+s])??(ze-tip.prof);info['f'+s]=zf;
+      P.push({ly:'SEC-CUNETA',closed:true,fill:'concrete',pts:[[X(x),ze],[X(x+t),ze],[X(x+t),zf],[X(x+w-t),zf],[X(x+w-t),zs],[X(x+w),zs],[X(x+w),zf-t],[X(x),zf-t]]});
+      if(v.cun==='cerrada')P.push({ly:'SEC-CUNETA',closed:true,fill:'cruce',pts:[[X(x+t),ze],[X(x+w-t),ze],[X(x+w-t),ze-0.10],[X(x+t),ze-0.10]]});
+      surf.push([x+t,ze],[x+t,zf],[x+w-t,zf],[x+w-t,zs],[x+w,zs]);x+=w}
+    else if(v.sar>0){P.push({ly:'SEC-SARDINEL',closed:true,fill:'concrete',pts:[[X(x),ze],[X(x),zs],[X(x+v.sar),zs],[X(x+v.sar),ze-tip.us],[X(x),ze-tip.us]]});surf.push([x,zs],[x+v.sar,zs]);x+=v.sar}
     if(v.fr>0){P.push({ly:'SEC-JARDIN',closed:true,fill:'grass',pts:[[X(x),zs],[X(x+v.fr),zv],[X(x+v.fr),zv-0.15],[X(x),zs-0.15]]});surf.push([x+v.fr,zv]);
       info['j'+s]={x:x+v.fr/2,z:(zs+zv)/2,p:(zv-zs)/v.fr*100};x+=v.fr}
     if(v.ver>0){P.push({ly:'SEC-VEREDA',closed:true,fill:'concrete',pts:[[X(x),zv],[X(x+v.ver),zv],[X(x+v.ver),zv-tip.ev],[X(x),zv-tip.ev]]});surf.push([x+v.ver,zv]);x+=v.ver}
@@ -606,9 +661,9 @@ function renderPlanta(){const c=street(),sd=SD(),pts=c.axis,xs=pts.map(p=>p[0]),
     if(on||i%(sd.st.length>30?5:2)===0||i===sd.st.length-1)h+=`<text x="${(X(s.x)+9).toFixed(1)}" y="${(Y(s.y)-9).toFixed(1)}" font-family="JetBrains Mono,monospace" font-size="11" fill="${on?'var(--ink)':'var(--muted)'}">${fst(s.st)}</text>`});
   svg.innerHTML=h;svg.querySelectorAll('circle').forEach(n=>n.onclick=()=>{S.sel=+n.dataset.i;renderStation()})}
 function sideTxt(v,r){if(!v)return '—';const ch=k=>r&&r[k]!==v[k];const cun=v.cun==='ninguna'?(v.sar?'sard. '+f2(v.sar):'—'):(v.cun==='abierta'?'abierta ':'tapada ')+f2(v.cunA);
-  return `<span class="${ch('calz')?'ed':''}">${f2(v.calz)}</span> | <span class="${ch('cun')||ch('cunA')||ch('sar')?'ed':''}">${cun}</span> | <span class="${ch('fr')?'ed':''}">${f2(v.fr)}</span> | <span class="${ch('ver')?'ed':''}">${f2(v.ver)}</span>`}
+  return `<span class="${ch('calz')?'ed':''}">${f2(v.calz)}</span>${v.ber>0?` <span class="${ch('ber')?'ed':''}" title="berma">+b ${f2(v.ber)}</span>`:''} | <span class="${ch('cun')||ch('cunA')||ch('sar')?'ed':''}">${cun}</span> | <span class="${ch('fr')?'ed':''}">${f2(v.fr)}</span> | <span class="${ch('ver')?'ed':''}">${f2(v.ver)}</span>`}
 function renderTabla(){const sd=SD();
-  let h=`<thead><tr><th class="l">Gen.</th><th class="l">Progresiva</th><th class="l">Estado</th><th class="bl">Izq: calz | cuneta | franja | vereda</th><th class="bl">Der: calz | cuneta | franja | vereda</th><th class="bl">Cota eje</th><th class="l">Extras</th></tr></thead><tbody>`;
+  let h=`<thead><tr><th class="l">Gen.</th><th class="l">Progresiva</th><th class="l">Estado</th><th class="bl">Izq: calz (+berma) | cuneta | franja | vereda</th><th class="bl">Der: calz (+berma) | cuneta | franja | vereda</th><th class="bl">Cota eje</th><th class="l">Extras</th></tr></thead><tbody>`;
   sd.st.forEach((s,i)=>{const nz=['eje','bL','bR','vL','vR','fL','fR'].filter(k=>num(s.z[k])!=null).length;
     h+=`<tr data-i="${i}" class="${i===S.sel?'sel':''} ${s.gen?'':'off'}"><td class="l"><input type="checkbox" data-g="${i}" ${s.gen?'checked':''} aria-label="Generar ${fst(s.st)}"></td><td class="l mono">${fst(s.st)}</td><td class="l"><span class="chip c-${s.s}">${ST[s.s]}</span></td><td class="bl mono">${sideTxt(s.L,s.read.L)}</td><td class="bl mono">${sideTxt(s.R,s.read.R)}</td><td class="bl mono">${num(s.z.eje)!=null?f3(s.z.eje)+(nz>1?` <span class="tag on">+${nz-1}</span>`:''):'<span class="note">—</span>'}</td><td class="l">${s.fr?'<span class="tag on">marco</span>':''}${s.zc&&s.zc.eje?'<span class="tag on">rasante Civil</span>':''}${s.muro.L||s.muro.R?'<span class="tag on">muro</span>':''}${s.bl.length?`<span class="tag on">${s.bl.length} bloq.</span>`:''}</td></tr>`});
   $('#tbl').innerHTML=h+'</tbody>';
@@ -619,7 +674,7 @@ function renderTabla(){const sd=SD();
 const FILL={asphalt:'var(--asphalt)',base:'var(--base)',subbase:'var(--subbase)',concrete:'var(--concrete)',grass:'var(--grass)',wall:'var(--wall)',cruce:'var(--cruce)'};
 // Vista con escala FIJA: el ancho se fija con la calle completa y la altura con el marco del Civil (o una ventana fija alrededor del eje)
 function drawSeccion(){const sd=SD(),stn=STN(),{P,T,info}=build(sd,stn),ex=S.exag,W=1000;
-  let half=4;sd.st.forEach(x=>['L','R'].forEach(s=>{const v=x[s];if(v)half=Math.max(half,v.calz+(v.cun!=='ninguna'?v.cunA:v.sar)+v.fr+v.ver+0.6,v.lim&&v.lim<14?v.lim+0.6:0)}));
+  let half=4;sd.st.forEach(x=>['L','R'].forEach(s=>{const v=x[s];if(v)half=Math.max(half,v.calz+(v.ber||0)+(v.cun!=='ninguna'?v.cunA:v.sar)+v.fr+v.ver+0.6,v.lim&&v.lim<14?v.lim+0.6:0)}));
   ['L','R'].forEach(s=>{if(stn.muro[s])half=Math.max(half,info.sides[s]?info.sides[s].end+2:0)});
   const fr=stn.fr&&stn.fr.zmin!=null?stn.fr:null;
   let zTop,zBot;if(fr){zTop=fr.zmax;zBot=fr.zmin}else{zTop=info.eje+2.2;zBot=info.eje-2.8}
@@ -647,12 +702,12 @@ function drawSeccion(){const sd=SD(),stn=STN(),{P,T,info}=build(sd,stn),ex=S.exa
   const zl=v=>info.rel?(v-info.eje>=0?'+':'')+(v-info.eje).toFixed(3):v.toFixed(3),lab=(x,z,t,dy,col)=>h+=`<text x="${X(x)}" y="${Y(z)+dy}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="${col}">${t}</text>`;
   lab(0,info.eje,info.rel?(fr?'eje ≈'+info.eje.toFixed(2)+' (sin cota)':'eje ±0.000'):'eje '+info.eje.toFixed(3),-12,'var(--ink)');
   ['L','R'].forEach(s=>{const v=stn[s];if(!v)return;const sg=s==='L'?-1:1,man=k=>num(stn.z[k+s])!=null,col=k=>man(k)?'var(--ink)':'var(--muted)';
-    lab(sg*v.calz,info['b'+s],zl(info['b'+s]),-10,col('b'));if(info['f'+s]!=null)lab(sg*(v.calz+v.cunA/2),info['f'+s],zl(info['f'+s]),16,col('f'));
+    lab(sg*v.calz,info['b'+s],zl(info['b'+s]),-10,col('b'));if(info['f'+s]!=null)lab(sg*(v.calz+(v.ber||0)+v.cunA/2),info['f'+s],zl(info['f'+s]),16,col('f'));
     const q=info.sides[s];lab(sg*(q.end-0.4),q.zv,zl(q.zv),-10,col('v'));
     const j=info['j'+s];if(j&&Math.abs(j.p)>0.05)lab(sg*j.x,j.z,'jardín '+(j.p>0?'+':'')+j.p.toFixed(1)+'%',-14,'var(--ok)')});
   h+='</g>';
   // cadena de anchos bajo el marco
-  ['L','R'].forEach(s=>{const v=stn[s];if(!v)return;const sg=s==='L'?-1:1;let xx=0;const dims=[v.calz];if(v.cun!=='ninguna'&&v.cunA>0)dims.push(v.cunA);else if(v.sar>0)dims.push(v.sar);if(v.fr>0)dims.push(v.fr);if(v.ver>0)dims.push(v.ver);
+  ['L','R'].forEach(s=>{const v=stn[s];if(!v)return;const sg=s==='L'?-1:1;let xx=0;const dims=[v.calz];if(v.ber>0)dims.push(v.ber);if(v.cun!=='ninguna'&&v.cunA>0)dims.push(v.cunA);else if(v.sar>0)dims.push(v.sar);if(v.fr>0)dims.push(v.fr);if(v.ver>0)dims.push(v.ver);
     const yy=Y(zBot)+(fr?36:22);dims.forEach(w=>{const a=X(sg*xx),b=X(sg*(xx+w));h+=`<line x1="${a}" y1="${yy}" x2="${b}" y2="${yy}" stroke="var(--muted)" stroke-width=".8"/><line x1="${a}" y1="${yy-4}" x2="${a}" y2="${yy+4}" stroke="var(--muted)"/><line x1="${b}" y1="${yy-4}" x2="${b}" y2="${yy+4}" stroke="var(--muted)"/>`;
       if(Math.abs(b-a)>26)h+=`<text x="${(a+b)/2}" y="${yy-5}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="10.5" fill="var(--ink)">${w.toFixed(2)}</text>`;xx+=w})});
   if(!stn.L&&!stn.R)h+=`<text x="${W/2}" y="${H/2}" text-anchor="middle" font-family="Barlow,sans-serif" font-size="14" fill="var(--muted)">Sin elementos leídos. Complétalos en "Anchos" o copia desde otra progresiva.</text>`;
@@ -660,8 +715,8 @@ function drawSeccion(){const sd=SD(),stn=STN(),{P,T,info}=build(sd,stn),ex=S.exa
   svg.innerHTML=h}
 
 // fichas (anchos, cotas, muro, bloques, típica)
-const AF=[['calz','Calzada','n'],['cun','Cuneta','s'],['cunA','Ancho cuneta','n'],['sar','Sardinel','n'],['fr','Franja / jardín','n'],['ver','Vereda','n'],['lim','Lím. propiedad','n']];
-const blank=()=>({calz:3,cun:'ninguna',cunA:0,sar:0.15,fr:0,ver:1.2});
+const AF=[['calz','Calzada','n'],['ber','Berma','n'],['cun','Cuneta','s'],['cunA','Ancho cuneta','n'],['sar','Sardinel','n'],['fr','Franja / jardín','n'],['ver','Vereda','n'],['lim','Lím. propiedad','n']];
+const blank=()=>({calz:3,ber:0,cun:'ninguna',cunA:0,sar:0.15,fr:0,ver:1.2});
 function renderAnchos(){const stn=STN();let h='<span></span><span class="h">Izq.</span><span class="h">Der.</span>';
   AF.forEach(([k,lab,ty])=>{h+=`<label for="a-L-${k}">${lab}</label>`;['L','R'].forEach(s=>{const v=stn[s]||{},r=(stn.read[s]||{})[k],val=v[k],ch=stn[s]&&r!==val;
     h+=ty==='s'?`<select id="a-${s}-${k}" data-s="${s}" data-k="${k}" ${!stn[s]?'disabled':''}>${['ninguna','abierta','cerrada'].map(o=>`<option value="${o}" ${val===o?'selected':''}>${o==='cerrada'?'tapada':o}</option>`).join('')}</select>`
@@ -766,7 +821,7 @@ $('#pOpen').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{openPr
 // =====================================================================
 // DXF DE SALIDA
 // =====================================================================
-const LAYERS={'CIVIL-MARCO':8,'CIVIL-TERRENO':1,'CIVIL-OTROS':6,'SEC-RASANTE':4,'SEC-RELLENO':9,'SEC-EJE':2,'SEC-PAVIMENTO':8,'SEC-BASE':33,'SEC-SUBBASE':43,'SEC-SUBRASANTE':1,'SEC-CUNETA':4,'SEC-SARDINEL':4,'SEC-VEREDA':4,'SEC-JARDIN':3,'SEC-MURO':6,'SEC-BLOQUES':5,'SEC-LIMITE':1,'SEC-TEXTO':7,'SEC-COTAS':7,'SEC-MARCO':9};
+const LAYERS={'CIVIL-MARCO':8,'CIVIL-TERRENO':1,'CIVIL-OTROS':6,'SEC-RASANTE':4,'SEC-RELLENO':9,'SEC-EJE':2,'SEC-PAVIMENTO':8,'SEC-BASE':33,'SEC-SUBBASE':43,'SEC-SUBRASANTE':1,'SEC-BERMA':42,'SEC-CUNETA':4,'SEC-SARDINEL':4,'SEC-VEREDA':4,'SEC-JARDIN':3,'SEC-MURO':6,'SEC-BLOQUES':5,'SEC-LIMITE':1,'SEC-TEXTO':7,'SEC-COTAS':7,'SEC-MARCO':9};
 const ascii=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\x20-\x7E]/g,'');
 function DX(){this.o=[]}
 DX.prototype.pl=function(ly,pts,closed){this.o.push(`0\nPOLYLINE\n8\n${ly}\n66\n1\n10\n0.0\n20\n0.0\n30\n0.0\n70\n${closed?1:0}\n`);pts.forEach(([x,y])=>this.o.push(`0\nVERTEX\n8\n${ly}\n10\n${x.toFixed(4)}\n20\n${y.toFixed(4)}\n30\n0.0\n`));this.o.push(`0\nSEQEND\n8\n${ly}\n`)};
@@ -833,7 +888,7 @@ function buildDXF(ids){const E=new DX(),blocks={};let oy=0,nF=0,nG=0,nSkip=0,nM=
       const L=info.sides.L,R=info.sides.R;
       if(L||R){const sl=L?L.surf.slice().reverse().map(([d,z])=>[-d,z]):[[0,info.eje]],sr=R?R.surf.map(([d,z])=>[d,z]):[[0,info.eje]];
         const ras=sl.concat(sr.slice(1));E.pl('SEC-RASANTE',ras.map(tr),false);
-        const sub=[];if(L){const v=stn.L;sub.push([-v.calz,info.bL-(sd.pav.e1+sd.pav.e2+sd.pav.e3)])}sub.push([0,(L||R).sub]);if(R){const v=stn.R;sub.push([v.calz,info.bR-(sd.pav.e1+sd.pav.e2+sd.pav.e3)])}
+        const ep=sd.pav.e1+sd.pav.e2+sd.pav.e3,sub=[];if(L){const v=stn.L;if(v.ber>0)sub.push([-(v.calz+v.ber),info.eL-ep]);sub.push([-v.calz,info.bL-ep])}sub.push([0,(L||R).sub]);if(R){const v=stn.R;sub.push([v.calz,info.bR-ep]);if(v.ber>0)sub.push([v.calz+v.ber,info.eR-ep])}
         E.pl('SEC-SUBRASANTE',sub.map(tr),false)}
       T.forEach(t=>{const [X,Y]=tr([t.x,t.z]);E.tx('SEC-TEXTO',X,Y,0.18,t.t,1)})});
     if(grid.length)oy-=Math.ceil(grid.length/COLS)*RH+12});
@@ -842,9 +897,9 @@ function buildDXF(ids){const E=new DX(),blocks={};let oy=0,nF=0,nG=0,nSkip=0,nM=
   const Ls=Object.entries(LAYERS).map(([n,c])=>`0\nLAYER\n2\n${n}\n70\n0\n62\n${c}\n6\nCONTINUOUS\n`).join('');
   return {txt:`0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$INSUNITS\n70\n6\n9\n$FILLMODE\n70\n1\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLTYPE\n70\n1\n0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n73\n0\n40\n0.0\n0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n${Object.keys(LAYERS).length+1}\n0\nLAYER\n2\n0\n70\n0\n62\n7\n6\nCONTINUOUS\n${Ls}0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nBLOCKS\n${B}0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${E.o.join('')}0\nENDSEC\n0\nEOF\n`,nF,nG,nSkip,nM,nT,nRec,nAmp,nBig}}
 
-function buildCSV(ids){const rows=[['Calle','Progresiva','Generar','Calz izq','Cuneta izq','Ancho cun izq','Sard izq','Franja izq','Vereda izq','Calz der','Cuneta der','Ancho cun der','Sard der','Franja der','Vereda der','Cota eje','Borde izq','Borde der','Vereda izq','Vereda der','Fondo cun izq','Fondo cun der','Muro izq','Muro der','Bloques']];
+function buildCSV(ids){const rows=[['Calle','Progresiva','Generar','Calz izq','Berma izq','Cuneta izq','Ancho cun izq','Sard izq','Franja izq','Vereda izq','Calz der','Berma der','Cuneta der','Ancho cun der','Sard der','Franja der','Vereda der','Cota eje','Borde izq','Borde der','Vereda izq','Vereda der','Fondo cun izq','Fondo cun der','Muro izq','Muro der','Bloques']];
   ids.forEach(id=>{const c=DATA.find(d=>d.id===id),sd=S.streets[id];sd.st.forEach(s=>{const {info}=build(sd,s),r=[c.name,fst(s.st),s.gen?'SI':'NO'];
-    ['L','R'].forEach(k=>{const v=s[k];r.push(...(v?[v.calz,v.cun,v.cunA,v.sar,v.fr,v.ver].map(x=>typeof x==='number'?x.toFixed(2):x):['','','','','','']))});
+    ['L','R'].forEach(k=>{const v=s[k];r.push(...(v?[v.calz,v.ber||0,v.cun,v.cunA,v.sar,v.fr,v.ver].map(x=>typeof x==='number'?x.toFixed(2):x):['','','','','','','']))});
     r.push(num(s.z.eje)!=null?f3(s.z.eje):'');['bL','bR','vL','vR','fL','fR'].forEach(k=>r.push(info.rel||info[k]==null?'':info[k].toFixed(3)));
     ['L','R'].forEach(k=>{const m=s.muro[k];r.push(m?(m.tipo==='propio'?m.nombre||'propio':m.tipo)+' H='+(m.H??''):'')});r.push(s.bl.map(b=>(b.tipo==='PROPIO'?b.nombre:b.tipo)+'@'+b.lado+b.off).join(' '));rows.push(r)})});
   return '﻿'+rows.map(r=>r.map(x=>/[;"\n]/.test(String(x))?'"'+String(x).replace(/"/g,'""')+'"':x).join(';')).join('\r\n')}
