@@ -301,3 +301,15 @@ def test_vereda_se_corta_donde_la_foto_muestra_tierra():
     piezas, quitado = cortar_por_foto(orto, box(0, 0, 30, 3))
     assert len(piezas) == 2 and 10 < quitado < 14
     assert all(p.bounds[1] < 0.01 and p.bounds[3] > 2.99 for p in piezas)  # cada pedazo cerrado de lado a lado
+
+
+def test_vegetacion_en_sombra_corta_la_vereda():
+    from shapely.geometry import box
+
+    from ortofoto.concreto import cortar_por_foto
+
+    img = np.full((60, 600, 3), (190, 188, 182), np.uint8)  # concreto 30 m x 3 m
+    img[:, 200:400] = (45, 70, 35)  # 10 m de plantas en sombra (oscuras pero verdes)
+    img[:, 60:100] = (55, 52, 50)  # sombra gris de alero: no corta
+    piezas, quitado = cortar_por_foto(Ortofoto(img, [0.05, 0, 0, 0, -0.05, 3.0]), box(0, 0, 30, 3))
+    assert len(piezas) == 2 and 27 < quitado < 33

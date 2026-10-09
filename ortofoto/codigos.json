@@ -1,7 +1,7 @@
 {
  "_comentario": "codigo de campo -> como se dibuja. tipo: linea | franja (dos bordes que cierran un area) | contorno (borde cerrado) | punto. separacion_max: distancia maxima entre puntos que se unen (m). ancho_min/ancho_max: ancho permitido de la franja (m). capa: bordes; capa_area: area cerrada + achurado. prefijo: etiqueta del metrado. Capas, colores y achurados copiados del plano PETRO. Codigos de PETRO y de Bambu.",
  "codigos": {
-  "VER":    {"nombre": "Vereda", "misma_manzana": true, "capa": "VEREDA EXIS.", "tipo": "franja", "separacion_max": 14, "ancho_min": 0.6, "ancho_max": 4.0, "color": 10,
+  "VER":    {"nombre": "Vereda", "misma_manzana": true, "capa": "VEREDA EXIS.", "tipo": "franja", "separacion_max": 14, "hueco_max": 10, "ancho_min": 0.3, "ancho_max": 4.0, "color": 10,
              "capa_area": "Vereda a demoler", "prefijo": "VD", "color_area": 180, "patron": "NET3", "escala_patron": 0.15,
              "referencia": ["CSH", "LP"]},
   "MAR":    {"nombre": "Martillo", "misma_manzana": true, "capa": "MARTILLO", "tipo": "contorno", "separacion_max": 8, "color": 31,

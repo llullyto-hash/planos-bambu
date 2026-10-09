@@ -50,6 +50,7 @@ class Codigo:
     nombre: str = ""  # descripcion legible para la ventana
     referencia: list = field(default_factory=list)  # franja: codigos del borde interior (fachada, lote)
     misma_manzana: bool = False  # con plano base: solo une puntos de la misma manzana
+    hueco_max: float = 0.0  # franja: m sin puntos a lo largo de la fachada que cortan el area (0 = 10 m)
 
 
 def cargar_codigos(ruta):

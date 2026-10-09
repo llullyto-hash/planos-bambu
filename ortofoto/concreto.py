@@ -260,7 +260,11 @@ def cortar_por_foto(orto, pol):
     v = max(3, int(0.5 / tp) | 1)
     tex = np.sqrt(np.maximum(ndi.uniform_filter(lb[..., 0] ** 2, v) - ndi.uniform_filter(lb[..., 0], v) ** 2, 0))
     sombra = L < L_MIN - 15
-    pasto = (a < -6) & ~sombra
+    # Vegetacion por su tono verde (indice de verde en exceso), aunque este en sombra
+    rgb = ndi.gaussian_filter(sub.rgb.astype(np.float32), (1, 1, 0))
+    suma = rgb.sum(-1) + 1.0
+    exceso_verde = (2 * rgb[..., 1] - rgb[..., 0] - rgb[..., 2]) / suma
+    pasto = ((exceso_verde > 0.06) & (rgb.sum(-1) > 60)) | ((a < -6) & ~sombra)
     # Tierra: beige/amarilla (b mayor que a), lisa. Los techos (rojizos o corrugados) no cuentan:
     # sobre la vereda son aleros y debajo puede haber concreto.
     tierra = (croma > CROMA_MAX + 4) & (b > 8) & (a < 0.8 * b) & (tex < TEXTURA_MAX * 1.5) & ~sombra

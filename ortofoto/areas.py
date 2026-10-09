@@ -326,6 +326,66 @@ def _tramo_de_limite(ref, s0, s1):
     return list(substring(ref, s0, largo).coords) + list(substring(ref, 0, s1).coords)[1:]
 
 
+SECCION = 1.5  # m a lo largo de la fachada: puntos mas cercanos que esto son la misma seccion
+HUECO_MAX = 10.0  # m sin puntos VER a lo largo de la fachada: la vereda se corta (no se rellena)
+ESCALON = 0.8  # m de diferencia de ancho entre secciones vecinas que se dibuja como escalon recto
+ANCHO_NULO = 0.2  # m: una seccion con todos sus puntos a menos de esto de la fachada no tiene ancho
+
+
+def _secciones_exteriores(ss, dd):
+    """Secciones con su borde exterior: [(s_inicio, s_fin, ancho, [indices exteriores])].
+
+    Una seccion son los puntos a menos de SECCION m entre si a lo largo de la fachada; su borde
+    exterior son los puntos mas alejados de la fachada (hasta 0.5 m menos que el mas alejado).
+    Asi cada seccion pone su propio ancho: una losa o un punto alejado no ensancha a sus vecinas.
+    """
+    grupos, actual = [], [0]
+    for j in range(1, len(ss)):
+        if ss[j] - ss[actual[-1]] > SECCION:
+            grupos.append(actual)
+            actual = []
+        actual.append(j)
+    grupos.append(actual)
+    res = []
+    for g in grupos:
+        dmax = max(dd[j] for j in g)
+        if dmax < ANCHO_NULO:
+            continue
+        ext = sorted((j for j in g if dd[j] >= dmax - 0.5), key=lambda j: ss[j])
+        res.append((float(ss[g[0]]), float(ss[g[-1]]), float(np.median([dd[j] for j in ext])), ext))
+    return res
+
+
+def _con_escalones(ref, secciones, dd, xy_pts):
+    """Borde exterior que pasa por los puntos de cada seccion, con escalones rectos.
+
+    Donde el ancho cambia mas de ESCALON entre secciones vecinas, el borde sigue con el ancho
+    menor y sube (o baja) en perpendicular a la fachada justo al inicio (o al final) de la
+    seccion ancha. Asi una losa sale como un rectangulo del largo de su seccion.
+    """
+    def punto(s_, d_, ref_xy):
+        base_ = ref.interpolate(s_)
+        vx, vy = ref_xy[0] - base_.x, ref_xy[1] - base_.y
+        n = np.hypot(vx, vy) or 1.0
+        return (base_.x + vx / n * d_, base_.y + vy / n * d_)
+
+    res = []
+    for k, (s0, s1, ancho, ext) in enumerate(secciones):
+        prev = secciones[k - 1] if k else None
+        sig = secciones[k + 1] if k + 1 < len(secciones) else None
+        primero, ultimo = ext[0], ext[-1]
+        if prev is not None and ancho - prev[2] > ESCALON:
+            # sube: con el ancho anterior hasta el inicio de esta seccion, y luego perpendicular
+            res.append(punto(s0, prev[2], xy_pts[primero]))
+            res.append(punto(s0, dd[primero], xy_pts[primero]))
+        res += [xy_pts[j] for j in ext]
+        if sig is not None and ancho - sig[2] > ESCALON:
+            # baja: perpendicular al final de esta seccion y sigue con el ancho siguiente
+            res.append(punto(s1, dd[ultimo], xy_pts[ultimo]))
+            res.append(punto(s1, sig[2], xy_pts[ultimo]))
+    return res
+
+
 def _franjas_contra_limite(res, base):
     """Veredas pegadas al limite de propiedad del plano base.
 
@@ -344,8 +404,7 @@ def _franjas_contra_limite(res, base):
             p = Point(x, y)
             por_limite.setdefault(k, []).append((ref.project(p), ref.distance(p), i))
     areas, bordes, usados = [], [], set()
-    tol = max(0.3, conf.ancho_min * 0.5)
-    ventana = max(4.0, conf.separacion_max / 2)
+    hueco = conf.hueco_max or min(conf.separacion_max, HUECO_MAX)
     for k, lista in por_limite.items():
         ref = base.limites[k]
         largo = ref.length
@@ -362,20 +421,21 @@ def _franjas_contra_limite(res, base):
         sr = (s - corte) % largo if cerrado else s
         o = np.argsort(sr)
         sr, d, idx, s = sr[o], d[o], idx[o], s[o]
-        cortes = np.where(np.diff(sr) > conf.separacion_max)[0]
+        # Tramos: se corta donde no hay puntos VER en mas de `hueco` m (no se rellena sin puntos)
+        cortes = np.where(np.diff(sr) > hueco)[0]
         ini = 0
         for fin in list(cortes) + [len(sr) - 1]:
             sel = slice(ini, fin + 1)
             ini = fin + 1
             ss, dd, ii, s_real = sr[sel], d[sel], idx[sel], s[sel]
-            exterior = []
-            for j in range(len(ss)):
-                cerca = np.abs(ss - ss[j]) <= ventana
-                if dd[j] >= conf.ancho_min * 0.8 and dd[j] >= dd[cerca].max() - tol:
-                    exterior.append(j)
+            secs = _secciones_exteriores(ss, dd)
+            exterior = [j for sec in secs for j in sec[3]]
             if len(exterior) < 2 or ss[exterior[-1]] - ss[exterior[0]] < TRAMO_MIN:
                 continue
-            ce = [tuple(xy[ii[j]]) for j in exterior]
+            # s de cada seccion en coordenadas reales del limite (ss puede estar rotado en un limite cerrado)
+            real = dict(zip(ss.tolist(), s_real.tolist()))
+            secs = [(real[a0], real[a1], an, ex) for a0, a1, an, ex in secs]
+            ce = _con_escalones(ref, secs, dd, {j: tuple(xy[ii[j]]) for j in exterior})
             ci = _tramo_de_limite(ref, s_real[exterior[0]], s_real[exterior[-1]])
             if len(ci) < 2:
                 continue
@@ -387,7 +447,7 @@ def _franjas_contra_limite(res, base):
             if ancho > conf.ancho_max * 1.2:
                 continue
             anchos = dd[exterior]
-            revisar = (not Polygon(ci + ce[::-1]).is_valid) or (anchos.max() - anchos.min() > conf.ancho_max * 0.6)
+            revisar = not Polygon(ci + ce[::-1]).is_valid
             areas.append(Area(res.codigo, conf, pol, "limite", float(np.median(anchos)), largo_tramo, revisar))
             bordes.append(LineString(ce))
             usados.update(int(i) for i in ii)
