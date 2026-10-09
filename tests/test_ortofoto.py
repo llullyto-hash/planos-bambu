@@ -526,3 +526,31 @@ def test_calcular_corregir_y_exportar(tmp_path):
     exportar_calculo(calc, avisar=lambda *a: None)
     doc = ezdxf.readfile(tmp_path / "s" / "resultado.dxf")
     assert len(doc.modelspace().query('HATCH[layer=="Vereda a demoler"]')) == 1
+
+
+def test_pagina_colaborativa_ida_y_vuelta(tmp_path):
+    """proyecto_web.json lleva las areas; lo que vuelve corregido de la pagina reemplaza al calculo."""
+    import json
+
+    from ortofoto import colaborativo
+    from ortofoto.__main__ import calcular
+
+    pts = _vereda_por_secciones(n=3) + _vereda_por_secciones(y0=-20.0, n=3, cod="VER")
+    calc = calcular(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s")), avisar=lambda *a: None)
+    d = colaborativo.exportar_proyecto(calc, tmp_path / "proyecto_web.json")
+    assert d["formato"] == "planos-bambu/proyecto"
+    assert "VER" in d["codigos"] and len(d["puntos"]) == len(pts)
+    ver = [a for a in d["areas"] if a["cod"] == "VER"]
+    assert len(ver) == 2
+    ver[0]["borrado"] = True  # borrada en la pagina
+    ver[1]["coords"] = [[0, 0], [10, 0], [10, 2], [0, 2]]  # redibujada
+    ver[1]["largo"] = 0
+    d["areas"].append({"id": "w1", "cod": "XXX", "coords": [[0, 0], [1, 0], [1, 1]]})
+    corr = {"formato": "planos-bambu/correcciones", "areas": d["areas"]}
+    ruta = tmp_path / "correcciones_web.json"
+    ruta.write_text(json.dumps(corr), encoding="utf-8")
+    n, desconocidos = colaborativo.importar_correcciones(calc, ruta)
+    nuevas = [a for a in calc.met.areas if a.codigo == "VER"]
+    assert desconocidos == ["XXX"] and len(nuevas) == 1
+    assert abs(nuevas[0].area - 20.0) < 1e-6 and abs(nuevas[0].largo - 10.0) < 1e-6
+    assert nuevas[0].etiqueta

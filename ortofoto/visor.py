@@ -6,6 +6,10 @@
 - Cortar tramo: dos clics a traves del area; queda partida en pedazos (luego Borrar el que sobra).
 - Dibujar area: clic en cada esquina (se pega a los puntos), doble clic o Enter para cerrar.
 - Supr: borrar el area seleccionada. Ctrl+Z: deshacer. Esc: cancelar la herramienta.
+- Los limites de propiedad (FACHADA del plano) se ven en magenta. Los vertices tambien se pegan a ellos;
+  un rombo verde marca el vertice que ya llego al limite.
+- Pagina colaborativa: "Exportar para la web" guarda proyecto_web.json; "Importar correcciones" carga el
+  correcciones_web.json bajado de la pagina (luego EXPORTAR).
 Nada se escribe hasta apretar EXPORTAR.
 
 Fluidez: el mapa completo (foto + areas + puntos) se dibuja solo al terminar un movimiento. Mientras
@@ -14,17 +18,18 @@ redibujan esas lineas sobre la imagen guardada (blitting).
 """
 import copy
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.collections import PolyCollection
+from matplotlib.collections import LineCollection, PolyCollection
 from matplotlib.figure import Figure
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon
+from shapely.strtree import STRtree
 from shapely.ops import split
 
-from . import areas
+from . import areas, colaborativo
 
 COLORES = {"VER": "#e4572e", "ALC": "#2e86de", "PTA": "#8e44ad", "CNTA": "#16a085", "MAR": "#f39c12",
            "ACC": "#d35400", "CV": "#95a5a6"}
@@ -34,6 +39,8 @@ VERTICE_PX = 14  # pixeles: distancia para agarrar un vertice
 MAX_PX_FONDO = 1600  # pixeles de la foto de fondo en la vista general
 ESPERA_DIBUJO = 90  # ms: varios giros de rueda seguidos se dibujan una sola vez
 ETIQUETAS_VISTA = 45.0  # m: con la vista mas angosta que esto se muestran los numeros de punto
+COLOR_LIMITE = "#ff3df5"
+EN_LIMITE = 0.02  # m: un vertice a menos de esto de un limite de propiedad ya llego a el
 AYUDA = {
     "sel": "Clic: seleccionar | arrastrar vertice: moverlo (Ctrl: sin iman) | doble clic en un borde: agregar vertice | "
            "Shift+clic en vertice: quitarlo | rueda: zoom | boton derecho: mover vista | Supr: borrar | Ctrl+Z",
@@ -74,6 +81,8 @@ class Visor(ttk.Frame):
         ttk.Button(barra, text="Revisado", command=self._marcar_revisado).pack(side="left", padx=2)
         ttk.Button(barra, text="Deshacer (Ctrl+Z)", command=self._deshacer).pack(side="left", padx=2)
         ttk.Button(barra, text="Ver todo", command=self._ver_todo).pack(side="left", padx=2)
+        ttk.Button(barra, text="Exportar para la web", command=self._exportar_web).pack(side="left", padx=(10, 2))
+        ttk.Button(barra, text="Importar correcciones", command=self._importar_web).pack(side="left", padx=2)
         self.btn_exportar = tk.Button(barra, text="  EXPORTAR DXF Y METRADO  ", bg="#2e7d32", fg="white",
                                       font=("Segoe UI", 10, "bold"), command=self._exportar)
         self.btn_exportar.pack(side="right", padx=4)
@@ -143,6 +152,10 @@ class Visor(ttk.Frame):
         met = calc.met
         self.puntos_xy = np.array([(p.e, p.n) for p in calc.puntos]) if calc.puntos else np.zeros((0, 2))
         self.arbol = cKDTree(self.puntos_xy) if len(self.puntos_xy) else None
+        base = calc.base
+        self.limites = list(base.limites) if base is not None and not base.vacio else []
+        self.arbol_lim = STRtree(self.limites) if self.limites else None
+        self.en_limite = False
         cods = sorted({a.codigo for a in met.areas})
         self.filtro_cod["values"] = ["Todos"] + cods
         self.filtro_cod.set("Todos")
@@ -163,6 +176,12 @@ class Visor(ttk.Frame):
         self.ax.add_collection(self.marco_sel)
         self.vertices, = self.ax.plot([], [], "o", ms=6, mfc="#ffff00", mec="black", zorder=5, animated=True)
         self.linea_temp, = self.ax.plot([], [], "-o", color="#00ff66", ms=4, lw=1.5, zorder=6, animated=True)
+        self.vert_lim, = self.ax.plot([], [], "D", ms=8, mfc="#00e676", mec="black", zorder=6, animated=True)
+        self.marca_lim, = self.ax.plot([], [], "o", ms=16, mfc="none", mec="#00e676", mew=2.5, zorder=7,
+                                       animated=True)
+        if self.limites:
+            self.ax.add_collection(LineCollection([np.asarray(ln.coords)[:, :2] for ln in self.limites],
+                                                  colors=COLOR_LIMITE, linewidths=1.1, zorder=2.5))
         self._dibujar_puntos()
         self.textos_pt = []
         self.textos_area = []
@@ -206,7 +225,7 @@ class Visor(ttk.Frame):
             return
         if restaurar:
             self.canvas.restore_region(self._bg)
-        for a in (self.marco_sel, self.vertices, self.linea_temp):
+        for a in (self.marco_sel, self.vertices, self.vert_lim, self.linea_temp, self.marca_lim):
             self.ax.draw_artist(a)
         self.canvas.blit(self.fig.bbox)
 
@@ -239,6 +258,7 @@ class Visor(ttk.Frame):
             c = np.array(self.sel.poligono.exterior.coords)
             self.marco_sel.set_verts([c])
             self.vertices.set_data(c[:-1, 0], c[:-1, 1])
+            self._vertices_en_limite(c[:-1])
             a = self.sel
             nota = f"{a.etiqueta}  ({a.conf.nombre or a.codigo})\nArea {a.area:.2f} m2"
             if a.largo:
@@ -366,13 +386,51 @@ class Visor(ttk.Frame):
         return (x1 - x0) / max(self.canvas.get_tk_widget().winfo_width(), 1)
 
     def _iman(self, x, y, libre=False):
-        """El clic se pega al punto topografico mas cercano si esta a menos de IMAN_PX pixeles."""
-        if self.arbol is None or libre:
+        """El clic se pega al punto topografico mas cercano si esta a menos de IMAN_PX pixeles; si no hay
+        punto, se pega al limite de propiedad (a su esquina si esta cerca). self.en_limite dice si quedo
+        sobre un limite."""
+        self.en_limite = False
+        if libre:
             return x, y
-        d, i = self.arbol.query((x, y))
-        if d <= IMAN_PX * self._m_por_px():
-            return tuple(self.puntos_xy[i])
+        tol = IMAN_PX * self._m_por_px()
+        if self.arbol is not None:
+            d, i = self.arbol.query((x, y))
+            if d <= tol:
+                q = tuple(self.puntos_xy[i])
+                self.en_limite = self._sobre_limite(q)
+                return q
+        if self.arbol_lim is not None:
+            p = Point(x, y)
+            ln = self.limites[int(self.arbol_lim.nearest(p))]
+            if ln.distance(p) <= tol:
+                c = np.asarray(ln.coords)[:, :2]
+                dv = np.hypot(c[:, 0] - x, c[:, 1] - y)
+                k = int(np.argmin(dv))
+                q = tuple(c[k]) if dv[k] <= tol else tuple(ln.interpolate(ln.project(p)).coords[0])[:2]
+                self.en_limite = True
+                return q
         return x, y
+
+    def _sobre_limite(self, q):
+        if self.arbol_lim is None:
+            return False
+        p = Point(q)
+        return self.limites[int(self.arbol_lim.nearest(p))].distance(p) <= EN_LIMITE
+
+    def _vertices_en_limite(self, c):
+        """Rombo verde en los vertices del area seleccionada que ya llegaron al limite de propiedad."""
+        en = [q for q in c if self._sobre_limite(q)]
+        if en:
+            e = np.array(en)
+            self.vert_lim.set_data(e[:, 0], e[:, 1])
+        else:
+            self.vert_lim.set_data([], [])
+
+    def _marcar_iman(self, q):
+        if self.en_limite:
+            self.marca_lim.set_data([q[0]], [q[1]])
+        else:
+            self.marca_lim.set_data([], [])
 
     # ---------- raton ----------
     def _presionar(self, ev):
@@ -386,7 +444,9 @@ class Visor(ttk.Frame):
             if ev.dblclick:
                 self._cerrar_dibujo()
                 return
-            self.temp.append(self._iman(ev.xdata, ev.ydata, _ctrl(ev)))
+            q = self._iman(ev.xdata, ev.ydata, _ctrl(ev))
+            self.temp.append(q)
+            self._marcar_iman(q)
             self._mostrar_temp()
             return
         if self.modo == "cortar":
@@ -451,9 +511,11 @@ class Visor(ttk.Frame):
             _, k, c = self.arrastre[:3]  # el 4.o elemento es la posicion en curso
             c = c.copy()
             c[k] = self._iman(ev.xdata, ev.ydata, _ctrl(ev))
+            self._marcar_iman(c[k])
             cerrado = np.vstack([c, c[:1]])
             self.marco_sel.set_verts([cerrado])
             self.vertices.set_data(c[:, 0], c[:, 1])
+            self._vertices_en_limite(c)
             self.arrastre = ("vertice", k, self.arrastre[2], c)
             self._pintar_dinamicos()
 
@@ -477,6 +539,7 @@ class Visor(ttk.Frame):
         self.arrastre = None
         if not a:
             return
+        self.marca_lim.set_data([], [])
         if a[0] == "pan":
             item = getattr(self.canvas, "_tkcanvas_image_region", None)
             ox, oy = getattr(self, "_pan_offset", (0, 0))
@@ -507,6 +570,11 @@ class Visor(ttk.Frame):
             b.state(["pressed"] if k == modo else ["!pressed"])
 
     def _mostrar_temp(self, extra=None):
+        if extra and self.modo == "dibujar":
+            extra = self._iman(*extra)
+            self._marcar_iman(extra)
+        elif not self.temp:
+            self.marca_lim.set_data([], [])
         pts = list(self.temp) + ([extra] if extra else [])
         if pts:
             c = np.array(pts)
@@ -635,6 +703,42 @@ class Visor(ttk.Frame):
         a = self.calc.met.areas[int(s[0])]
         if a is not self.sel:
             self._seleccionar(a, centrar=True)
+
+    # ---------- pagina colaborativa ----------
+    def _exportar_web(self):
+        if self.calc is None:
+            return
+        ruta = filedialog.asksaveasfilename(title="Exportar para la pagina colaborativa", defaultextension=".json",
+                                            initialfile="proyecto_web.json", filetypes=[("JSON", "*.json")])
+        if not ruta:
+            return
+        areas._numerar(self.calc.met)
+        d = colaborativo.exportar_proyecto(self.calc, ruta)
+        messagebox.showinfo("Pagina colaborativa",
+                            f"Guardado {ruta}\n{len(d['areas'])} areas, {len(d['puntos'])} puntos, "
+                            f"{len(d['limites'])} limites.\n\nSubelo en la pagina (boton 'Cargar proyecto') junto "
+                            "con los ZIP de muestras de la ortofoto.")
+
+    def _importar_web(self):
+        if self.calc is None:
+            return
+        ruta = filedialog.askopenfilename(title="Importar correcciones de la pagina colaborativa",
+                                          filetypes=[("JSON", "*.json")])
+        if not ruta:
+            return
+        self._guardar_estado()
+        try:
+            n, desconocidos = colaborativo.importar_correcciones(self.calc, ruta)
+        except (ValueError, KeyError, OSError) as e:
+            self.deshacer_pila.pop()
+            messagebox.showerror("Importar correcciones", str(e))
+            return
+        self.sel = None
+        self._despues_de_cambio()
+        txt = f"{n} areas cargadas de la pagina. Revisa y luego EXPORTAR DXF Y METRADO."
+        if desconocidos:
+            txt += "\nCodigos que este proyecto no tiene (se omitieron): " + ", ".join(desconocidos)
+        messagebox.showinfo("Importar correcciones", txt)
 
     # ---------- exportar ----------
     def _exportar(self):

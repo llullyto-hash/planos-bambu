@@ -1,6 +1,6 @@
 # Estado del proyecto: plano de demoliciones desde topografía + ortofoto
 
-Versión publicada: **1.0.17** (instalador en GitHub → Releases → `instalador-v1.0.17`).
+Versión publicada: **1.0.19** o posterior (instalador en GitHub → Releases → `instalador-v1.0.N` más reciente).
 Repositorio: `llullyto-hash/planos-bambu`, rama `claude/demolition-plans-automation-h0etwe`.
 
 Este archivo resume todo lo necesario para retomar el trabajo (con Claude u otra persona) sin perder
@@ -31,7 +31,7 @@ corregir sobre la foto; nada se escribe hasta **EXPORTAR DXF Y METRADO**).
   pip install -r requirements.txt
   python -m ortofoto.gui            # ventana
   python -m ortofoto --help         # línea de comandos
-  python -m pytest -q tests         # 28 pruebas automáticas (deben pasar todas)
+  python -m pytest -q tests         # 29 pruebas automáticas (deben pasar todas)
   ```
 - Instalador: cada `git push` a la rama dispara `.github/workflows/instalador-windows.yml`
   (pruebas → PyInstaller → prueba del .exe → Inno Setup → Release `instalador-v1.0.N`).
@@ -42,7 +42,9 @@ corregir sobre la foto; nada se escribe hasta **EXPORTAR DXF Y METRADO**).
 |---|---|
 | `ortofoto/__main__.py` | `calcular()` (todo el proceso, sin escribir) y `exportar_calculo()`; `procesar()` = ambos; línea de comandos; `exportar_muestras()` (foto en cuadros ZIP) |
 | `ortofoto/gui.py` | Ventana (pestañas 1–3) |
-| `ortofoto/visor.py` | Pestaña 4: mapa con la foto, lista de áreas, corrección por tramos |
+| `ortofoto/visor.py` | Pestaña 4: mapa con la foto, límites de propiedad, lista de áreas, corrección por tramos |
+| `ortofoto/colaborativo.py` | `proyecto_web.json` (para la página colaborativa) y lectura de `correcciones_web.json` |
+| `web/revision_colaborativa.html` | Copia de la página colaborativa publicada en claude.ai (ver sección 8) |
 | `ortofoto/veredas.py` | **Veredas pegadas a la fachada, por caras** (la parte más ajustada) |
 | `ortofoto/areas.py` | Cierre de áreas (canales, cunetas, contornos), regla de jardín, metrado, numeración |
 | `ortofoto/unir.py` | Configuración de códigos y unión de puntos en polilíneas |
@@ -112,3 +114,24 @@ Canal (ALC): cajas por sus esquinas, secciones, o por el eje con ancho supuesto 
 > `ESTADO_DEL_PROYECTO.md` (criterios acordados y pendientes), luego `ortofoto/README.md`. Respeta los
 > criterios de la sección 4; corre `python -m pytest -q tests` antes y después de cada cambio. Quiero
 > seguir con: [describir lo siguiente, p.ej. los pendientes de la sección 5].
+
+## 8. Página colaborativa (revisión en línea, hasta 4 personas)
+
+Página publicada en claude.ai (privada; el dueño la comparte desde su menú *Compartir*):
+https://claude.ai/artifact/JE4cjrT7tKMN1zgjYr7Ap1 — fuente en `web/revision_colaborativa.html`.
+
+Flujo:
+1. Programa → Procesar → pestaña 4 → **Exportar para la web** → `proyecto_web.json`
+   (áreas, puntos, límites de propiedad, códigos). Con *Exportar la ortofoto en cuadros* salen los ZIP de foto.
+2. Página → pestaña Proyecto → **Cargar proyecto…** (solo el dueño): `proyecto_web.json` + los ZIP.
+3. Cada persona entra con su cuenta de Claude. El dueño dibuja **zonas** y las asigna; todos pueden
+   corregir todo (mover/agregar/quitar vértices, cortar, dibujar, borrar, revisado, deshacer). Los
+   cambios se guardan solos y se ven en vivo, con el área y el metrado recalculados al instante.
+4. **Descargar correcciones_web.json** → en el programa, pestaña 4 → **Importar correcciones** →
+   EXPORTAR DXF Y METRADO.
+
+Datos de la página (base de datos de la página): `proyecto/info` (nombre, foto en cuadros, puntos y límites
+como archivo), áreas en colecciones `<pref><k>` (una por cada 800) y `<pref>x` (las nuevas), `zonas/*`,
+`personas/*`. Reglas: solo el dueño escribe `proyecto`, `zonas` y `personas` (cada uno escribe su propia
+ficha en `personas`); las áreas las escribe cualquier invitado con permiso de edición. Invitados de fuera
+de la organización: invitarlos por correo como **Editor** y sin enlace público.

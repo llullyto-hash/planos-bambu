@@ -58,6 +58,14 @@ Tipos:
 | `linea` | fachada, lote, sardinel | polilínea (m si tiene prefijo) |
 | `punto` | árboles, cajas, postes, terreno | solo puntos en su capa |
 
+**4. Resultados (revisar antes de exportar)**
+- Los límites de propiedad (FACHADA) se ven en magenta; los vértices se pegan a los puntos y, si no hay
+  punto cerca, al límite (a su esquina si está cerca). Un rombo verde marca el vértice que ya llegó al
+  límite y un círculo verde aparece mientras se arrastra sobre él.
+- **Exportar para la web**: guarda `proyecto_web.json` para la página colaborativa (revisión en línea
+  entre varias personas). **Importar correcciones**: carga el `correcciones_web.json` que se baja de la
+  página; luego EXPORTAR DXF Y METRADO. Ver `ESTADO_DEL_PROYECTO.md`, sección 8.
+
 **3. Procesar** → en la carpeta de resultados quedan:
 - `resultado.dxf`: puntos por capa, bordes, áreas con achurado, etiquetas y la ortofoto de fondo
   (se enlaza la foto original, no se copia);

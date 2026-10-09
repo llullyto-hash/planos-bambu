@@ -1,0 +1,1160 @@
+<title>Demoliciones en línea</title>
+<style>
+:root{
+  --bg:#f4f5f7;--panel:#ffffff;--panel2:#f0f2f5;--text:#1d2330;--muted:#5b6475;--line:#d9dde5;
+  --accent:#1f6feb;--accent-text:#ffffff;--ok:#2e7d32;--warn:#c62828;--map:#2b2f36;--chip:#e8ecf3;
+  --shadow:0 2px 10px rgba(0,0,0,.12);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14171c;--panel:#1d2128;--panel2:#252a33;--text:#e7eaf0;--muted:#9aa3b2;--line:#323844;
+    --accent:#4c8dff;--accent-text:#0b0f16;--ok:#58b95d;--warn:#ff6b6b;--map:#0f1115;--chip:#2a303b;
+    --shadow:0 2px 10px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14171c;--panel:#1d2128;--panel2:#252a33;--text:#e7eaf0;--muted:#9aa3b2;--line:#323844;
+  --accent:#4c8dff;--accent-text:#0b0f16;--ok:#58b95d;--warn:#ff6b6b;--map:#0f1115;--chip:#2a303b;
+  --shadow:0 2px 10px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+button:hover:not(:disabled){border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+button.on{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+button.prim{background:var(--accent);color:var(--accent-text);border-color:var(--accent);font-weight:600}
+button.peligro{color:var(--warn)}
+select,input[type=text],input[type=search]{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:5px 7px}
+#app{display:flex;flex-direction:column;height:100%}
+header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);min-height:48px}
+header h1{font-size:16px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#estado{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+#gente{display:flex;gap:4px;align-items:center}
+#gente img{width:26px;height:26px;border-radius:50%;border:2px solid var(--panel);box-shadow:0 0 0 2px var(--c,#888)}
+#barra{display:flex;gap:6px;padding:6px 14px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;align-items:center}
+#barra .sep{width:1px;align-self:stretch;background:var(--line);margin:0 4px;flex:none}
+#barra label{display:flex;align-items:center;gap:4px;color:var(--muted);white-space:nowrap}
+main{flex:1;display:flex;min-height:0}
+#mapaWrap{position:relative;flex:1;min-width:0;background:var(--map);touch-action:none}
+#mapa{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+#ayuda{position:absolute;left:10px;right:10px;top:8px;color:#fff;font-size:12px;text-shadow:0 1px 2px #000;pointer-events:none}
+#coord{position:absolute;left:10px;bottom:8px;color:#fff;font-size:12px;text-shadow:0 1px 2px #000;pointer-events:none;font-variant-numeric:tabular-nums}
+#vacio{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:#dfe3ea}
+#vacio div{max-width:460px;background:rgba(0,0,0,.45);padding:18px 20px;border-radius:12px}
+aside{width:340px;flex:none;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;border-radius:0;background:none;padding:9px 4px;border-bottom:2px solid transparent;color:var(--muted)}
+.tabs button.on{color:var(--text);border-bottom-color:var(--accent);background:none}
+.pane{flex:1;overflow:auto;padding:10px 12px;display:none}
+.pane.on{display:block}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px}
+.card h3{margin:0 0 6px;font-size:14px}
+.fila{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.muted{color:var(--muted);font-size:12px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:4px 6px;text-align:right;border-bottom:1px solid var(--line);font-size:12.5px}
+th:first-child,td:first-child{text-align:left}
+#lista tr{cursor:pointer}
+#lista tr:hover td{background:var(--chip)}
+#lista tr.sel td{background:var(--accent);color:var(--accent-text)}
+#lista tr.rev td:first-child{color:var(--warn);font-weight:600}
+#lista tr.sel.rev td:first-child{color:var(--accent-text)}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--chip);border-radius:999px;padding:2px 8px 2px 2px;font-size:12px}
+.chip img{width:18px;height:18px;border-radius:50%}
+.chip button{border:0;background:none;padding:0 2px;color:var(--muted)}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;margin-right:4px}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#222a;backdrop-filter:blur(4px);color:#fff;padding:9px 14px;border-radius:9px;font-size:13px;max-width:min(560px,calc(100% - 32px));display:none;z-index:20;box-shadow:var(--shadow)}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:30;padding:16px}
+#modal .caja{background:var(--panel);color:var(--text);border-radius:12px;padding:16px 18px;max-width:440px;width:100%;box-shadow:var(--shadow)}
+#modal .caja p{margin:0 0 12px;white-space:pre-line}
+#modal .bot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.barraProg{height:8px;background:var(--chip);border-radius:4px;overflow:hidden;margin-top:8px}
+.barraProg div{height:100%;width:0;background:var(--accent)}
+#btnLado{display:none}
+@media (max-width:820px){
+  header{padding:6px 16px}
+  #barra{padding:6px 16px}
+  aside{position:fixed;left:0;right:0;bottom:0;width:auto;height:55%;border-left:0;border-top:1px solid var(--line);transform:translateY(100%);transition:transform .2s;z-index:10;box-shadow:var(--shadow)}
+  aside.abierto{transform:none}
+  #btnLado{display:inline-block}
+  .pane{padding:10px 16px}
+}
+</style>
+
+<div id="app">
+  <header>
+    <h1 id="titulo">Demoliciones en línea</h1>
+    <span id="estado">Conectando…</span>
+    <div id="gente"></div>
+    <button id="btnLado" title="Mostrar panel">Panel</button>
+  </header>
+  <div id="barra">
+    <button data-tool="sel" class="on" title="Seleccionar y mover vértices">Seleccionar</button>
+    <button data-tool="cortar" title="Partir un área con una línea">Cortar</button>
+    <button data-tool="dibujar" title="Dibujar un área nueva">Dibujar</button>
+    <select id="codNuevo" title="Código del área nueva"></select>
+    <span class="sep"></span>
+    <button id="btnBorrar" title="Borrar el área seleccionada (Supr)">Borrar</button>
+    <button id="btnRevisado" title="Quitar o poner la marca 'a revisar'">Revisado</button>
+    <button id="btnQuitarV" title="Quitar el vértice marcado">Quitar vértice</button>
+    <button id="btnCerrar" title="Cerrar la figura que se dibuja (Enter)">Cerrar figura</button>
+    <button id="btnDeshacer" title="Deshacer (Ctrl+Z)">Deshacer</button>
+    <span class="sep"></span>
+    <button id="btnIman" class="on" title="Pegar a puntos y límites (con Ctrl apretado se suelta)">Imán</button>
+    <button id="btnTodo">Ver todo</button>
+    <button id="btnMiZona" title="Ir a mi zona asignada">Mi zona</button>
+    <button data-tool="zona" id="btnZona" title="Dibujar una zona de trabajo (solo el dueño)" hidden>Nueva zona</button>
+  </div>
+  <main>
+    <div id="mapaWrap">
+      <canvas id="mapa"></canvas>
+      <div id="ayuda"></div>
+      <div id="coord"></div>
+      <div id="vacio"><div id="vacioTxt">Cargando…</div></div>
+    </div>
+    <aside id="lado">
+      <div class="tabs">
+        <button data-pane="pArea" class="on">Áreas</button>
+        <button data-pane="pZonas">Zonas</button>
+        <button data-pane="pProy">Proyecto</button>
+      </div>
+      <div class="pane on" id="pArea">
+        <div class="card" id="selCard" hidden></div>
+        <div class="card"><h3>Metrado en vivo</h3><table id="totales"></table></div>
+        <div class="fila">
+          <select id="fCod"><option value="">Todos</option></select>
+          <label class="muted"><input type="checkbox" id="fRev"> solo a revisar</label>
+          <label class="muted"><input type="checkbox" id="fZona"> solo mi zona</label>
+        </div>
+        <table><thead><tr><th>Área</th><th>m²</th><th>Largo</th><th>Rev.</th></tr></thead><tbody id="lista"></tbody></table>
+      </div>
+      <div class="pane" id="pZonas">
+        <p class="muted" id="zonasAyuda"></p>
+        <div id="zonas"></div>
+      </div>
+      <div class="pane" id="pProy">
+        <div class="card" id="proyInfo"></div>
+        <div class="card" id="proyDueno" hidden>
+          <h3>Cargar proyecto (solo el dueño)</h3>
+          <p class="muted">Elige el <b>proyecto_web.json</b> que exporta el programa (botón "Exportar para la web") y los <b>ZIP de muestras de la ortofoto</b>. Puedes elegir todos juntos.</p>
+          <div class="fila"><button class="prim" id="btnCargar">Cargar proyecto…</button><button id="btnFotos">Agregar fotos (ZIP)…</button></div>
+          <input type="file" id="fileProy" accept=".json,.zip,application/json,application/zip" multiple hidden>
+          <input type="file" id="fileFotos" accept=".zip,application/zip" multiple hidden>
+          <p class="muted" id="usoAlm"></p>
+        </div>
+        <div class="card">
+          <h3>Bajar al programa</h3>
+          <p class="muted">Descarga las correcciones y en el programa usa "Importar correcciones" en la pestaña 4; luego EXPORTAR DXF Y METRADO.</p>
+          <div class="fila"><button class="prim" id="btnBajar">Descargar correcciones_web.json</button><button id="btnCsv">Metrado (CSV)</button></div>
+        </div>
+        <div class="card">
+          <h3>Cómo se usa</h3>
+          <p class="muted">Rueda o pellizco: zoom. Arrastrar el fondo: mover. Clic en un área: seleccionarla. Arrastrar un vértice amarillo: moverlo (se pega a los puntos y al límite de propiedad magenta; el rombo verde indica que ya llegó al límite). Doble clic en un borde: agregar vértice. Shift+clic en un vértice (o tocarlo y "Quitar vértice"): quitarlo. Cortar: dos clics a través del área. Dibujar: clic en cada esquina, doble clic o Enter para cerrar. Lo que cada uno cambia se guarda solo y los demás lo ven al instante.</p>
+        </div>
+      </div>
+    </aside>
+  </main>
+</div>
+<div id="toast"></div>
+<div id="modal"><div class="caja"><p id="modalTxt"></p><div id="modalExtra"></div><div class="bot" id="modalBot"></div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(() => {
+"use strict";
+// ---------------------------------------------------------------- constantes
+const IMAN_PX = 10, VERTICE_PX = 14, AREA_MIN = 0.15, POR_COLECCION = 800, EN_LIMITE = 0.02;
+const COLOR_PUNTO = {VER:"#ff9f1c", CSH:"#3a86ff", ALC:"#00d2ff", OCHV:"#3a86ff", LP:"#3a86ff"};
+const COLOR_LIMITE = "#ff3df5";
+const PALETA = ["#e6194b","#3cb44b","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45"];
+const AYUDA = {
+  sel: "Clic: seleccionar · arrastrar vértice: moverlo (Ctrl: sin imán) · doble clic en borde: agregar vértice · Shift+clic en vértice: quitarlo · arrastrar fondo: mover · rueda: zoom",
+  cortar: "CORTAR: clic a un lado del área y clic al otro lado. Esc: terminar",
+  dibujar: "DIBUJAR: clic en cada esquina (se pega a puntos y límites). Doble clic o Enter: cerrar. Retroceso: quitar el último. Esc: cancelar",
+  zona: "NUEVA ZONA: clic en cada esquina de la zona de trabajo. Doble clic o Enter: cerrar. Esc: cancelar",
+};
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ---------------------------------------------------------------- estado
+const S = {
+  db:null, user:null, room:null, assets:null, downloads:null,
+  uid:null, owner:false, soloLectura:false,
+  info:null, base:null, codigos:{}, tiles:[], areas:new Map(), zonas:new Map(), personas:new Map(),
+  subsAreas:[], prefActual:null,
+  vista:{cx:0, cy:0, s:1}, W:0, H:0, dpr:1,
+  sel:null, vsel:-1, tool:"sel", temp:[], arr:null, iman:true, cursor:null, snapLim:null,
+  pila:[], peers:[], perfiles:{}, img:new Map(),
+  pts:null, grid:null, segs:[],
+  ultimoToque:{t:0,x:0,y:0},
+};
+
+// ---------------------------------------------------------------- utilidades
+function toast(txt, ms = 3500){
+  const t = $("toast"); t.textContent = txt; t.style.display = "block";
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = "none", ms);
+}
+function modal(txt, botones, extra){
+  return new Promise(res => {
+    $("modalTxt").textContent = txt;
+    const ex = $("modalExtra"); ex.innerHTML = ""; if (extra) ex.appendChild(extra);
+    const b = $("modalBot"); b.innerHTML = "";
+    for (const [et, val, cls] of botones){
+      const x = document.createElement("button"); x.textContent = et; if (cls) x.className = cls;
+      x.onclick = () => { if (val !== undefined) { $("modal").style.display = "none"; res(val); } };
+      b.appendChild(x);
+    }
+    $("modal").style.display = "flex";
+  });
+}
+function progreso(txt){
+  const d = document.createElement("div"); d.innerHTML = '<div class="barraProg"><div></div></div>';
+  $("modalTxt").textContent = txt; const ex = $("modalExtra"); ex.innerHTML = ""; ex.appendChild(d);
+  $("modalBot").innerHTML = ""; $("modal").style.display = "flex";
+  return {
+    set(f, t){ d.firstChild.firstChild.style.width = Math.round(f * 100) + "%"; if (t) $("modalTxt").textContent = t; },
+    cerrar(){ $("modal").style.display = "none"; },
+  };
+}
+async function reintentar(fn){
+  for (let i = 0; ; i++){
+    try { return await fn(); }
+    catch (e){
+      const c = e && e.code;
+      if ((c === "unavailable" || c === "resource_exhausted" || c === "rate_limited" || c === "store_unavailable") && i < 5){
+        await sleep(500 * 2 ** i + Math.random() * 400); continue;
+      }
+      throw e;
+    }
+  }
+}
+// Una escritura a la vez por documento
+const colas = new Map();
+function escribir(path, fn){
+  const prev = colas.get(path) || Promise.resolve();
+  const p = prev.catch(() => {}).then(() => reintentar(fn)).catch(e => {
+    if (e && e.code === "invalid_argument"){ S.soloLectura = true; toast("No tienes permiso para editar: pide al dueño que te invite como Editor."); }
+    else if (e && e.code === "quota_exceeded") toast("La página llegó a su límite de datos.");
+    else toast("No se pudo guardar (" + (e && e.code || e) + "). Revisa tu conexión.");
+    throw e;
+  });
+  colas.set(path, p); p.finally(() => { if (colas.get(path) === p) colas.delete(path); }).catch(() => {});
+  return p;
+}
+async function enParalelo(items, n, fn, avance){
+  let i = 0, hechos = 0;
+  const trab = async () => { while (i < items.length){ const k = i++; await fn(items[k], k); hechos++; avance && avance(hechos / items.length); } };
+  await Promise.all(Array.from({length: Math.min(n, items.length)}, trab));
+}
+const fmt = (v, d = 2) => (v || 0).toLocaleString("es-PE", {minimumFractionDigits:d, maximumFractionDigits:d});
+function hace(t){
+  if (!t) return ""; const s = (Date.now() - t) / 1000;
+  if (s < 60) return "hace un momento"; if (s < 3600) return "hace " + Math.round(s / 60) + " min";
+  if (s < 86400) return "hace " + Math.round(s / 3600) + " h"; return new Date(t).toLocaleDateString("es-PE");
+}
+
+// ---------------------------------------------------------------- geometría
+function areaAnillo(c){ let s = 0; for (let i = 0, n = c.length; i < n; i++){ const a = c[i], b = c[(i + 1) % n]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; }
+function centroide(c){
+  const A = areaAnillo(c); if (Math.abs(A) < 1e-9){ let x = 0, y = 0; for (const p of c){ x += p[0]; y += p[1]; } return [x / c.length, y / c.length]; }
+  const x0 = c[0][0], y0 = c[0][1]; let cx = 0, cy = 0;
+  for (let i = 0, n = c.length; i < n; i++){ const a = c[i], b = c[(i + 1) % n]; const ax = a[0]-x0, ay = a[1]-y0, bx = b[0]-x0, by = b[1]-y0; const f = ax * by - bx * ay; cx += (ax + bx) * f; cy += (ay + by) * f; }
+  return [x0 + cx / (6 * A), y0 + cy / (6 * A)];
+}
+function dentro(p, c){
+  let r = false;
+  for (let i = 0, j = c.length - 1; i < c.length; j = i++){
+    const a = c[i], b = c[j];
+    if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) r = !r;
+  }
+  return r;
+}
+function caja(c){ let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const p of c){ if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0]; if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; } return [x0, y0, x1, y1]; }
+function cruza(a, b, c, d){
+  const o = (p, q, r) => Math.sign((q[0]-p[0]) * (r[1]-p[1]) - (q[1]-p[1]) * (r[0]-p[0]));
+  return o(a,b,c) * o(a,b,d) < 0 && o(c,d,a) * o(c,d,b) < 0;
+}
+function seCruza(c){
+  const n = c.length;
+  for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++){
+    if (i === 0 && j === n - 1) continue;
+    if (cruza(c[i], c[(i+1)%n], c[j], c[(j+1)%n])) return true;
+  }
+  return false;
+}
+function casco(pts){
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const x = (o, a, b) => (a[0]-o[0]) * (b[1]-o[1]) - (a[1]-o[1]) * (b[0]-o[0]);
+  const lo = [], up = [];
+  for (const q of p){ while (lo.length >= 2 && x(lo[lo.length-2], lo[lo.length-1], q) <= 0) lo.pop(); lo.push(q); }
+  for (let i = p.length - 1; i >= 0; i--){ const q = p[i]; while (up.length >= 2 && x(up[up.length-2], up[up.length-1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+// Lado largo del rectangulo minimo que encierra el area (como el programa de escritorio)
+function largoRect(c){
+  const h = casco(c); if (h.length < 3) return 0;
+  let mejor = null;
+  for (let i = 0; i < h.length; i++){
+    const a = h[i], b = h[(i+1) % h.length]; const L = Math.hypot(b[0]-a[0], b[1]-a[1]); if (L < 1e-9) continue;
+    const ux = (b[0]-a[0]) / L, uy = (b[1]-a[1]) / L;
+    let t0 = Infinity, t1 = -Infinity, d0 = Infinity, d1 = -Infinity;
+    for (const p of h){ const t = (p[0]-a[0]) * ux + (p[1]-a[1]) * uy, d = -(p[0]-a[0]) * uy + (p[1]-a[1]) * ux; t0 = Math.min(t0, t); t1 = Math.max(t1, t); d0 = Math.min(d0, d); d1 = Math.max(d1, d); }
+    const w = t1 - t0, hh = d1 - d0;
+    if (!mejor || w * hh < mejor[0]) mejor = [w * hh, Math.max(w, hh)];
+  }
+  return mejor ? mejor[1] : 0;
+}
+function distSeg(p, a, b){
+  const vx = b[0]-a[0], vy = b[1]-a[1]; const L = vx*vx + vy*vy;
+  let t = L ? ((p[0]-a[0]) * vx + (p[1]-a[1]) * vy) / L : 0; t = Math.max(0, Math.min(1, t));
+  const q = [a[0] + vx*t, a[1] + vy*t]; return [Math.hypot(p[0]-q[0], p[1]-q[1]), q];
+}
+const r3 = v => Math.round(v * 1000) / 1000;
+
+// ---------------------------------------------------------------- áreas: datos derivados
+function derivar(a){
+  const c = a.coords;
+  a.area = Math.abs(areaAnillo(c));
+  a.cen = centroide(c);
+  a.bb = caja(c);
+  a.largo = a.largo0 ? a.largo0 * a.area / Math.max(a.area0 || a.area, 1e-6) : largoRect(c);
+  a.ancho = a.largo ? a.area / a.largo : 0;
+}
+function vivas(){ const r = []; for (const a of S.areas.values()) if (!a.borrado) r.push(a); return r; }
+function numerar(){
+  const grupos = {};
+  for (const a of vivas()){ const cf = S.codigos[a.cod] || {}; (grupos[cf.prefijo || a.cod] ||= []).push(a); }
+  for (const [pref, l] of Object.entries(grupos)){
+    l.sort((a, b) => (-Math.round(a.cen[1] / 20)) - (-Math.round(b.cen[1] / 20)) || a.cen[0] - b.cen[0]);
+    l.forEach((a, k) => a.etq = pref + " - " + String(k + 1).padStart(2, "0"));
+  }
+}
+function colorCod(cod){ return (S.codigos[cod] && S.codigos[cod].color) || "#f1c40f"; }
+
+// ---------------------------------------------------------------- vista
+const cv = $("mapa"), ctx = cv.getContext("2d");
+function aPantalla(x, y){ const v = S.vista; return [(x - v.cx) * v.s + S.W / 2, S.H / 2 - (y - v.cy) * v.s]; }
+function aTerreno(px, py){ const v = S.vista; return [(px - S.W / 2) / v.s + v.cx, (S.H / 2 - py) / v.s + v.cy]; }
+function redimensionar(){
+  const r = cv.getBoundingClientRect(); S.dpr = window.devicePixelRatio || 1;
+  S.W = r.width; S.H = r.height; cv.width = Math.round(r.width * S.dpr); cv.height = Math.round(r.height * S.dpr);
+  pedirDibujo();
+}
+function verCaja(x0, y0, x1, y1){
+  const v = S.vista; v.cx = (x0 + x1) / 2; v.cy = (y0 + y1) / 2;
+  v.s = Math.min(S.W / Math.max(x1 - x0, 1), S.H / Math.max(y1 - y0, 1)) * 0.92; pedirDibujo();
+}
+function verTodo(){
+  let bb = null;
+  if (S.pts && S.pts.n){ bb = [S.pts.x0, S.pts.y0, S.pts.x1, S.pts.y1]; }
+  else { for (const a of vivas()){ if (!bb) bb = a.bb.slice(); else { bb[0] = Math.min(bb[0], a.bb[0]); bb[1] = Math.min(bb[1], a.bb[1]); bb[2] = Math.max(bb[2], a.bb[2]); bb[3] = Math.max(bb[3], a.bb[3]); } } }
+  if (bb) verCaja(bb[0] - 10, bb[1] - 10, bb[2] + 10, bb[3] + 10);
+}
+let pendiente = false;
+function pedirDibujo(){ if (!pendiente){ pendiente = true; requestAnimationFrame(dibujar); } }
+
+function imagenTile(id){
+  let e = S.img.get(id);
+  if (!e){ e = {img:new Image(), ok:false}; e.img.onload = () => { e.ok = true; pedirDibujo(); }; e.img.src = "/_blob/" + id; S.img.set(id, e); }
+  return e;
+}
+function trazar(c){ ctx.beginPath(); c.forEach((p, i) => { const q = aPantalla(p[0], p[1]); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.closePath(); }
+function coordsVivas(a){ return (S.arr && S.arr.tipo === "vertice" && S.arr.path === a.path) ? S.arr.c : a.coords; }
+
+function dibujar(){
+  pendiente = false;
+  ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
+  ctx.clearRect(0, 0, S.W, S.H);
+  const [vx0, vy1] = aTerreno(0, 0), [vx1, vy0] = aTerreno(S.W, S.H);
+  const vis = bb => bb[2] >= vx0 && bb[0] <= vx1 && bb[3] >= vy0 && bb[1] <= vy1;
+  const s = S.vista.s;
+  // foto
+  for (const t of S.tiles){
+    const [id, x0, y0, x1, y1] = t; if (!vis([x0, y0, x1, y1])) continue;
+    const e = imagenTile(id); if (!e.ok) continue;
+    const [a, b] = aPantalla(x0, y1), [c, d] = aPantalla(x1, y0);
+    ctx.drawImage(e.img, a, b, c - a, d - b);
+  }
+  // zonas
+  for (const z of S.zonas.values()){
+    if (!z.coords || !vis(z.bb)) continue;
+    const mia = S.uid && (z.asignados || []).includes(S.uid);
+    trazar(z.coords); ctx.setLineDash([10, 6]); ctx.lineWidth = mia ? 3.5 : 2; ctx.strokeStyle = z.color || "#fff"; ctx.stroke(); ctx.setLineDash([]);
+    const q = aPantalla(z.bb[0], z.bb[3]); ctx.font = "bold 13px system-ui"; ctx.fillStyle = z.color || "#fff";
+    ctx.fillText(z.nombre || "Zona", q[0] + 4, q[1] + 15);
+  }
+  // límites de propiedad
+  ctx.strokeStyle = COLOR_LIMITE; ctx.lineWidth = 1.2;
+  for (const ln of S.segs){
+    if (!vis(ln.bb)) continue;
+    ctx.beginPath(); ln.c.forEach((p, i) => { const q = aPantalla(p[0], p[1]); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke();
+  }
+  // áreas
+  const visibles = [];
+  for (const a of S.areas.values()){
+    if (a.borrado) continue; const c = coordsVivas(a); const bb = c === a.coords ? a.bb : caja(c); if (!vis(bb)) continue;
+    visibles.push(a);
+    trazar(c); const col = colorCod(a.cod);
+    ctx.globalAlpha = 0.38; ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.lineWidth = 1.4; ctx.strokeStyle = col; ctx.stroke();
+    if (a.revisar && s > 1.5){ ctx.setLineDash([5, 4]); ctx.strokeStyle = "#ff1744"; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]); }
+  }
+  // puntos
+  if (S.pts && s > 1.2){
+    const P = S.pts, tam = s > 12 ? 3.2 : 2;
+    for (let i = 0; i < P.n; i++){
+      const x = P.x[i], y = P.y[i]; if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
+      const q = aPantalla(x, y); ctx.fillStyle = P.col[i]; const t = P.imp[i] ? tam : tam * 0.6;
+      ctx.fillRect(q[0] - t, q[1] - t, 2 * t, 2 * t);
+    }
+    if (s > 22){
+      ctx.font = "10px system-ui"; ctx.fillStyle = "#fff"; let n = 0;
+      for (let i = 0; i < P.n && n < 500; i++){
+        const x = P.x[i], y = P.y[i]; if (x < vx0 || x > vx1 || y < vy0 || y > vy1) continue;
+        const q = aPantalla(x, y); ctx.fillText(P.num[i] + " " + P.desc[i], q[0] + 4, q[1] - 3); n++;
+      }
+    }
+  }
+  // etiquetas de áreas
+  if (visibles.length <= 80){
+    ctx.font = "bold 11px system-ui"; ctx.textAlign = "center";
+    for (const a of visibles){
+      const c = coordsVivas(a); const ar = c === a.coords ? a.area : Math.abs(areaAnillo(c)); const cen = c === a.coords ? a.cen : centroide(c);
+      const q = aPantalla(cen[0], cen[1]); const t1 = a.etq || a.cod, t2 = fmt(ar) + " m²";
+      const w = Math.max(ctx.measureText(t1).width, ctx.measureText(t2).width) + 8;
+      ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(q[0] - w / 2, q[1] - 14, w, 28);
+      ctx.fillStyle = "#fff"; ctx.fillText(t1, q[0], q[1] - 2); ctx.fillText(t2, q[0], q[1] + 11);
+    }
+    ctx.textAlign = "start";
+  }
+  // lo que otros tienen seleccionado / arrastrando
+  for (const p of S.peers){
+    if (p.isMe && p.sameTab) continue; const pr = p.presence || {}; const col = colorPeer(p);
+    let c = Array.isArray(pr.drag) ? pr.drag : null;
+    if (!c && typeof pr.sel === "string" && S.areas.has(pr.sel)) c = S.areas.get(pr.sel).coords;
+    if (c && c.length > 2){ trazar(c); ctx.lineWidth = 3; ctx.strokeStyle = col; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]); }
+    if (Array.isArray(pr.cur) && pr.cur.length === 2){
+      const q = aPantalla(+pr.cur[0], +pr.cur[1]);
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(q[0] + 4, q[1] + 13); ctx.lineTo(q[0] + 11, q[1] + 8); ctx.closePath(); ctx.fill();
+      ctx.font = "11px system-ui"; const nm = nombrePeer(p); const w = ctx.measureText(nm).width + 8;
+      ctx.fillRect(q[0] + 10, q[1] + 10, w, 16); ctx.fillStyle = "#fff"; ctx.fillText(nm, q[0] + 14, q[1] + 22);
+    }
+  }
+  // selección
+  const a = S.sel && S.areas.get(S.sel);
+  if (a && !a.borrado){
+    const c = coordsVivas(a);
+    trazar(c); ctx.lineWidth = 2.5; ctx.strokeStyle = "#ffff00"; ctx.stroke();
+    c.forEach((p, i) => {
+      const q = aPantalla(p[0], p[1]);
+      if (sobreLimite(p)){
+        ctx.fillStyle = "#00e676"; ctx.strokeStyle = "#000"; ctx.lineWidth = 1; ctx.beginPath();
+        ctx.moveTo(q[0], q[1] - 7); ctx.lineTo(q[0] + 7, q[1]); ctx.lineTo(q[0], q[1] + 7); ctx.lineTo(q[0] - 7, q[1]); ctx.closePath(); ctx.fill(); ctx.stroke();
+      } else {
+        ctx.fillStyle = i === S.vsel ? "#ff5252" : "#ffff00"; ctx.strokeStyle = "#000"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(q[0], q[1], i === S.vsel ? 7 : 5, 0, 7); ctx.fill(); ctx.stroke();
+      }
+    });
+  }
+  // herramienta en curso
+  if (S.temp.length){
+    const pts = S.temp.concat(S.cursor && S.tool !== "sel" ? [S.cursor] : []);
+    ctx.beginPath(); pts.forEach((p, i) => { const q = aPantalla(p[0], p[1]); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
+    ctx.strokeStyle = S.tool === "cortar" ? "#ff1744" : "#00ff66"; ctx.lineWidth = 2; ctx.stroke();
+    for (const p of S.temp){ const q = aPantalla(p[0], p[1]); ctx.fillStyle = "#00ff66"; ctx.fillRect(q[0] - 3, q[1] - 3, 6, 6); }
+  }
+  if (S.snapLim){
+    const q = aPantalla(S.snapLim[0], S.snapLim[1]);
+    ctx.strokeStyle = "#00e676"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(q[0], q[1], 10, 0, 7); ctx.stroke();
+  }
+}
+
+// ---------------------------------------------------------------- imán (puntos y límites)
+function armarIndices(){
+  const b = S.base; S.pts = null; S.grid = null; S.segs = [];
+  if (!b) return;
+  const n = b.puntos.length;
+  const P = {n, x:new Float64Array(n), y:new Float64Array(n), col:new Array(n), imp:new Uint8Array(n), num:new Array(n), desc:new Array(n), x0:Infinity, y0:Infinity, x1:-Infinity, y1:-Infinity};
+  const grid = new Map();
+  b.puntos.forEach((p, i) => {
+    P.x[i] = p[0]; P.y[i] = p[1]; P.num[i] = p[3]; P.desc[i] = p[4];
+    const c = COLOR_PUNTO[p[5]]; P.col[i] = c || "#bbbbbb"; P.imp[i] = c ? 1 : 0;
+    P.x0 = Math.min(P.x0, p[0]); P.y0 = Math.min(P.y0, p[1]); P.x1 = Math.max(P.x1, p[0]); P.y1 = Math.max(P.y1, p[1]);
+    const k = Math.floor(p[0] / 2) + "," + Math.floor(p[1] / 2); let l = grid.get(k); if (!l) grid.set(k, l = []); l.push(i);
+  });
+  S.pts = P; S.grid = grid;
+  S.segs = (b.limites || []).filter(c => c.length > 1).map(c => ({c, bb:caja(c)}));
+}
+function puntoCercano(p, tol){
+  if (!S.grid || tol > 6) return null;
+  const r = Math.ceil(tol / 2), gx = Math.floor(p[0] / 2), gy = Math.floor(p[1] / 2); let mejor = null, md = tol;
+  for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++){
+    const l = S.grid.get((gx + i) + "," + (gy + j)); if (!l) continue;
+    for (const k of l){ const d = Math.hypot(S.pts.x[k] - p[0], S.pts.y[k] - p[1]); if (d <= md){ md = d; mejor = [S.pts.x[k], S.pts.y[k]]; } }
+  }
+  return mejor;
+}
+function limiteCercano(p, tol){
+  let mejor = null, md = tol;
+  for (const ln of S.segs){
+    const b = ln.bb; if (p[0] < b[0] - tol || p[0] > b[2] + tol || p[1] < b[1] - tol || p[1] > b[3] + tol) continue;
+    for (const v of ln.c){ const d = Math.hypot(v[0] - p[0], v[1] - p[1]); if (d <= md){ md = d; mejor = [v[0], v[1]]; } }
+  }
+  if (mejor) return mejor;  // esquina del lote
+  md = tol;
+  for (const ln of S.segs){
+    const b = ln.bb; if (p[0] < b[0] - tol || p[0] > b[2] + tol || p[1] < b[1] - tol || p[1] > b[3] + tol) continue;
+    for (let i = 0; i + 1 < ln.c.length; i++){ const [d, q] = distSeg(p, ln.c[i], ln.c[i + 1]); if (d <= md){ md = d; mejor = q; } }
+  }
+  return mejor;
+}
+function sobreLimite(p){ return !!limiteCercano(p, EN_LIMITE); }
+function iman(p, libre){
+  S.snapLim = null;
+  if (libre || !S.iman) return p;
+  const tol = IMAN_PX / S.vista.s;
+  const q = puntoCercano(p, tol);
+  if (q){ if (sobreLimite(q)) S.snapLim = q; return q; }
+  const l = limiteCercano(p, tol);
+  if (l){ S.snapLim = l; return l; }
+  return p;
+}
+
+// ---------------------------------------------------------------- personas y presencia
+function colorPeer(p){ const pf = p.by && S.perfiles[p.by]; return (pf && pf.color) || "#ffab00"; }
+function nombrePeer(p){ const pf = p.by && S.perfiles[p.by]; return (pf && pf.name) || (p.kind === "agent" ? "Claude" : "Alguien"); }
+async function resolverPerfiles(ids){
+  if (!S.user || !ids.length) return;
+  try { Object.assign(S.perfiles, await S.user.profiles(ids)); } catch (e) {}
+}
+async function pintarGente(){
+  const ids = [...new Set(S.peers.map(p => p.by).filter(Boolean))];
+  await resolverPerfiles(ids);
+  const g = $("gente"); g.innerHTML = ""; const vistos = new Set();
+  for (const p of S.peers){
+    const k = p.by || p.peer; if (vistos.has(k)) continue; vistos.add(k);
+    const pf = p.by && S.perfiles[p.by];
+    const im = document.createElement("img"); im.alt = ""; im.title = nombrePeer(p) + (p.isMe ? " (tú)" : "");
+    if (pf && pf.avatarUrl) im.src = pf.avatarUrl; im.style.setProperty("--c", colorPeer(p)); g.appendChild(im);
+  }
+  pedirDibujo();
+}
+let ultPres = 0, presPend = null;
+function presencia(patch){
+  if (!S.room) return;
+  presPend = Object.assign(presPend || {}, patch);
+  const ahora = Date.now();
+  if (ahora - ultPres > 80){ ultPres = ahora; const p = presPend; presPend = null; S.room.presence(p).catch(() => {}); }
+  else { clearTimeout(presencia._t); presencia._t = setTimeout(() => presencia({}), 90); }
+}
+
+// ---------------------------------------------------------------- selección, lista, totales
+function seleccionar(path, centrar){
+  S.sel = path; S.vsel = -1;
+  presencia({sel: path || null});
+  if (path && centrar){ const a = S.areas.get(path); if (a) verCaja(a.bb[0] - 8, a.bb[1] - 8, a.bb[2] + 8, a.bb[3] + 8); }
+  pintarSel(); marcarLista(); pedirDibujo(); botones();
+}
+async function pintarSel(){
+  const box = $("selCard"); const a = S.sel && S.areas.get(S.sel);
+  if (!a || a.borrado){ box.hidden = true; return; }
+  box.hidden = false;
+  const cf = S.codigos[a.cod] || {};
+  if (a.por) await resolverPerfiles([a.por]);
+  const quien = a.por ? ((S.perfiles[a.por] && S.perfiles[a.por].name) || "alguien") : "";
+  box.innerHTML = "";
+  const h = document.createElement("h3"); h.textContent = (a.etq || a.cod) + "  ·  " + (cf.nombre || a.cod); box.appendChild(h);
+  const t = document.createElement("div");
+  t.innerHTML = '<table><tr><td>Área</td><td></td></tr><tr><td>Largo</td><td></td></tr><tr><td>Ancho medio</td><td></td></tr></table>';
+  const td = t.querySelectorAll("td:nth-child(2)");
+  td[0].textContent = fmt(a.area) + " m²"; td[1].textContent = fmt(a.largo) + " m"; td[2].textContent = fmt(a.ancho) + " m";
+  box.appendChild(t);
+  const f = document.createElement("div"); f.className = "fila";
+  const sc = document.createElement("select");
+  for (const k of Object.keys(S.codigos)){ const o = document.createElement("option"); o.value = k; o.textContent = k + " · " + (S.codigos[k].nombre || k); sc.appendChild(o); }
+  sc.value = a.cod; sc.title = "Cambiar el código del área";
+  sc.onchange = () => cambiar(a, {cod: sc.value, largo0: 0}, "código cambiado");
+  f.appendChild(sc); box.appendChild(f);
+  const m = document.createElement("div"); m.className = "muted";
+  m.textContent = [a.revisar ? "⚠ A revisar" : "", a.nota || "", quien ? "Último cambio: " + quien + " " + hace(a.t) : ""].filter(Boolean).join(" · ");
+  box.appendChild(m);
+}
+let listaPend = null;
+function refrescarLuego(){ clearTimeout(listaPend); listaPend = setTimeout(() => { numerar(); llenarLista(); totales(); pintarSel(); pintarZonas(); pedirDibujo(); }, 120); }
+function misZonas(){ return [...S.zonas.values()].filter(z => S.uid && (z.asignados || []).includes(S.uid) && z.coords); }
+function enZonas(a, zs){ return zs.some(z => dentro(a.cen, z.coords)); }
+function llenarLista(){
+  const fc = $("fCod").value, fr = $("fRev").checked, fz = $("fZona").checked; const zs = fz ? misZonas() : null;
+  const l = vivas().filter(a => (!fc || a.cod === fc) && (!fr || a.revisar) && (!zs || enZonas(a, zs)));
+  l.sort((a, b) => (a.etq || "").localeCompare(b.etq || "", "es", {numeric:true}));
+  const tb = $("lista"); tb.innerHTML = "";
+  const fr2 = document.createDocumentFragment();
+  for (const a of l){
+    const tr = document.createElement("tr"); tr.dataset.p = a.path; if (a.revisar) tr.className = "rev";
+    for (const v of [a.etq || a.cod, fmt(a.area), (S.codigos[a.cod] || {}).largo ? fmt(a.largo) : "", a.revisar ? "sí" : ""]){ const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
+    fr2.appendChild(tr);
+  }
+  tb.appendChild(fr2); marcarLista();
+}
+function marcarLista(){
+  for (const tr of $("lista").querySelectorAll("tr.sel")) tr.classList.remove("sel");
+  if (!S.sel) return; const tr = $("lista").querySelector('tr[data-p="' + CSS.escape(S.sel) + '"]');
+  if (tr){ tr.classList.add("sel"); tr.scrollIntoView({block:"nearest"}); }
+}
+function totales(){
+  const t = {};
+  for (const a of vivas()){ const k = a.cod; const e = t[k] ||= {n:0, m2:0, ml:0, rev:0}; e.n++; e.m2 += a.area; e.ml += a.largo; if (a.revisar) e.rev++; }
+  const tb = $("totales"); tb.innerHTML = "<tr><th>Código</th><th>N.º</th><th>m²</th><th>ml</th><th>Rev.</th></tr>";
+  let resumen = [];
+  for (const [k, e] of Object.entries(t).sort()){
+    const cf = S.codigos[k] || {};
+    const tr = document.createElement("tr");
+    const c0 = document.createElement("td"); const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = colorCod(k); c0.appendChild(sw); c0.append(cf.prefijo || k); tr.appendChild(c0);
+    for (const v of [e.n, fmt(e.m2), cf.largo ? fmt(e.ml) : "", e.rev || ""]){ const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
+    tb.appendChild(tr);
+    resumen.push((cf.prefijo || k) + " " + fmt(e.m2, 1) + " m²");
+  }
+  $("estado").textContent = resumen.join(" · ") || (S.info ? "Sin áreas" : "");
+}
+function llenarCodigos(){
+  const fc = $("fCod"), cn = $("codNuevo"); const v1 = fc.value, v2 = cn.value;
+  fc.innerHTML = '<option value="">Todos</option>'; cn.innerHTML = "";
+  for (const [k, c] of Object.entries(S.codigos)){
+    const o = document.createElement("option"); o.value = k; o.textContent = (c.prefijo || k) + " · " + (c.nombre || k); fc.appendChild(o);
+    const o2 = o.cloneNode(true); o2.textContent = k; cn.appendChild(o2);
+  }
+  fc.value = v1; cn.value = v2 || (S.codigos.VER ? "VER" : Object.keys(S.codigos)[0] || "");
+}
+
+// ---------------------------------------------------------------- escrituras de áreas
+function cuerpo(a){
+  return {cod:a.cod, coords:a.coords, revisar:!!a.revisar, nota:a.nota || "", largo0:a.largo0 || 0, area0:a.area0 || 0,
+          origen:a.origen || "", borrado:!!a.borrado, por:a.por || null, t:a.t || 0, id0:a.id0 || ""};
+}
+function puedeEditar(){
+  if (S.soloLectura){ toast("Solo lectura: pide al dueño que te invite como Editor."); return false; }
+  if (!S.db){ toast("Sin conexión con la página."); return false; }
+  return true;
+}
+function guardarPila(ops){ S.pila.push(ops); if (S.pila.length > 80) S.pila.shift(); botones(); }
+function aplicarLocal(path, body){
+  if (body === null){ S.areas.delete(path); }
+  else { const a = Object.assign({path, id:path.split("/")[1]}, body); derivar(a); S.areas.set(path, a); }
+  refrescarLuego(); pedirDibujo();
+}
+function escribirArea(path, body){
+  aplicarLocal(path, body);
+  return escribir(path, () => body === null ? S.db.doc(path).delete() : S.db.doc(path).set(body)).catch(() => {});
+}
+function cambiar(a, cambios, nota){
+  if (!puedeEditar()) return;
+  const antes = cuerpo(a);
+  const nuevo = Object.assign(cuerpo(a), cambios, {por:S.uid, t:Date.now()});
+  if (nota) nuevo.nota = nota;
+  guardarPila([{path:a.path, antes}]);
+  escribirArea(a.path, nuevo);
+}
+function coleccionNueva(){ return (S.info && S.info.pref ? S.info.pref : "a_") + "x"; }
+function nuevoId(){ return "w" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function deshacer(){
+  const ops = S.pila.pop(); botones(); if (!ops) return;
+  for (const op of ops.slice().reverse()) escribirArea(op.path, op.antes);
+  if (S.sel && !S.areas.has(S.sel)) seleccionar(null);
+  toast("Deshecho");
+}
+
+// ---------------------------------------------------------------- herramientas
+function herramienta(t){
+  if (t === "zona" && !S.owner) return;
+  S.tool = t; S.temp = []; S.snapLim = null;
+  for (const b of document.querySelectorAll("[data-tool]")) b.classList.toggle("on", b.dataset.tool === t);
+  $("ayuda").textContent = AYUDA[t]; botones(); pedirDibujo();
+}
+function botones(){
+  const a = S.sel && S.areas.get(S.sel);
+  $("btnBorrar").disabled = !a; $("btnRevisado").disabled = !a;
+  $("btnQuitarV").disabled = !(a && S.vsel >= 0 && a.coords.length > 3);
+  $("btnCerrar").disabled = !((S.tool === "dibujar" || S.tool === "zona") && S.temp.length >= 3);
+  $("btnDeshacer").disabled = !S.pila.length;
+  $("btnRevisado").textContent = a && !a.revisar ? "Marcar a revisar" : "Revisado";
+  $("btnMiZona").disabled = !misZonas().length;
+}
+function borrarSel(){
+  const a = S.sel && S.areas.get(S.sel); if (!a) return;
+  cambiar(a, {borrado:true}); seleccionar(null); toast("Área borrada (Deshacer para recuperarla)");
+}
+function quitarVertice(k){
+  const a = S.sel && S.areas.get(S.sel); if (!a || a.coords.length <= 3) return;
+  const c = a.coords.filter((_, i) => i !== k);
+  cambiar(a, {coords:c, origen:"manual"}, "vértice quitado a mano"); S.vsel = -1; botones();
+}
+function cortar(p, q){
+  const L = Math.hypot(q[0] - p[0], q[1] - p[1]); if (L < 1e-3) return;
+  const ux = (q[0] - p[0]) / L, uy = (q[1] - p[1]) / L, nx = -uy * 0.001, ny = ux * 0.001;
+  const a0 = [p[0] - ux * 2, p[1] - uy * 2], b0 = [q[0] + ux * 2, q[1] + uy * 2];
+  const bb = caja([a0, b0]);
+  let obj = [];
+  const sel = S.sel && S.areas.get(S.sel);
+  const corta = a => a.coords.some((v, i) => cruza(a0, b0, v, a.coords[(i + 1) % a.coords.length]));
+  if (sel && !sel.borrado && corta(sel)) obj = [sel];
+  else obj = vivas().filter(a => a.bb[2] >= bb[0] && a.bb[0] <= bb[2] && a.bb[3] >= bb[1] && a.bb[1] <= bb[3] && corta(a));
+  if (!obj.length){ toast("La línea no atraviesa ningún área de lado a lado."); return; }
+  if (!puedeEditar()) return;
+  const ops = []; let partidas = 0; const ahora = Date.now();
+  for (const a of obj){
+    const ox = a.bb[0], oy = a.bb[1]; const loc = c => c.map(v => [v[0] - ox, v[1] - oy]);
+    const banda = [[a0[0] + nx, a0[1] + ny], [b0[0] + nx, b0[1] + ny], [b0[0] - nx, b0[1] - ny], [a0[0] - nx, a0[1] - ny]];
+    let res;
+    try { res = polygonClipping.difference([loc(a.coords)], [loc(banda)]); } catch (e) { continue; }
+    const piezas = res.map(pg => pg[0].slice(0, -1).map(v => [r3(v[0] + ox), r3(v[1] + oy)])).filter(c => c.length >= 3 && Math.abs(areaAnillo(c)) >= 0.01);
+    if (piezas.length < 2) continue;
+    partidas++;
+    piezas.sort((x, y) => Math.abs(areaAnillo(y)) - Math.abs(areaAnillo(x)));
+    ops.push({path:a.path, antes:cuerpo(a)});
+    const base = cuerpo(a);
+    escribirArea(a.path, Object.assign({}, base, {coords:piezas[0], origen:"manual", nota:"cortada a mano", por:S.uid, t:ahora}));
+    for (const c of piezas.slice(1)){
+      const path = coleccionNueva() + "/" + nuevoId();
+      ops.push({path, antes:null});
+      escribirArea(path, Object.assign({}, base, {coords:c, origen:"manual", nota:"cortada a mano", por:S.uid, t:ahora, id0:""}));
+    }
+  }
+  if (!partidas){ toast("La línea no parte ningún área en dos."); return; }
+  guardarPila(ops); seleccionar(null);
+  toast("Área partida. Toca el pedazo que sobra y Borrar.");
+}
+async function cerrarFigura(){
+  if (S.temp.length < 3) return;
+  let c = S.temp.map(v => [r3(v[0]), r3(v[1])]); S.temp = []; S.snapLim = null; botones(); pedirDibujo();
+  if (seCruza(c)){ toast("La figura se cruza consigo misma; dibújala de nuevo."); return; }
+  if (S.tool === "zona"){ await crearZona(c); return; }
+  if (Math.abs(areaAnillo(c)) < AREA_MIN){ toast("Área demasiado pequeña."); return; }
+  if (!puedeEditar()) return;
+  const cod = $("codNuevo").value; if (!cod){ toast("Elige un código"); return; }
+  const path = coleccionNueva() + "/" + nuevoId();
+  guardarPila([{path, antes:null}]);
+  escribirArea(path, {cod, coords:c, revisar:false, nota:"dibujada a mano", largo0:0, area0:0, origen:"manual", borrado:false, por:S.uid, t:Date.now(), id0:""});
+  seleccionar(path);
+}
+
+// ---------------------------------------------------------------- ratón / táctil
+const punteros = new Map(); let pinza = null;
+function evPos(e){ const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+function areaEn(p){
+  let mejor = null;
+  for (const a of S.areas.values()){
+    if (a.borrado) continue; const b = a.bb; if (p[0] < b[0] || p[0] > b[2] || p[1] < b[1] || p[1] > b[3]) continue;
+    if (dentro(p, a.coords) && (!mejor || a.area < mejor.area)) mejor = a;
+  }
+  return mejor;
+}
+function verticeCerca(a, px){
+  let k = -1, md = VERTICE_PX;
+  a.coords.forEach((v, i) => { const q = aPantalla(v[0], v[1]); const d = Math.hypot(q[0] - px[0], q[1] - px[1]); if (d <= md){ md = d; k = i; } });
+  return k;
+}
+function bordeCerca(a, w){
+  const tol = VERTICE_PX / S.vista.s; let mejor = null;
+  for (let i = 0; i < a.coords.length; i++){
+    const [d, q] = distSeg(w, a.coords[i], a.coords[(i + 1) % a.coords.length]);
+    if (d <= tol && (!mejor || d < mejor[0])) mejor = [d, i, q];
+  }
+  return mejor;
+}
+cv.addEventListener("pointerdown", e => {
+  if (!S.info) return;
+  cv.setPointerCapture(e.pointerId);
+  const px = evPos(e); punteros.set(e.pointerId, px);
+  if (punteros.size === 2){
+    const [p1, p2] = [...punteros.values()]; S.arr = null;
+    pinza = {d:Math.hypot(p1[0]-p2[0], p1[1]-p2[1]), m:[(p1[0]+p2[0])/2, (p1[1]+p2[1])/2], v:Object.assign({}, S.vista)}; return;
+  }
+  const w = aTerreno(px[0], px[1]);
+  const ahora = performance.now(), u = S.ultimoToque;
+  const doble = ahora - u.t < 350 && Math.hypot(px[0] - u.x, px[1] - u.y) < 10;
+  S.ultimoToque = {t:doble ? 0 : ahora, x:px[0], y:px[1]};
+  if (e.button === 1 || e.button === 2){ S.arr = {tipo:"pan", x:px[0], y:px[1], v:Object.assign({}, S.vista), movio:true}; return; }
+  const libre = e.ctrlKey || e.metaKey;
+  if (S.tool === "dibujar" || S.tool === "zona"){
+    if (doble){ cerrarFigura(); return; }
+    S.arr = {tipo:"pan", x:px[0], y:px[1], v:Object.assign({}, S.vista), movio:false, clic:iman(w, libre)};
+    return;
+  }
+  if (S.tool === "cortar"){
+    S.arr = {tipo:"pan", x:px[0], y:px[1], v:Object.assign({}, S.vista), movio:false, clic:w};
+    return;
+  }
+  const a = S.sel && S.areas.get(S.sel);
+  if (a && !a.borrado){
+    const k = verticeCerca(a, px);
+    if (k >= 0){
+      if (e.shiftKey){ quitarVertice(k); return; }
+      S.arr = {tipo:"vertice", path:a.path, k, c:a.coords.map(v => v.slice()), movio:false, x:px[0], y:px[1]};
+      return;
+    }
+    if (doble){
+      const b = bordeCerca(a, w);
+      if (b){
+        const c = a.coords.slice(); c.splice(b[1] + 1, 0, [r3(b[2][0]), r3(b[2][1])]);
+        cambiar(a, {coords:c, origen:"manual"}, "vértice agregado a mano"); S.vsel = b[1] + 1; return;
+      }
+    }
+  }
+  S.arr = {tipo:"pan", x:px[0], y:px[1], v:Object.assign({}, S.vista), movio:false, sel:true, w};
+});
+cv.addEventListener("pointermove", e => {
+  const px = evPos(e);
+  if (punteros.has(e.pointerId)) punteros.set(e.pointerId, px);
+  const w = aTerreno(px[0], px[1]);
+  $("coord").textContent = "E " + fmt(w[0], 2) + "   N " + fmt(w[1], 2);
+  if (e.pointerType === "mouse") presencia({cur:[r3(w[0]), r3(w[1])]});
+  if (pinza && punteros.size === 2){
+    const [p1, p2] = [...punteros.values()]; const d = Math.hypot(p1[0]-p2[0], p1[1]-p2[1]); const m = [(p1[0]+p2[0])/2, (p1[1]+p2[1])/2];
+    const v0 = pinza.v; const s = v0.s * d / Math.max(pinza.d, 1);
+    const wm = [(pinza.m[0] - S.W / 2) / v0.s + v0.cx, (S.H / 2 - pinza.m[1]) / v0.s + v0.cy];
+    S.vista = {s, cx:wm[0] - (m[0] - S.W / 2) / s, cy:wm[1] + (m[1] - S.H / 2) / s}; pedirDibujo(); return;
+  }
+  const A = S.arr;
+  if (!A){
+    if ((S.tool === "dibujar" || S.tool === "zona") && S.temp.length){ S.cursor = iman(w, e.ctrlKey || e.metaKey); pedirDibujo(); }
+    else if (S.tool === "cortar" && S.temp.length){ S.cursor = w; pedirDibujo(); }
+    return;
+  }
+  if (A.tipo === "pan"){
+    if (!A.movio && Math.hypot(px[0] - A.x, px[1] - A.y) < 5) return;
+    A.movio = true;
+    S.vista.cx = A.v.cx - (px[0] - A.x) / A.v.s; S.vista.cy = A.v.cy + (px[1] - A.y) / A.v.s; pedirDibujo(); return;
+  }
+  if (A.tipo === "vertice"){
+    if (!A.movio && Math.hypot(px[0] - A.x, px[1] - A.y) < 3) return;
+    A.movio = true;
+    A.c[A.k] = iman(w, e.ctrlKey || e.metaKey);
+    presencia({drag:A.c.map(v => [r3(v[0]), r3(v[1])])});
+    $("coord").textContent = "Área " + fmt(Math.abs(areaAnillo(A.c))) + " m²";
+    pedirDibujo();
+  }
+});
+function soltar(e){
+  punteros.delete(e.pointerId);
+  if (pinza){ if (punteros.size < 2) pinza = null; S.arr = null; return; }
+  const A = S.arr; S.arr = null;
+  if (!A) return;
+  if (A.tipo === "pan"){
+    if (A.movio) return;
+    if (A.clic && (S.tool === "dibujar" || S.tool === "zona")){ S.temp.push(A.clic); S.cursor = null; botones(); pedirDibujo(); return; }
+    if (A.clic && S.tool === "cortar"){
+      S.temp.push(A.clic);
+      if (S.temp.length === 2){ const [p, q] = S.temp; S.temp = []; S.cursor = null; cortar(p, q); }
+      pedirDibujo(); return;
+    }
+    if (A.sel){ const a = areaEn(A.w); seleccionar(a ? a.path : null); }
+    return;
+  }
+  if (A.tipo === "vertice"){
+    S.snapLim = null; presencia({drag:null});
+    const a = S.areas.get(A.path);
+    if (!A.movio){ S.vsel = A.k; botones(); pedirDibujo(); return; }
+    if (!a){ pedirDibujo(); return; }
+    const c = A.c.map(v => [r3(v[0]), r3(v[1])]);
+    if (seCruza(c) || Math.abs(areaAnillo(c)) < AREA_MIN){ toast("Esa forma se cruza o queda muy chica; no se guardó."); pedirDibujo(); return; }
+    cambiar(a, {coords:c, origen:"manual"}, "vértices movidos a mano");
+    const otro = S.peers.find(p => !p.isMe && p.presence && p.presence.sel === a.path);
+    if (otro) toast(nombrePeer(otro) + " también tiene seleccionada esta área.");
+  }
+}
+cv.addEventListener("pointerup", soltar);
+cv.addEventListener("pointercancel", soltar);
+cv.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") presencia({cur:null}); });
+cv.addEventListener("contextmenu", e => e.preventDefault());
+cv.addEventListener("wheel", e => {
+  e.preventDefault(); const px = evPos(e); const w = aTerreno(px[0], px[1]);
+  const f = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0018)); const s = Math.min(Math.max(S.vista.s * f, 0.05), 400);
+  S.vista = {s, cx:w[0] - (px[0] - S.W / 2) / s, cy:w[1] + (px[1] - S.H / 2) / s}; pedirDibujo();
+}, {passive:false});
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "Escape"){ herramienta("sel"); S.vsel = -1; pedirDibujo(); }
+  else if (e.key === "Enter") cerrarFigura();
+  else if ((e.key === "z" || e.key === "Z") && (e.ctrlKey || e.metaKey)){ e.preventDefault(); deshacer(); }
+  else if (e.key === "Delete"){ if (S.vsel >= 0) quitarVertice(S.vsel); else borrarSel(); }
+  else if (e.key === "Backspace" && S.temp.length){ S.temp.pop(); botones(); pedirDibujo(); }
+});
+
+// ---------------------------------------------------------------- zonas
+async function crearZona(c){
+  const n = S.zonas.size + 1; const id = "z" + Date.now().toString(36);
+  try { await escribir("zonas/" + id, () => S.db.doc("zonas/" + id).set({nombre:"Zona " + n, coords:c, asignados:[], color:PALETA[(n - 1) % PALETA.length]})); }
+  catch (e) { return; }
+  herramienta("sel"); toast("Zona creada. Asigna personas en la pestaña Zonas.");
+  abrirPane("pZonas");
+}
+async function pintarZonas(){
+  const cont = $("zonas");
+  $("zonasAyuda").textContent = S.owner
+    ? "Dibuja zonas con \"Nueva zona\" y asigna a cada persona. Todos pueden corregir todo; la zona solo ordena el trabajo. Para que alguien aparezca en la lista debe abrir la página una vez."
+    : "El dueño asigna las zonas. \"Mi zona\" te lleva a la tuya; todos pueden corregir todo.";
+  const ids = new Set([...S.personas.keys()]); for (const z of S.zonas.values()) for (const u of z.asignados || []) ids.add(u);
+  await resolverPerfiles([...ids]);
+  cont.innerHTML = "";
+  if (!S.zonas.size){ const p = document.createElement("p"); p.className = "muted"; p.textContent = "Aún no hay zonas."; cont.appendChild(p); }
+  const todas = vivas();
+  for (const [id, z] of S.zonas){
+    if (!z.coords) continue;
+    const card = document.createElement("div"); card.className = "card";
+    const h = document.createElement("div"); h.className = "fila";
+    const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = z.color || "#888"; h.appendChild(sw);
+    if (S.owner){
+      const inp = document.createElement("input"); inp.type = "text"; inp.value = z.nombre || ""; inp.style.flex = "1";
+      inp.onchange = () => escribir("zonas/" + id, () => S.db.doc("zonas/" + id).update({nombre:inp.value.slice(0, 60)})).catch(() => {});
+      h.appendChild(inp);
+    } else { const b = document.createElement("b"); b.textContent = z.nombre || "Zona"; h.appendChild(b); }
+    const ir = document.createElement("button"); ir.textContent = "Ir"; ir.onclick = () => { verCaja(z.bb[0] - 5, z.bb[1] - 5, z.bb[2] + 5, z.bb[3] + 5); cerrarLadoMovil(); }; h.appendChild(ir);
+    card.appendChild(h);
+    const dentroZ = todas.filter(a => dentro(a.cen, z.coords));
+    const est = document.createElement("div"); est.className = "muted";
+    est.textContent = dentroZ.length + " áreas · " + dentroZ.filter(a => a.revisar).length + " a revisar · " + dentroZ.filter(a => a.por).length + " corregidas";
+    card.appendChild(est);
+    const f = document.createElement("div"); f.className = "fila";
+    for (const u of z.asignados || []){
+      const pf = S.perfiles[u] || {}; const ch = document.createElement("span"); ch.className = "chip";
+      const im = document.createElement("img"); im.alt = ""; if (pf.avatarUrl) im.src = pf.avatarUrl; ch.appendChild(im);
+      ch.append(pf.name || "Alguien");
+      if (S.owner){ const x = document.createElement("button"); x.textContent = "×"; x.title = "Quitar"; x.onclick = () => asignar(id, z, u, false); ch.appendChild(x); }
+      f.appendChild(ch);
+    }
+    if (S.owner){
+      const sel = document.createElement("select"); sel.innerHTML = '<option value="">+ asignar…</option>';
+      for (const u of S.personas.keys()){ if ((z.asignados || []).includes(u)) continue; const o = document.createElement("option"); o.value = u; o.textContent = (S.perfiles[u] && S.perfiles[u].name) || "Alguien"; sel.appendChild(o); }
+      sel.onchange = () => { if (sel.value) asignar(id, z, sel.value, true); };
+      f.appendChild(sel);
+      const del = document.createElement("button"); del.className = "peligro"; del.textContent = "Eliminar zona";
+      del.onclick = async () => { if (await modal("¿Eliminar la zona \"" + (z.nombre || "") + "\"? Las áreas no se tocan.", [["Cancelar", false], ["Eliminar", true, "prim"]])) escribir("zonas/" + id, () => S.db.doc("zonas/" + id).delete()).catch(() => {}); };
+      f.appendChild(del);
+    }
+    card.appendChild(f); cont.appendChild(card);
+  }
+  botones();
+}
+function asignar(id, z, u, poner){
+  const l = (z.asignados || []).filter(x => x !== u); if (poner) l.push(u);
+  escribir("zonas/" + id, () => S.db.doc("zonas/" + id).update({asignados:l})).catch(() => {});
+}
+function irMiZona(){
+  const zs = misZonas(); if (!zs.length){ toast("No tienes zona asignada."); return; }
+  let bb = zs[0].bb.slice(); for (const z of zs){ bb = [Math.min(bb[0], z.bb[0]), Math.min(bb[1], z.bb[1]), Math.max(bb[2], z.bb[2]), Math.max(bb[3], z.bb[3])]; }
+  verCaja(bb[0] - 5, bb[1] - 5, bb[2] + 5, bb[3] + 5);
+}
+
+// ---------------------------------------------------------------- cargar proyecto (dueño)
+async function leerFotos(zips, prog, desde, hasta){
+  const tiles = []; let total = 0; const zs = [];
+  for (const f of zips){ const z = await JSZip.loadAsync(f); zs.push(z); total += Object.keys(z.files).filter(n => /\.jpe?g$/i.test(n)).length; }
+  let hechos = 0;
+  for (const z of zs){
+    const jpgs = Object.keys(z.files).filter(n => /\.jpe?g$/i.test(n) && !z.files[n].dir);
+    for (const n of jpgs){
+      const base = n.replace(/\.[^.]+$/, ""); const wf = z.file(base + ".jgw") || z.file(base + ".JGW") || z.file(base + ".jpgw") || z.file(base + ".wld");
+      hechos++;
+      if (!wf) continue;
+      const v = (await wf.async("string")).trim().split(/\s+/).map(Number);
+      if (v.length < 6 || v.some(isNaN)) continue;
+      const [A, D, B, E, C, F] = v;
+      const blob = new Blob([await z.file(n).async("uint8array")], {type:"image/jpeg"});
+      const bmp = await createImageBitmap(blob); const w = bmp.width, h = bmp.height; bmp.close && bmp.close();
+      const x0 = C - A / 2, y1 = F - E / 2, x1 = x0 + A * w, y0 = y1 + E * h;
+      const r = await reintentar(() => S.assets.upload(blob, {type:"image/jpeg"}));
+      tiles.push([r.id, r3(x0), r3(Math.min(y0, y1)), r3(x1), r3(Math.max(y0, y1))]);
+      prog.set(desde + (hasta - desde) * hechos / total, "Subiendo fotos " + hechos + " de " + total + "…");
+    }
+  }
+  return tiles;
+}
+async function cargarProyecto(files){
+  if (!S.owner || !S.assets){ toast("Solo el dueño de la página puede cargar el proyecto."); return; }
+  const json = files.find(f => /\.json$/i.test(f.name)); const zips = files.filter(f => /\.zip$/i.test(f.name));
+  if (!json){ toast("Falta el archivo proyecto_web.json"); return; }
+  let d;
+  try { d = JSON.parse(await json.text()); } catch (e) { toast("El JSON no se pudo leer."); return; }
+  if (d.formato !== "planos-bambu/proyecto"){ toast("Ese archivo no es un proyecto_web.json del programa."); return; }
+  if (S.info){
+    const ok = await modal("Ya hay un proyecto cargado (" + (S.info.nombre || "") + "). Cargar otro REEMPLAZA las áreas y se pierden las correcciones hechas en la página.\n\nSi las necesitas, primero descarga correcciones_web.json.", [["Cancelar", false], ["Reemplazar", true, "prim"]]);
+    if (!ok) return;
+  }
+  const prog = progreso("Preparando…");
+  try {
+    const base = {formato:"planos-bambu/base", nombre:d.nombre || "", codigos:d.codigos || {}, puntos:d.puntos || [], limites:d.limites || []};
+    prog.set(0.02, "Subiendo puntos y límites…");
+    const rb = await reintentar(() => S.assets.upload(new Blob([JSON.stringify(base)], {type:"application/json"}), {type:"application/json"}));
+    const tiles = zips.length ? await leerFotos(zips, prog, 0.05, 0.6) : (S.info ? S.info.tiles || [] : []);
+    const pref = "a" + Date.now().toString(36) + "_";
+    const lista = (d.areas || []).filter(a => a && a.coords && a.coords.length >= 3);
+    const buckets = Math.max(1, Math.ceil(lista.length / POR_COLECCION));
+    prog.set(0.6, "Guardando " + lista.length + " áreas…");
+    await enParalelo(lista, 6, (a, k) => {
+      const c = a.coords.map(v => [+v[0], +v[1]]);
+      const path = pref + Math.floor(k / POR_COLECCION) + "/" + String(a.id || ("i" + k)).replace(/[^A-Za-z0-9_.~:@+-]/g, "_");
+      const body = {cod:a.cod, coords:c, revisar:!!a.revisar, nota:a.nota || "", largo0:+a.largo || 0, area0:Math.abs(areaAnillo(c)),
+                    origen:a.origen || "", borrado:false, por:null, t:0, id0:String(a.id || "")};
+      return reintentar(() => S.db.doc(path).set(body));
+    }, f => prog.set(0.6 + 0.38 * f, "Guardando áreas " + Math.round(f * 100) + "%…"));
+    const viejo = S.info;
+    await reintentar(() => S.db.doc("proyecto/info").set({nombre:d.nombre || "", base:rb.id, tiles, pref, buckets, n:lista.length, creado:Date.now(), por:S.uid}));
+    prog.cerrar();
+    toast("Proyecto cargado: " + lista.length + " áreas, " + tiles.length + " fotos.", 5000);
+    if (viejo && viejo.pref) limpiarViejo(viejo);
+  } catch (e) {
+    prog.cerrar(); toast("No se pudo cargar: " + (e && (e.message || e.code) || e), 8000);
+  }
+}
+async function limpiarViejo(v){
+  const cols = []; for (let k = 0; k < (v.buckets || 1); k++) cols.push(v.pref + k); cols.push(v.pref + "x");
+  for (const c of cols){
+    try { const snap = await S.db.collection(c).get(); await enParalelo(snap.docs, 3, d => reintentar(() => S.db.doc(c + "/" + d.id).delete())); } catch (e) {}
+  }
+}
+async function agregarFotos(files){
+  if (!S.owner || !S.assets || !S.info){ toast("Primero carga el proyecto."); return; }
+  const prog = progreso("Leyendo ZIP…");
+  try {
+    const nuevas = await leerFotos(files, prog, 0, 0.95);
+    await reintentar(() => S.db.doc("proyecto/info").update({tiles:(S.info.tiles || []).concat(nuevas)}));
+    prog.cerrar(); toast(nuevas.length + " fotos agregadas.");
+  } catch (e) { prog.cerrar(); toast("No se pudo: " + (e && (e.message || e.code) || e)); }
+}
+
+// ---------------------------------------------------------------- descargar
+async function bajar(nombre, texto, tipo){
+  if (!S.downloads){ toast("Descargas no disponibles en esta vista."); return; }
+  try { await S.downloads.save({filename:nombre, data:new Blob([texto], {type:tipo})}); }
+  catch (e) { if (e && e.code !== "cancelled" && e.code !== "declined") toast("No se pudo descargar (" + (e.code || e) + ")"); }
+}
+function bajarCorrecciones(){
+  numerar();
+  const areas = [...S.areas.values()].map(a => ({id:a.id0 || a.id, cod:a.cod, coords:a.coords, revisar:!!a.revisar, nota:a.nota || "",
+    largo:r3(a.largo), ancho:r3(a.ancho), origen:a.origen || "web", borrado:!!a.borrado, etiqueta:a.etq || ""}));
+  const d = {formato:"planos-bambu/correcciones", version:1, nombre:(S.info && S.info.nombre) || "", exportado:new Date().toISOString(), areas};
+  bajar("correcciones_web.json", JSON.stringify(d), "application/json");
+}
+function bajarCsv(){
+  numerar();
+  const l = vivas().sort((a, b) => (a.etq || "").localeCompare(b.etq || "", "es", {numeric:true}));
+  const q = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const filas = [["Etiqueta", "Codigo", "Descripcion", "Area m2", "Largo m", "Ancho m", "Revisar", "Nota", "Este", "Norte"].map(q).join(",")];
+  for (const a of l) filas.push([a.etq, a.cod, (S.codigos[a.cod] || {}).nombre || "", a.area.toFixed(2), a.largo.toFixed(2), a.ancho.toFixed(2), a.revisar ? "SI" : "", a.nota || "", a.cen[0].toFixed(3), a.cen[1].toFixed(3)].map(q).join(","));
+  bajar("metrado_web.csv", "﻿" + filas.join("\r\n"), "text/csv");
+}
+
+// ---------------------------------------------------------------- panel lateral
+function abrirPane(id){
+  for (const b of document.querySelectorAll(".tabs button")) b.classList.toggle("on", b.dataset.pane === id);
+  for (const p of document.querySelectorAll(".pane")) p.classList.toggle("on", p.id === id);
+}
+function cerrarLadoMovil(){ $("lado").classList.remove("abierto"); }
+function pintarProyecto(){
+  const box = $("proyInfo"); box.innerHTML = "";
+  const h = document.createElement("h3"); h.textContent = S.info ? (S.info.nombre || "Proyecto") : "Sin proyecto"; box.appendChild(h);
+  const p = document.createElement("p"); p.className = "muted";
+  p.textContent = S.info ? (S.info.n + " áreas importadas · " + (S.info.tiles || []).length + " fotos · cargado " + hace(S.info.creado) + (S.base ? " · " + S.base.puntos.length + " puntos, " + S.base.limites.length + " límites" : "")) : (S.owner ? "Carga el proyecto abajo." : "El dueño aún no ha cargado el proyecto.");
+  box.appendChild(p);
+  if (S.soloLectura){ const r = document.createElement("p"); r.className = "muted"; r.textContent = "Estás en solo lectura."; box.appendChild(r); }
+  $("proyDueno").hidden = !S.owner;
+  if (S.owner && S.assets) S.assets.list().then(r => { const u = r.usage; $("usoAlm").textContent = "Almacenamiento: " + fmt(u.bytes / 1048576, 1) + " de " + fmt(u.maxBytes / 1048576, 0) + " MB · " + u.files + " archivos"; }).catch(() => {});
+}
+function pintarVacio(txt){ $("vacio").style.display = txt ? "flex" : "none"; if (txt) $("vacioTxt").textContent = txt; }
+
+// ---------------------------------------------------------------- datos en vivo
+function suscribirAreas(info){
+  for (const u of S.subsAreas) u(); S.subsAreas = []; S.areas.clear(); S.pila = []; S.sel = null;
+  const cols = []; for (let k = 0; k < (info.buckets || 1); k++) cols.push(info.pref + k); cols.push(info.pref + "x");
+  for (const c of cols){
+    S.subsAreas.push(S.db.collection(c).onSnapshot(snap => {
+      for (const ch of snap.docChanges()){
+        const path = c + "/" + ch.doc.id;
+        if (ch.type === "removed") S.areas.delete(path);
+        else {
+          if (S.arr && S.arr.path === path) continue;  // la estoy moviendo: se guarda al soltar
+          const a = Object.assign({path, id:ch.doc.id}, ch.doc.data()); derivar(a); S.areas.set(path, a);
+        }
+      }
+      refrescarLuego();
+    }, e => toast("Se cortó la conexión de datos (" + e.code + "). Recarga la página.")));
+  }
+}
+async function cargarBase(info){
+  try {
+    const r = await fetch("/_blob/" + info.base); if (!r.ok) throw new Error(r.status);
+    S.base = await r.json();
+  } catch (e) { S.base = {codigos:{}, puntos:[], limites:[]}; toast("No se pudieron leer los puntos del proyecto."); }
+  S.codigos = S.base.codigos || {}; armarIndices(); llenarCodigos(); verTodo(); refrescarLuego(); pintarProyecto();
+}
+function alInfo(snap){
+  const info = snap.exists ? snap.data() : null;
+  const antes = S.info; S.info = info;
+  $("titulo").textContent = info && info.nombre ? "Demoliciones · " + info.nombre : "Demoliciones en línea";
+  if (!info){ pintarVacio(S.owner ? "Carga el proyecto: pestaña Proyecto → \"Cargar proyecto…\" (proyecto_web.json + ZIP de fotos)." : "El dueño todavía no ha cargado el proyecto."); pintarProyecto(); if (S.owner) abrirPane("pProy"); return; }
+  pintarVacio("");
+  S.tiles = info.tiles || [];
+  if (!antes || antes.pref !== info.pref) suscribirAreas(info);
+  if (!antes || antes.base !== info.base) cargarBase(info); else pintarProyecto();
+  pedirDibujo();
+}
+
+// ---------------------------------------------------------------- arranque
+function enlazar(){
+  for (const b of document.querySelectorAll("[data-tool]")) b.onclick = () => herramienta(b.dataset.tool);
+  for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => abrirPane(b.dataset.pane);
+  $("btnBorrar").onclick = borrarSel;
+  $("btnRevisado").onclick = () => { const a = S.sel && S.areas.get(S.sel); if (a) cambiar(a, {revisar:!a.revisar}); };
+  $("btnQuitarV").onclick = () => quitarVertice(S.vsel);
+  $("btnCerrar").onclick = cerrarFigura;
+  $("btnDeshacer").onclick = deshacer;
+  $("btnIman").onclick = () => { S.iman = !S.iman; $("btnIman").classList.toggle("on", S.iman); };
+  $("btnTodo").onclick = verTodo;
+  $("btnMiZona").onclick = irMiZona;
+  $("btnLado").onclick = () => $("lado").classList.toggle("abierto");
+  $("fCod").onchange = llenarLista; $("fRev").onchange = llenarLista; $("fZona").onchange = llenarLista;
+  $("lista").onclick = e => { const tr = e.target.closest("tr"); if (tr){ seleccionar(tr.dataset.p, true); cerrarLadoMovil(); } };
+  $("btnCargar").onclick = () => $("fileProy").click();
+  $("btnFotos").onclick = () => $("fileFotos").click();
+  $("fileProy").onchange = e => { const f = [...e.target.files]; e.target.value = ""; if (f.length) cargarProyecto(f); };
+  $("fileFotos").onchange = e => { const f = [...e.target.files]; e.target.value = ""; if (f.length) agregarFotos(f); };
+  $("btnBajar").onclick = bajarCorrecciones;
+  $("btnCsv").onclick = bajarCsv;
+  new ResizeObserver(redimensionar).observe($("mapaWrap"));
+  herramienta("sel");
+}
+async function iniciar(){
+  enlazar(); redimensionar();
+  if (!window.claude || !window.claude.use){ pintarVacio("Abre esta página desde Claude (claude.ai) con tu cuenta."); $("estado").textContent = ""; return; }
+  const [db, user, room, assets, downloads] = await Promise.all(["db", "user", "room", "assets", "downloads"].map(n => window.claude.use(n).catch(() => null)));
+  Object.assign(S, {db, user, room, assets, downloads});
+  if (!db){ pintarVacio("Para ver y corregir, entra con tu cuenta de Claude (el dueño debe invitarte)."); $("estado").textContent = ""; return; }
+  if (user){
+    S.uid = await user.id().catch(() => null);
+    S.owner = await user.isOwner().catch(() => false);
+    const w = await user.can("data.write").catch(() => null); if (w === false) S.soloLectura = true;
+  }
+  $("btnZona").hidden = !S.owner;
+  $("estado").textContent = "";
+  db.doc("proyecto/info").onSnapshot(alInfo, e => toast("Sin acceso a los datos (" + e.code + ")."));
+  db.collection("zonas").onSnapshot(snap => {
+    S.zonas.clear(); for (const d of snap.docs){ const z = Object.assign({id:d.id}, d.data()); if (z.coords) z.bb = caja(z.coords); S.zonas.set(d.id, z); }
+    pintarZonas(); pedirDibujo(); if ($("fZona").checked) llenarLista();
+  }, () => {});
+  db.collection("personas").onSnapshot(snap => {
+    S.personas.clear(); for (const d of snap.docs) S.personas.set(d.id, d.data());
+    if (S.uid && !S.soloLectura && !S.personas.has(S.uid) && !S.yaAnotado){ S.yaAnotado = true; reintentar(() => db.doc("personas/" + S.uid).set({desde:Date.now()})).catch(() => {}); }
+    pintarZonas();
+  }, () => {});
+  if (room){
+    room.onPeers(ch => { S.peers = ch.peers.filter(p => p.kind === "viewer" || p.kind === "agent"); pintarGente(); });
+  }
+}
+if (window.__store) window.__aPantalla = aPantalla;  // solo para las pruebas automaticas
+iniciar();
+})();
+</script>
