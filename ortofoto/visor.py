@@ -2,11 +2,15 @@
 
 - Rueda del mouse: zoom donde esta el cursor. Boton derecho (o central) arrastrando: mover la vista.
 - Clic en un area (o en la lista): seleccionarla. Arrastrar un vertice del area seleccionada: moverlo
-  (se pega a los puntos topograficos cercanos).
+  (se pega a los puntos topograficos cercanos; con Ctrl apretado se mueve libre).
 - Cortar tramo: dos clics a traves del area; queda partida en pedazos (luego Borrar el que sobra).
 - Dibujar area: clic en cada esquina (se pega a los puntos), doble clic o Enter para cerrar.
 - Supr: borrar el area seleccionada. Ctrl+Z: deshacer. Esc: cancelar la herramienta.
 Nada se escribe hasta apretar EXPORTAR.
+
+Fluidez: el mapa completo (foto + areas + puntos) se dibuja solo al terminar un movimiento. Mientras
+se arrastra la vista se desplaza la imagen ya dibujada, y al mover un vertice, cortar o dibujar solo se
+redibujan esas lineas sobre la imagen guardada (blitting).
 """
 import copy
 import tkinter as tk
@@ -25,12 +29,13 @@ from . import areas
 COLORES = {"VER": "#e4572e", "ALC": "#2e86de", "PTA": "#8e44ad", "CNTA": "#16a085", "MAR": "#f39c12",
            "ACC": "#d35400", "CV": "#95a5a6"}
 COLOR_PUNTO = {"VER": "#ff9f1c", "CSH": "#3a86ff", "ALC": "#00d2ff", "OCHV": "#3a86ff", "LP": "#3a86ff"}
-IMAN_PX = 12  # pixeles: un clic a menos de esto de un punto topografico se pega a el
-VERTICE_PX = 9  # pixeles: distancia para agarrar un vertice
-MAX_PX_FONDO = 2600  # pixeles de la foto de fondo en la vista general
+IMAN_PX = 10  # pixeles: un clic a menos de esto de un punto topografico se pega a el (Ctrl: sin iman)
+VERTICE_PX = 14  # pixeles: distancia para agarrar un vertice
+MAX_PX_FONDO = 1600  # pixeles de la foto de fondo en la vista general
+ESPERA_DIBUJO = 90  # ms: varios giros de rueda seguidos se dibujan una sola vez
 ETIQUETAS_VISTA = 45.0  # m: con la vista mas angosta que esto se muestran los numeros de punto
 AYUDA = {
-    "sel": "Clic: seleccionar | arrastrar vertice: moverlo | doble clic en un borde: agregar vertice | "
+    "sel": "Clic: seleccionar | arrastrar vertice: moverlo (Ctrl: sin iman) | doble clic en un borde: agregar vertice | "
            "Shift+clic en vertice: quitarlo | rueda: zoom | boton derecho: mover vista | Supr: borrar | Ctrl+Z",
     "cortar": "CORTAR TRAMO: clic a un lado del area y clic al otro lado (la linea la parte). Esc: cancelar",
     "dibujar": "DIBUJAR AREA: clic en cada esquina (se pega a los puntos). Doble clic o Enter: cerrar. "
@@ -49,6 +54,7 @@ class Visor(ttk.Frame):
         self.temp = []  # vertices de la herramienta en curso
         self.arrastre = None  # (indice de vertice) o ("pan", x, y, xlim, ylim)
         self._fondo_pendiente = None
+        self._bg = None  # imagen del mapa ya dibujado (para mover lineas sin redibujar todo)
         self._armar()
 
     # ---------- interfaz ----------
@@ -93,6 +99,7 @@ class Visor(ttk.Frame):
         c.mpl_connect("button_press_event", self._presionar)
         c.mpl_connect("motion_notify_event", self._mover)
         c.mpl_connect("button_release_event", self._soltar)
+        c.mpl_connect("draw_event", self._al_dibujar)
         w = c.get_tk_widget()
         for tecla, fn in (("<Delete>", lambda e: self._borrar()), ("<Control-z>", lambda e: self._deshacer()),
                           ("<Escape>", lambda e: self._herramienta("sel")), ("<Return>", lambda e: self._cerrar_dibujo())):
@@ -151,10 +158,11 @@ class Visor(ttk.Frame):
         self._fondo_general()
         self.coleccion = PolyCollection([], zorder=2)
         self.ax.add_collection(self.coleccion)
-        self.marco_sel = PolyCollection([], facecolors="none", edgecolors="#ffff00", linewidths=2.2, zorder=4)
+        self.marco_sel = PolyCollection([], facecolors="none", edgecolors="#ffff00", linewidths=2.2, zorder=4,
+                                        animated=True)
         self.ax.add_collection(self.marco_sel)
-        self.vertices, = self.ax.plot([], [], "o", ms=5, mfc="#ffff00", mec="black", zorder=5)
-        self.linea_temp, = self.ax.plot([], [], "-o", color="#00ff66", ms=4, lw=1.5, zorder=6)
+        self.vertices, = self.ax.plot([], [], "o", ms=6, mfc="#ffff00", mec="black", zorder=5, animated=True)
+        self.linea_temp, = self.ax.plot([], [], "-o", color="#00ff66", ms=4, lw=1.5, zorder=6, animated=True)
         self._dibujar_puntos()
         self.textos_pt = []
         self.textos_area = []
@@ -172,7 +180,7 @@ class Visor(ttk.Frame):
         e0, n0 = orto.a_terreno(0, 0)
         e1, n1 = orto.a_terreno(w, h)
         self.img = self.ax.imshow(orto.rgb[::paso, ::paso], extent=(e0, e1, n1, n0), zorder=0,
-                                  interpolation="bilinear")
+                                  interpolation="nearest")
         self.fondo_general = (orto.rgb[::paso, ::paso], (e0, e1, n1, n0))
 
     def _dibujar_puntos(self):
@@ -186,6 +194,21 @@ class Visor(ttk.Frame):
         if rev:
             r = np.array(rev)
             self.ax.plot(r[:, 0], r[:, 1], "x", color="#ff00ff", ms=8, mew=2, zorder=3)
+
+    def _al_dibujar(self, _ev):
+        """Tras cada dibujo completo se guarda la imagen y se ponen encima las lineas de edicion."""
+        self._bg = self.canvas.copy_from_bbox(self.fig.bbox)
+        self._pintar_dinamicos(restaurar=False)
+
+    def _pintar_dinamicos(self, restaurar=True):
+        if self._bg is None or not hasattr(self, "marco_sel"):
+            self.canvas.draw_idle()
+            return
+        if restaurar:
+            self.canvas.restore_region(self._bg)
+        for a in (self.marco_sel, self.vertices, self.linea_temp):
+            self.ax.draw_artist(a)
+        self.canvas.blit(self.fig.bbox)
 
     def _indice(self, a):
         """Posicion del area en la lista (por identidad: dos pedazos pueden ser iguales)."""
@@ -272,10 +295,10 @@ class Visor(ttk.Frame):
         self._vista_cambio()
 
     def _vista_cambio(self):
+        """Un solo dibujo completo cuando la vista deja de cambiar (zoom con la rueda, fin del arrastre)."""
         if self._fondo_pendiente:
             self.after_cancel(self._fondo_pendiente)
-        self._fondo_pendiente = self.after(200, self._fondo_detalle)
-        self.canvas.draw_idle()
+        self._fondo_pendiente = self.after(ESPERA_DIBUJO, self._fondo_detalle)
 
     def _fondo_detalle(self):
         """Al acercarse, la foto se vuelve a leer con mas detalle solo en la zona visible."""
@@ -342,9 +365,9 @@ class Visor(ttk.Frame):
         x0, x1 = self.ax.get_xlim()
         return (x1 - x0) / max(self.canvas.get_tk_widget().winfo_width(), 1)
 
-    def _iman(self, x, y):
+    def _iman(self, x, y, libre=False):
         """El clic se pega al punto topografico mas cercano si esta a menos de IMAN_PX pixeles."""
-        if self.arbol is None:
+        if self.arbol is None or libre:
             return x, y
         d, i = self.arbol.query((x, y))
         if d <= IMAN_PX * self._m_por_px():
@@ -357,12 +380,13 @@ class Visor(ttk.Frame):
             return
         if ev.button in (2, 3):
             self.arrastre = ("pan", ev.x, ev.y, self.ax.get_xlim(), self.ax.get_ylim())
+            self._pan_offset = (0, 0)
             return
         if self.modo == "dibujar":
             if ev.dblclick:
                 self._cerrar_dibujo()
                 return
-            self.temp.append(self._iman(ev.xdata, ev.ydata))
+            self.temp.append(self._iman(ev.xdata, ev.ydata, _ctrl(ev)))
             self._mostrar_temp()
             return
         if self.modo == "cortar":
@@ -412,17 +436,26 @@ class Visor(ttk.Frame):
             dx, dy = (ev.x - x) * m, (ev.y - y) * m
             self.ax.set_xlim(xl[0] - dx, xl[1] - dx)
             self.ax.set_ylim(yl[0] - dy, yl[1] - dy)
-            self.canvas.draw_idle()
+            # Se desplaza la imagen ya dibujada dentro del lienzo de Tk (instantaneo, sin redibujar);
+            # el dibujo completo va al soltar
+            item = getattr(self.canvas, "_tkcanvas_image_region", None)
+            if item is not None:
+                ox, oy = self._pan_offset
+                nx, ny = ev.x - x, -(ev.y - y)
+                self.canvas.get_tk_widget().move(item, nx - ox, ny - oy)
+                self._pan_offset = (nx, ny)
+            else:
+                self.canvas.draw_idle()
             return
         if self.arrastre[0] == "vertice" and ev.xdata is not None:
-            _, k, c = self.arrastre
+            _, k, c = self.arrastre[:3]  # el 4.o elemento es la posicion en curso
             c = c.copy()
-            c[k] = self._iman(ev.xdata, ev.ydata)
+            c[k] = self._iman(ev.xdata, ev.ydata, _ctrl(ev))
             cerrado = np.vstack([c, c[:1]])
             self.marco_sel.set_verts([cerrado])
             self.vertices.set_data(c[:, 0], c[:, 1])
             self.arrastre = ("vertice", k, self.arrastre[2], c)
-            self.canvas.draw_idle()
+            self._pintar_dinamicos()
 
     def _borde_cercano(self, c, ev):
         """(indice del lado, punto sobre el lado) si el clic esta a menos de VERTICE_PX de un borde."""
@@ -445,7 +478,12 @@ class Visor(ttk.Frame):
         if not a:
             return
         if a[0] == "pan":
-            self._vista_cambio()
+            item = getattr(self.canvas, "_tkcanvas_image_region", None)
+            ox, oy = getattr(self, "_pan_offset", (0, 0))
+            if item is not None and (ox or oy):
+                self.canvas.get_tk_widget().move(item, -ox, -oy)  # vuelve a su lugar; se redibuja completo
+            self._pan_offset = (0, 0)
+            self._fondo_detalle()
             return
         if a[0] == "vertice" and len(a) == 4:
             pol = Polygon(a[3])
@@ -475,7 +513,7 @@ class Visor(ttk.Frame):
             self.linea_temp.set_data(c[:, 0], c[:, 1])
         else:
             self.linea_temp.set_data([], [])
-        self.canvas.draw_idle()
+        self._pintar_dinamicos()
 
     def _guardar_estado(self):
         met = self.calc.met
@@ -587,7 +625,8 @@ class Visor(ttk.Frame):
             if centrar:
                 x0, y0, x1, y1 = a.poligono.bounds
                 self._vista(x0 - 8, y0 - 8, x1 + 8, y1 + 8)
-        self.canvas.draw_idle()
+                return
+        self._pintar_dinamicos()
 
     def _elegir_en_lista(self, _ev):
         s = self.lista.selection()
@@ -603,3 +642,9 @@ class Visor(ttk.Frame):
             return
         areas._numerar(self.calc.met)
         self.al_exportar(self.calc)
+
+
+def _ctrl(ev):
+    """Ctrl apretado durante el evento del raton (mover o dibujar sin iman)."""
+    k = str(getattr(ev, "key", None) or "")
+    return "control" in k or "ctrl" in k
