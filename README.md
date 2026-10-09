@@ -1,5 +1,7 @@
 # planos-bambu
 
+> Para retomar el trabajo, lea primero **ESTADO_DEL_PROYECTO.md** (criterios acordados, pendientes y cómo continuar).
+
 Herramientas para automatizar planos de topografía y demoliciones.
 
 | Carpeta | Qué hace |
