@@ -76,6 +76,11 @@ Tipos:
 - **Con foto:** primero se unen los tramos que la foto confirma (hay un borde a lo largo). Lo que la foto
   no confirma (sombra, árbol) se une igual pero queda en la capa `REVISAR UNION`. Si no quiere eso,
   desmarque la opción en *Archivos*.
+- **La foto manda en el ancho de la vereda:** desde la fachada hacia afuera, la vereda termina donde la
+  foto ve pasto o tierra entre dos puntos VER (un jardín, una berma). Los puntos de más afuera no la
+  ensanchan y quedan marcados en `REVISAR PUNTO VS FOTO`. Un desnivel brusco entre puntos refuerza el
+  corte; en sombra o bajo alero no se corta (casas elevadas con gradas). Además, siempre que cargue la
+  foto, las áreas se parten donde se ve pasto o tierra atravesándolas.
 
 Capas para revisar a mano:
 

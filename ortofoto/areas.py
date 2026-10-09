@@ -246,9 +246,12 @@ def cerrar_areas(resultados, base=None, usar_foto=False):
         if conf.tipo == "franja" and conf.referencia:
             if con_base:
                 # El borde interior es el limite de propiedad dibujado en el plano
-                ars, bordes, usados = _franjas_contra_limite(res, base)
+                ars, bordes, usados = _franjas_contra_limite(res, base, met.puntos_revisar)
                 if usar_foto and res.orto is not None:
                     ars = _ajustar_con_foto(res, base, ars, met)
+                elif res.orto is not None:
+                    # Siempre que haya foto: donde se ve pasto o tierra no hay vereda
+                    ars = _cortar_con_foto(res.orto, ars)
             else:
                 refs = [ln for cod in conf.referencia for ln in lineas_por_codigo.get(cod, [])]
                 ars, bordes, usados = _franjas_por_secciones(res, refs)
@@ -274,7 +277,7 @@ def cerrar_areas(resultados, base=None, usar_foto=False):
                 if ars3:
                     met.lineas += [Linea(res.codigo, conf, LineString(res.xy(c)), borde=True) for c in res.cadenas]
                     res.cadenas = []
-            if usar_foto and res.orto is not None:
+            if res.orto is not None:
                 ars = _cortar_con_foto(res.orto, ars)
             candidatas += ars
             met.lineas += [Linea(res.codigo, conf, b, borde=True) for b in bordes]
@@ -353,12 +356,53 @@ ESCALON = 0.8  # m de diferencia de ancho entre secciones vecinas que se dibuja 
 ANCHO_NULO = 0.2  # m: una seccion con todos sus puntos a menos de esto de la fachada no tiene ancho
 
 
-def _secciones_exteriores(ss, dd):
+DESNIVEL_MAX = 0.30  # m de salto de cota entre dos puntos VER seguidos: ya no es la misma losa
+PENDIENTE_MAX = 0.25  # y con mas pendiente que esto (una vereda baja 2-5 % hacia la pista)
+NO_CONCRETO_MAX = 0.5  # fraccion del tramo entre dos puntos donde la foto ve pasto/tierra para cortar
+NO_CONCRETO_CON_DESNIVEL = 0.25  # con un desnivel brusco basta con esto
+
+
+def _continua(a, b, dd, zz, xy, orto):
+    """Motivo por el que el punto b (mas afuera) ya no es la misma vereda que a, o "" si lo es.
+
+    Manda la foto: se corta solo si entre los dos puntos se ve pasto o tierra. Un desnivel brusco
+    (la vereda no baja asi) hace que baste con menos pasto/tierra. En sombra o bajo alero la foto
+    no ve nada y no se corta (las casas elevadas tienen veredas con gradas).
+    """
+    if orto is None or xy is None:
+        return ""
+    f = _no_concreto(orto, xy[a], xy[b])
+    if f is None:
+        return ""
+    if f > NO_CONCRETO_MAX:
+        return "pasto/tierra en la foto"
+    if zz is not None:
+        dz = abs(zz[b] - zz[a])
+        paso = max(np.hypot(*np.subtract(xy[b], xy[a])), 0.05)
+        if dz > DESNIVEL_MAX and dz / paso > PENDIENTE_MAX and f > NO_CONCRETO_CON_DESNIVEL:
+            return f"desnivel de {dz:.2f} m y pasto/tierra en la foto"
+    return ""
+
+
+def _no_concreto(orto, p, q):
+    from .concreto import no_concreto_entre
+
+    try:
+        return no_concreto_entre(orto, p, q)
+    except Exception:  # la foto no alcanza: no se decide con la foto
+        return None
+
+
+def _secciones_exteriores(ss, dd, zz=None, xy=None, orto=None, fuera=None):
     """Secciones con su borde exterior: [(s_inicio, s_fin, ancho, [indices exteriores])].
 
     Una seccion son los puntos a menos de SECCION m entre si a lo largo de la fachada; su borde
     exterior son los puntos mas alejados de la fachada (hasta 0.5 m menos que el mas alejado).
     Asi cada seccion pone su propio ancho: una losa o un punto alejado no ensancha a sus vecinas.
+
+    Con foto: la vereda se recorre desde la fachada hacia afuera y termina donde la foto ve pasto o
+    tierra entre dos puntos (con un desnivel brusco basta con menos). Los puntos de mas afuera no
+    ensanchan la vereda; se anotan en `fuera` (indice -> motivo) para revisarlos.
     """
     grupos, actual = [], [0]
     for j in range(1, len(ss)):
@@ -367,6 +411,34 @@ def _secciones_exteriores(ss, dd):
             actual = []
         actual.append(j)
     grupos.append(actual)
+    fuera = {} if fuera is None else fuera
+    if orto is not None:
+        filtrados = []
+        for g in grupos:
+            orden = sorted(g, key=lambda j: dd[j])
+            g = [orden[0]]
+            for k, j in enumerate(orden[1:], 1):
+                motivo = _continua(g[-1], j, dd, zz, xy, orto)
+                if motivo:
+                    fuera.update({o: motivo for o in orden[k:]})
+                    break
+                g.append(j)
+            filtrados.append(g)
+        # Una seccion que solo tiene puntos alejados (sin punto junto a la fachada) se compara
+        # con el punto mas cercano de la seccion vecina, que si esta junto a la vereda
+        grupos = []
+        for n, g in enumerate(filtrados):
+            vecinos = [j for m in (n - 1, n + 1) if 0 <= m < len(filtrados) for j in filtrados[m]
+                       if dd[j] < min(dd[i] for i in g) - ESCALON]
+            if vecinos:
+                j0 = min(g, key=lambda j: dd[j])
+                k = min(vecinos, key=lambda j: np.hypot(*np.subtract(xy[j], xy[j0])))
+                if np.hypot(*np.subtract(xy[k], xy[j0])) <= 2 * SECCION + max(dd[i] for i in g):
+                    motivo = _continua(k, j0, dd, zz, xy, orto)
+                    if motivo:
+                        fuera.update({o: motivo for o in g})
+                        continue
+            grupos.append(g)
     res = []
     for g in grupos:
         dmax = max(dd[j] for j in g)
@@ -407,7 +479,7 @@ def _con_escalones(ref, secciones, dd, xy_pts):
     return res
 
 
-def _franjas_contra_limite(res, base):
+def _franjas_contra_limite(res, base, revisar=None):
     """Veredas pegadas al limite de propiedad del plano base.
 
     Cada punto se asigna al limite (manzana) mas cercano. A lo largo de ese
@@ -424,6 +496,7 @@ def _franjas_contra_limite(res, base):
             ref = base.limites[k]
             p = Point(x, y)
             por_limite.setdefault(k, []).append((ref.project(p), ref.distance(p), i))
+    revisar = [] if revisar is None else revisar
     areas, bordes, usados = [], [], set()
     hueco = conf.hueco_max or min(conf.separacion_max, HUECO_MAX)
     for k, lista in por_limite.items():
@@ -449,7 +522,12 @@ def _franjas_contra_limite(res, base):
             sel = slice(ini, fin + 1)
             ini = fin + 1
             ss, dd, ii, s_real = sr[sel], d[sel], idx[sel], s[sel]
-            secs = _secciones_exteriores(ss, dd)
+            zz = np.array([res.puntos[i].z for i in ii])
+            fuera = {}
+            secs = _secciones_exteriores(ss, dd, zz, xy[ii], getattr(res, "orto", None), fuera)
+            for j, motivo in fuera.items():
+                p = res.puntos[ii[j]]
+                revisar.append((p.e, p.n, f"{p.num} {p.desc}: fuera de la vereda ({motivo})"))
             exterior = [j for sec in secs for j in sec[3]]
             if len(exterior) < 2 or ss[exterior[-1]] - ss[exterior[0]] < TRAMO_MIN:
                 continue
@@ -468,8 +546,8 @@ def _franjas_contra_limite(res, base):
             if ancho > conf.ancho_max * 1.2:
                 continue
             anchos = dd[exterior]
-            revisar = not Polygon(ci + ce[::-1]).is_valid
-            areas.append(Area(res.codigo, conf, pol, "limite", float(np.median(anchos)), largo_tramo, revisar))
+            invalido = not Polygon(ci + ce[::-1]).is_valid
+            areas.append(Area(res.codigo, conf, pol, "limite", float(np.median(anchos)), largo_tramo, invalido))
             bordes.append(LineString(ce))
             usados.update(int(i) for i in ii)
     return areas, bordes, usados

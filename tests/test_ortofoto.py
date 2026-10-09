@@ -330,3 +330,50 @@ def test_canal_alc_figuras_secciones_y_eje(tmp_path):
     assert len(caja) == 1 and abs(caja[0].area - 2.4) < 0.01
     assert len(eje) == 1 and abs(eje[0].largo - 11.1) < 0.01 and abs(eje[0].area - 11.1 * 0.8) < 0.01
     assert all(a.etiqueta.startswith("CAN D - ") for a in canales)
+
+
+def _foto_franjas(tmp_path, franjas, gsd=0.05):
+    """Foto de la calle norte (y de 0 a -8): franjas [(y_desde, y_hasta, color)] sobre tierra."""
+    x0, y0, x1, y1 = -5.0, -12.0, 45.0, 5.0
+    w, h = int((x1 - x0) / gsd), int((y1 - y0) / gsd)
+    img = np.zeros((h, w, 3), float) + (176, 146, 102)
+    for ya, yb, color in franjas:
+        f0, f1 = int((y1 - ya) / gsd), int((y1 - yb) / gsd)
+        img[min(f0, f1):max(f0, f1), :] = color
+    img += np.random.default_rng(2).normal(0, 4, img.shape)
+    Image.fromarray(img.clip(0, 255).astype(np.uint8)).save(tmp_path / "foto.png")
+    (tmp_path / "foto.pgw").write_text(f"{gsd}\n0\n0\n{-gsd}\n{x0 + gsd / 2}\n{y1 - gsd / 2}\n")
+    return str(tmp_path / "foto.png")
+
+
+def test_vereda_no_cruza_el_jardin_hasta_el_punto_de_afuera(tmp_path):
+    """Vereda de 1.4 m junto a la casa, luego un jardin y un punto VER mas abajo al otro lado:
+    el area termina en el concreto, no se estira sobre el jardin."""
+    ruta_base = _plano_base(tmp_path)
+    foto = _foto_franjas(tmp_path, [(0, -1.4, (190, 188, 182)), (-1.4, -3.6, (70, 120, 50))])
+    pts = []
+    for k, x in enumerate(np.arange(3, 37, 4.0)):
+        pts += [Punto(f"i{k}", x, -0.2, 97.2, "VER"), Punto(f"m{k}", x + 0.3, -1.3, 97.15, "VER"),
+                Punto(f"o{k}", x + 0.6, -3.5, 96.5, "VER")]
+    _, met, _ = procesar(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s"), plano_base=ruta_base,
+                                  orto=foto, calce_auto=False), avisar=lambda *a: None)
+    ver = [a for a in met.areas if a.codigo == "VER"]
+    assert ver
+    assert all(a.poligono.bounds[1] > -1.7 for a in ver)  # no entra al jardin
+    assert sum(a.area for a in ver) > 0.8 * 1.3 * 32
+    assert sum("fuera de la vereda" in m for *_, m in met.puntos_revisar) == 9
+
+
+def test_casa_elevada_con_concreto_continuo_no_se_corta(tmp_path):
+    """Casa elevada: el punto junto a la casa esta 1 m mas alto que el borde, pero la foto ve
+    concreto de lado a lado: es la misma vereda (con grada)."""
+    ruta_base = _plano_base(tmp_path)
+    foto = _foto_franjas(tmp_path, [(0, -2.2, (190, 188, 182))])
+    pts = []
+    for k, x in enumerate(np.arange(3, 37, 4.0)):
+        pts += [Punto(f"i{k}", x, -0.2, 95.0, "VER"), Punto(f"o{k}", x + 0.3, -2.0, 93.9, "VER")]
+    _, met, _ = procesar(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s"), plano_base=ruta_base,
+                                  orto=foto, calce_auto=False), avisar=lambda *a: None)
+    ver = [a for a in met.areas if a.codigo == "VER"]
+    assert min(a.poligono.bounds[1] for a in ver) < -1.9
+    assert not any("fuera de la vereda" in m for *_, m in met.puntos_revisar)
