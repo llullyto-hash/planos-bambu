@@ -263,39 +263,10 @@ def _mascaras(sub, con_textura=False):
 TEXTURA_COPA = 7.0  # las copas de arboles y palmeras son mas rugosas que esto; el cesped, mas liso
 
 
-def cesped_entre(orto, p, q, ancho=0.3):
-    """Fraccion del tramo p-q (franja de `ancho` m) donde la foto ve cesped a ras del suelo.
-
-    No cuenta copas de arboles ni palmeras (verde rugoso): debajo puede seguir la vereda.
-    Devuelve None si la foto no alcanza o el tramo esta casi todo en sombra (no se puede decir).
-    """
-    from shapely.geometry import LineString
-
-    ln = LineString([tuple(p), tuple(q)])
-    if ln.length < 0.2:
-        return None
-    pol = ln.buffer(ancho / 2, cap_style=2)
-    x0, y0, x1, y1 = pol.bounds
-    try:
-        sub = orto.recortar(x0 - 0.5, y0 - 0.5, x1 + 0.5, y1 + 0.5)
-    except ValueError:
-        return None
-    if sub.rgb.shape[0] < 5 or sub.rgb.shape[1] < 5:
-        return None
-    dentro = _rasterizar(pol, sub.afin, sub.rgb.shape[:2])
-    if dentro.sum() < 4:
-        return None
-    pasto, _, sombra, tex = _mascaras(sub, con_textura=True)
-    visible = dentro & ~sombra
-    if visible.sum() < 0.4 * dentro.sum():
-        return None
-    cesped = pasto & (tex < TEXTURA_COPA)
-    return float((cesped & visible).sum() / visible.sum())
-
-
 def fracciones_suelo(orto, pol):
-    """Dentro de un poligono: que fraccion de lo visible (sin sombra) es suelo (cesped liso o tierra)
-    y cual es concreto a la vista. None si la foto no alcanza o casi todo esta en sombra/alero."""
+    """Dentro de un poligono, fracciones de lo visible (sin sombra): suelo (cesped liso o tierra),
+    concreto a la vista, vegetacion (cualquiera: cesped, maleza, copas) y tierra.
+    None si la foto no alcanza o casi todo esta en sombra/alero."""
     x0, y0, x1, y1 = pol.bounds
     try:
         sub = orto.recortar(x0 - 0.5, y0 - 0.5, x1 + 0.5, y1 + 0.5)
@@ -317,7 +288,8 @@ def fracciones_suelo(orto, pol):
     concreto = (L > L_MIN) & (croma < CROMA_MAX) & ~pasto & ~tierra
     n = visible.sum()
     return {"visible": float(n / dentro.sum()), "suelo": float((suelo & visible).sum() / n),
-            "concreto": float((concreto & visible).sum() / n)}
+            "concreto": float((concreto & visible).sum() / n),
+            "vegetacion": float((pasto & visible).sum() / n), "tierra": float((tierra & visible).sum() / n)}
 
 
 def cortar_por_foto(orto, pol):

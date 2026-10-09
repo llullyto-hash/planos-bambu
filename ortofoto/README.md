@@ -91,7 +91,7 @@ Tipos:
     fachada real.
   - Los canales y cunetas tienen prioridad: la vereda no los pisa.
 - **Mandan los puntos:** árboles, palmeras, aleros, sombra o polvo sobre el concreto no cortan la vereda.
-  Solo se excluye un punto en un caso claro de jardín: césped a ras del suelo en la foto **y** un
+  Solo se excluye un punto en un caso claro de jardín: vegetación a la vista entre los puntos **y** un
   desnivel brusco respecto del punto anterior (queda marcado en `REVISAR PUNTO VS FOTO`).
 - **Fachada lejana:** si el límite del plano está a más del ancho máximo (p.ej. dibujado bajo el techo),
   la vereda se cierra contra la fachada levantada en campo (CSH/LP).

@@ -407,10 +407,11 @@ def test_arbol_sobre_la_vereda_no_la_corta(tmp_path):
     foto = _foto_franjas(tmp_path, [(0, -3.0, (190, 188, 182))])
     img = np.asarray(Image.open(foto)).astype(float)
     rng = np.random.default_rng(3)
-    # copa de 8 m entre x=12 y x=20 sobre toda la vereda: hojas claras y oscuras (rugosa)
+    # copa de 8 m entre x=12 y x=20 sobre toda la vereda: hojas con mucha sombra (como en la
+    # ortofoto real de Bambu: bajo una copa la foto casi no ve el suelo)
     c0, c1, f0, f1 = int(17 / 0.05), int(25 / 0.05), int(5 / 0.05), int(8.5 / 0.05)
-    hojas = rng.choice([0, 1], size=(f1 - f0, c1 - c0, 1))
-    img[f0:f1, c0:c1] = np.where(hojas, (40, 90, 30), (110, 170, 70))
+    hojas = (rng.random((f1 - f0, c1 - c0, 1)) < 0.3).astype(int)
+    img[f0:f1, c0:c1] = np.where(hojas, (110, 170, 70), (25, 50, 20))
     Image.fromarray(img.clip(0, 255).astype(np.uint8)).save(foto)
     pts = []
     for k, x in enumerate(np.arange(3, 37, 4.0)):

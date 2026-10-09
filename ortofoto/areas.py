@@ -280,15 +280,15 @@ def cerrar_areas(resultados, base=None, usar_foto=False):
 
 DESNIVEL_MAX = 0.30  # m de salto de cota entre dos puntos VER seguidos
 PENDIENTE_MAX = 0.25  # y con mas pendiente que esto (una vereda baja 2-5 % hacia la pista)
-CESPED_MIN = 0.6  # fraccion del tramo entre los dos puntos con cesped a ras del suelo
+VEGETACION_MIN = 0.6  # fraccion visible del tramo entre los dos puntos con vegetacion (jardin)
 
 
 def _continua(a, b, dd, zz, xy, orto):
     """Motivo por el que el punto b (mas afuera) ya no es la misma vereda que a, o "" si lo es.
 
     Mandan los puntos: solo se corta en un caso claro, un jardin. Tiene que haber un desnivel
-    brusco Y cesped a ras del suelo entre los dos puntos. Las copas de arboles y palmeras, la
-    tierra o el polvo sobre el concreto, la sombra y los aleros no cortan.
+    brusco Y vegetacion a la vista en la mayor parte del tramo entre los dos puntos. Bajo la copa
+    de un arbol la foto ve sombra (no decide) y no se corta; el polvo sobre el concreto tampoco.
     """
     if orto is None or xy is None or zz is None:
         return ""
@@ -296,17 +296,20 @@ def _continua(a, b, dd, zz, xy, orto):
     paso = max(np.hypot(*np.subtract(xy[b], xy[a])), 0.05)
     if dz <= DESNIVEL_MAX or dz / paso <= PENDIENTE_MAX:
         return ""
-    f = _cesped(orto, xy[a], xy[b])
-    if f is not None and f >= CESPED_MIN:
-        return f"jardin: cesped en la foto y desnivel de {dz:.2f} m"
+    f = _fracciones_tramo(orto, xy[a], xy[b])
+    if f is not None and f["vegetacion"] >= VEGETACION_MIN:
+        return f"jardin: vegetacion en la foto y desnivel de {dz:.2f} m"
     return ""
 
 
-def _cesped(orto, p, q):
-    from .concreto import cesped_entre
+def _fracciones_tramo(orto, p, q, ancho=0.3):
+    from .concreto import fracciones_suelo
 
+    ln = LineString([tuple(p), tuple(q)])
+    if ln.length < 0.2:
+        return None
     try:
-        return cesped_entre(orto, p, q)
+        return fracciones_suelo(orto, ln.buffer(ancho / 2, cap_style=2))
     except Exception:  # la foto no alcanza: no se decide con la foto
         return None
 

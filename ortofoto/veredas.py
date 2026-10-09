@@ -32,6 +32,7 @@ LARGO_SUELTO = 2.0  # m de vereda para un tramo con una sola seccion (a revisar)
 HUECO_LARGO = 30.0  # m: huecos sin puntos mas largos que esto nunca se unen
 DIF_HUECO_LARGO = 0.5  # m: para unir un hueco largo, los anchos de los dos lados deben coincidir
 SUELO_CORTA = 0.6  # fraccion de pasto/tierra en el hueco para no rellenarlo (lote vacio)
+CONCRETO_LOTE = 0.25  # fraccion maxima de concreto a la vista en el frente de un lote vacio
 SUELO_HUECO_LARGO = 0.3  # fraccion maxima de pasto/tierra para unir un hueco largo
 PASO_LOSA = 0.25  # m: paso con que se busca en la foto el borde de una losa sin punto
 CONCRETO_LOSA = 0.5  # fraccion de concreto visible para estirar una losa
@@ -152,11 +153,28 @@ def _secciones(cara, xy, zz, orto, fuera):
 
 
 def _hay_csh(cara, t0, t1, csh):
+    """Hay fachada levantada (CSH) DENTRO del tramo (no en sus extremos, que son las casas vecinas)."""
     for x, y in csh:
         t, d = cara.t_d((x, y))
-        if t0 - 0.5 <= t <= t1 + 0.5 and abs(d) <= TOL_CSH:
+        if t0 + 0.5 < t < t1 - 0.5 and abs(d) <= TOL_CSH:
             return True
     return False
+
+
+def _frente_de_lote(cara, it, orto, csh):
+    """Un tramo entero frente a un lote vacio: sin CSH dentro y la foto ve maleza o tierra (no
+    concreto) en todo su frente. Solo si en la manzana se levantaron fachadas (hay CSH cerca)."""
+    t0, t1, w, _ = it
+    if t1 - t0 < 1.0 or _hay_csh(cara, t0, t1, csh):
+        return False
+    cerca = any(abs(cara.t_d(c)[1]) <= TOL_CSH and -5 <= cara.t_d(c)[0] <= cara.largo + 5 for c in csh)
+    return cerca and _lote_vacio(_fracciones(orto, cara.rect(t0, t1, 0.0, w)))
+
+
+def _lote_vacio(f):
+    """La foto del frente muestra suelo o maleza (no concreto): frente de un lote vacio."""
+    return (f is not None and f["concreto"] < CONCRETO_LOTE and
+            (f["suelo"] > SUELO_CORTA or f["vegetacion"] + f["tierra"] > SUELO_CORTA))
 
 
 def _intervalos(cara, secs, conf, orto, csh):
@@ -180,7 +198,9 @@ def _intervalos(cara, secs, conf, orto, csh):
                 rellenar = (gap <= HUECO_LARGO and abs(wa - wb) <= DIF_HUECO_LARGO and
                             f is not None and f["suelo"] < SUELO_HUECO_LARGO)
                 revisar = True
-            elif f is not None and f["suelo"] > SUELO_CORTA and not _hay_csh(cara, a1, b0, csh):
+            elif (_lote_vacio(f) and _hay_csh(cara, -1e9, 1e9, csh)
+                  and not _hay_csh(cara, a1, b0, csh)):
+                # la fachada se levanto (hay CSH en la cara) pero no en este tramo
                 rellenar = False  # frente de un lote vacio: no hay vereda
         if rellenar and gap > 0.05:
             # La seccion ancha se estira sobre el hueco solo mientras la foto muestre concreto
@@ -349,6 +369,8 @@ def veredas_contra_fachada(res, limites, manzanas=None, csh=(), indices=None, re
                 revisar.append((p.e, p.n, f"{p.num} {p.desc}: fuera de la vereda ({motivo})"))
             if secs:
                 cara.intervalos = _intervalos(cara, secs, conf, orto, csh)
+                if orto is not None:
+                    cara.intervalos = [it for it in cara.intervalos if not _frente_de_lote(cara, it, orto, csh)]
         # Esquinas entre caras seguidas (y la ultima con la primera en una manzana cerrada)
         piezas = []
         pares = list(zip(caras, caras[1:]))
