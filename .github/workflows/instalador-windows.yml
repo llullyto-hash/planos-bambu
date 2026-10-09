@@ -27,6 +27,10 @@ jobs:
       - name: Pruebas
         run: python -m pytest -q tests
 
+      - name: Numero de version
+        shell: pwsh
+        run: Set-Content ortofoto/_version.py "VERSION = '1.0.$env:GITHUB_RUN_NUMBER'"
+
       - name: Compilar programa (PyInstaller)
         run: >
           pyinstaller --noconfirm --windowed --name TopografiaMetrados --paths .

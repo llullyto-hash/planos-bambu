@@ -4,3 +4,4 @@ salida_analisis/
 *.dwg
 *.zip
 .venv/
+ortofoto/_version.py

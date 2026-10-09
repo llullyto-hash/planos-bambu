@@ -43,7 +43,11 @@ AYUDA_TIPOS = ("linea: se une en polilinea abierta (metrado en m)\n"
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title(TITULO)
+        try:
+            from ._version import VERSION
+        except ImportError:
+            VERSION = "desarrollo"
+        self.title(f"{TITULO}  (version {VERSION})")
         self.geometry("1280x820")
         self.minsize(1000, 640)
         self.cola = queue.Queue()
