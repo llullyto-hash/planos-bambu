@@ -293,6 +293,33 @@ def cesped_entre(orto, p, q, ancho=0.3):
     return float((cesped & visible).sum() / visible.sum())
 
 
+def fracciones_suelo(orto, pol):
+    """Dentro de un poligono: que fraccion de lo visible (sin sombra) es suelo (cesped liso o tierra)
+    y cual es concreto a la vista. None si la foto no alcanza o casi todo esta en sombra/alero."""
+    x0, y0, x1, y1 = pol.bounds
+    try:
+        sub = orto.recortar(x0 - 0.5, y0 - 0.5, x1 + 0.5, y1 + 0.5)
+    except ValueError:
+        return None
+    if sub.rgb.shape[0] < 5 or sub.rgb.shape[1] < 5:
+        return None
+    dentro = _rasterizar(pol, sub.afin, sub.rgb.shape[:2])
+    if dentro.sum() < 4:
+        return None
+    pasto, tierra, sombra, tex = _mascaras(sub, con_textura=True)
+    visible = dentro & ~sombra
+    if visible.sum() < 0.4 * dentro.sum():
+        return None
+    lb = _lab(sub.rgb)
+    croma = np.hypot(ndi.gaussian_filter(lb[..., 1], 1), ndi.gaussian_filter(lb[..., 2], 1))
+    L = ndi.gaussian_filter(lb[..., 0], 1)
+    suelo = (pasto & (tex < TEXTURA_COPA)) | tierra
+    concreto = (L > L_MIN) & (croma < CROMA_MAX) & ~pasto & ~tierra
+    n = visible.sum()
+    return {"visible": float(n / dentro.sum()), "suelo": float((suelo & visible).sum() / n),
+            "concreto": float((concreto & visible).sum() / n)}
+
+
 def cortar_por_foto(orto, pol):
     """Quita de una vereda los tramos donde la foto muestra tierra o pasto (no hay concreto).
 

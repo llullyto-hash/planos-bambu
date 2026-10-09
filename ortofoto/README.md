@@ -76,11 +76,20 @@ Tipos:
 - **Con foto:** primero se unen los tramos que la foto confirma (hay un borde a lo largo). Lo que la foto
   no confirma (sombra, árbol) se une igual pero queda en la capa `REVISAR UNION`. Si no quiere eso,
   desmarque la opción en *Archivos*.
-- **Veredas rectangulares:** cada punto VER pone el ancho de su tramo (la distancia del punto más
-  alejado a la fachada) y el borde exterior va **paralelo a la fachada**, no en diagonal de punto a
-  punto. Entre tramos de distinto ancho hay un escalón recto y cada vereda cierra en escuadra en su
-  primer y último punto. En las esquinas dobla con la fachada. Un tramo con un solo punto sale de 2 m
-  y queda en `REVISAR AREA`.
+- **Veredas rectangulares, por caras de la fachada:** la fachada se parte en caras rectas (cada lado
+  de la casa, cada ochave). Cada punto VER se mide perpendicular a la cara que tiene enfrente; el
+  borde exterior va paralelo a esa cara al ancho del punto más alejado de cada sección.
+  - Cada sección cubre de su primer a su último punto; el ancho mayor no se estira hacia una vecina
+    más angosta (salvo donde la foto muestra concreto: el borde de una losa sin punto). Los huecos
+    entre secciones los rellena el ancho menor. Escalones rectos; cierre en escuadra en los extremos.
+  - En una esquina u ochave la vereda dobla solo si hay puntos en las dos caras; cada cara conserva
+    su ancho y la esquina exterior pasa por el punto de esquina.
+  - Frente a un lote vacío (sin CSH y con pasto o tierra en la foto) no se rellena.
+  - Un hueco de más de `hueco_max` m sin puntos se une (hasta 30 m) solo si los dos lados tienen el
+    mismo ancho y la foto no ve suelo; queda en `REVISAR AREA`. Un punto suelto sale de 2 m, a revisar.
+  - Si los CSH (fachada levantada) quedan detrás de la FACHADA del plano, la vereda llega hasta la
+    fachada real.
+  - Los canales y cunetas tienen prioridad: la vereda no los pisa.
 - **Mandan los puntos:** árboles, palmeras, aleros, sombra o polvo sobre el concreto no cortan la vereda.
   Solo se excluye un punto en un caso claro de jardín: césped a ras del suelo en la foto **y** un
   desnivel brusco respecto del punto anterior (queda marcado en `REVISAR PUNTO VS FOTO`).

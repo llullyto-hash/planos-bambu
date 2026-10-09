@@ -166,18 +166,26 @@ def cerrar_areas(resultados, base=None, usar_foto=False):
     for res in resultados:
         conf = res.conf
         if conf.tipo == "franja" and conf.referencia:
+            from .veredas import veredas_contra_fachada
+
             refs = [ln for cod in conf.referencia for ln in lineas_por_codigo.get(cod, [])]
+            csh = [(p.e, p.n) for r in resultados if r.codigo in conf.referencia for p in r.puntos]
             ars, bordes, usados = [], [], set()
             if con_base:
                 # El borde interior es el limite de propiedad dibujado en el plano
-                ars, bordes, usados = _franjas_contra_limite(res, base, met.puntos_revisar)
+                ars, bordes, usados = veredas_contra_fachada(
+                    res, base.limites, base.union_manzanas() if base.manzanas else None, csh,
+                    revisar=met.puntos_revisar)
                 if usar_foto and res.orto is not None:
                     ars = _ajustar_con_foto(res, base, ars, met)
-            # Puntos sin limite del plano a su alcance (la fachada del plano esta bajo el techo, o no
-            # hay plano base): el borde interior son las fachadas levantadas en campo (CSH, LP)
+            # Puntos sin limite del plano a su alcance (la fachada del plano esta bajo el techo, o
+            # corrida hacia la calle, o no hay plano base): contra la fachada levantada (CSH, LP)
             resto = [i for i in range(len(res.puntos)) if i not in usados]
             if refs and resto:
-                a_, b_, u_ = _franjas_contra_limite(res, None, met.puntos_revisar, indices=resto, limites=refs)
+                a_, b_, u_ = veredas_contra_fachada(res, refs, None, csh, indices=resto,
+                                                        revisar=met.puntos_revisar)
+                for a in a_:
+                    a.origen = "fachada levantada"  # ya esta pegada a la fachada real: no se recorta
                 ars, bordes, usados = ars + a_, bordes + b_, usados | u_
             resto = [i for i in range(len(res.puntos)) if i not in usados]
             ars2, bordes2, usados2 = _franjas_por_estaciones(res, resto, res.barreras)
@@ -241,13 +249,17 @@ def cerrar_areas(resultados, base=None, usar_foto=False):
         # Ningun area entra a los lotes
         recortadas = []
         for ar in candidatas:
+            if ar.origen in ("fachada", "fachada levantada"):  # ya recortadas contra los lotes
+                recortadas.append(ar)
+                continue
             pol = base.recortar(ar.poligono)
             if isinstance(pol, Polygon) and pol.area >= AREA_MIN:
                 ar.poligono = pol
                 recortadas.append(ar)
         candidatas = recortadas
     # Sin superposiciones: primero las mas confiables (contornos, luego franjas grandes)
-    candidatas.sort(key=lambda a: (a.revisar, a.origen != "contorno", -a.area))
+    # Los canales y cunetas van primero: la vereda se corta contra ellos, no los pisa
+    candidatas.sort(key=lambda a: (bool(a.conf.referencia), a.revisar, a.origen != "contorno", -a.area))
     ocupado = None
     for ar in candidatas:
         pol = ar.poligono
@@ -264,20 +276,6 @@ def cerrar_areas(resultados, base=None, usar_foto=False):
         ocupado = ar.poligono if ocupado is None else unary_union([ocupado, ar.poligono])
     _numerar(met)
     return met
-
-
-def _tramo_de_limite(ref, s0, s1):
-    """Tramo del limite entre las posiciones s0 y s1 (si el limite es cerrado, puede pasar por el inicio)."""
-    largo = ref.length
-    if s0 <= s1:
-        return list(substring(ref, s0, s1).coords)
-    return list(substring(ref, s0, largo).coords) + list(substring(ref, 0, s1).coords)[1:]
-
-
-SECCION = 1.5  # m a lo largo de la fachada: puntos mas cercanos que esto son la misma seccion
-HUECO_MAX = 10.0  # m sin puntos VER a lo largo de la fachada: la vereda se corta (no se rellena)
-ESCALON = 0.8  # m: una seccion mas ancha que su vecina en esto se compara con ella antes de aceptarla
-ANCHO_NULO = 0.2  # m: una seccion con todos sus puntos a menos de esto de la fachada no tiene ancho
 
 
 DESNIVEL_MAX = 0.30  # m de salto de cota entre dos puntos VER seguidos
@@ -311,193 +309,6 @@ def _cesped(orto, p, q):
         return cesped_entre(orto, p, q)
     except Exception:  # la foto no alcanza: no se decide con la foto
         return None
-
-
-def _secciones_exteriores(ss, dd, zz=None, xy=None, orto=None, fuera=None):
-    """Secciones con su borde exterior: [(s_inicio, s_fin, ancho, [indices exteriores])].
-
-    Una seccion son los puntos a menos de SECCION m entre si a lo largo de la fachada; su borde
-    exterior son los puntos mas alejados de la fachada (hasta 0.5 m menos que el mas alejado).
-    Asi cada seccion pone su propio ancho: una losa o un punto alejado no ensancha a sus vecinas.
-
-    Con foto: la vereda se recorre desde la fachada hacia afuera y termina solo en un jardin
-    (cesped a ras del suelo y desnivel brusco entre dos puntos). Los puntos de mas afuera no
-    ensanchan la vereda; se anotan en `fuera` (indice -> motivo) para revisarlos.
-    """
-    grupos, actual = [], [0]
-    for j in range(1, len(ss)):
-        if ss[j] - ss[actual[-1]] > SECCION:
-            grupos.append(actual)
-            actual = []
-        actual.append(j)
-    grupos.append(actual)
-    fuera = {} if fuera is None else fuera
-    if orto is not None:
-        filtrados = []
-        for g in grupos:
-            orden = sorted(g, key=lambda j: dd[j])
-            g = [orden[0]]
-            for k, j in enumerate(orden[1:], 1):
-                motivo = _continua(g[-1], j, dd, zz, xy, orto)
-                if motivo:
-                    fuera.update({o: motivo for o in orden[k:]})
-                    break
-                g.append(j)
-            filtrados.append(g)
-        # Una seccion que solo tiene puntos alejados (sin punto junto a la fachada) se compara
-        # con el punto mas cercano de la seccion vecina, que si esta junto a la vereda
-        grupos = []
-        for n, g in enumerate(filtrados):
-            vecinos = [j for m in (n - 1, n + 1) if 0 <= m < len(filtrados) for j in filtrados[m]
-                       if dd[j] < min(dd[i] for i in g) - ESCALON]
-            if vecinos:
-                j0 = min(g, key=lambda j: dd[j])
-                k = min(vecinos, key=lambda j: np.hypot(*np.subtract(xy[j], xy[j0])))
-                if np.hypot(*np.subtract(xy[k], xy[j0])) <= 2 * SECCION + max(dd[i] for i in g):
-                    motivo = _continua(k, j0, dd, zz, xy, orto)
-                    if motivo:
-                        fuera.update({o: motivo for o in g})
-                        continue
-            grupos.append(g)
-    res = []
-    for g in grupos:
-        dmax = max(dd[j] for j in g)
-        if dmax < ANCHO_NULO:
-            continue
-        ext = sorted((j for j in g if dd[j] >= dmax - 0.5), key=lambda j: ss[j])
-        res.append((float(min(ss[j] for j in g)), float(max(ss[j] for j in g)), float(dmax), ext))
-    return res
-
-
-UNIR_ANCHOS = 0.25  # m: secciones vecinas con anchos que difieren menos que esto llevan un solo ancho
-LARGO_PUNTO_SUELTO = 2.0  # m de vereda que se dibuja para un tramo con una sola seccion (a revisar)
-
-
-def _lado(ref, s_, xy_):
-    """+1 si el punto esta a la izquierda del limite (segun su sentido), -1 si a la derecha."""
-    a = ref.interpolate(max(s_ - 0.05, 0))
-    b = ref.interpolate(min(s_ + 0.05, ref.length))
-    return 1 if (b.x - a.x) * (xy_[1] - a.y) - (b.y - a.y) * (xy_[0] - a.x) >= 0 else -1
-
-
-def _franja_paralela(ref, zonas, lado):
-    """Vereda de rectangulos: cada zona (s0, s1, ancho) es una franja paralela al limite de ese ancho.
-
-    Las zonas vecinas se juntan con escalones rectos (perpendiculares al limite) y en las esquinas
-    del limite la franja dobla con el (no corta en diagonal).
-    """
-    piezas = []
-    for s0, s1, w in zonas:
-        c = _tramo_de_limite(ref, s0, s1)
-        if len(c) < 2 or w <= 0:
-            continue
-        piezas.append(LineString(c).buffer(lado * w, single_sided=True, join_style=2, mitre_limit=3.0))
-    if not piezas:
-        return Polygon()
-    # 1 mm de holgura para que las piezas vecinas se suelden (el redondeo deja rendijas)
-    pol = unary_union([g.buffer(0.001, join_style=2) for g in piezas]).buffer(-0.001, join_style=2)
-    if isinstance(pol, MultiPolygon):
-        pol = max(pol.geoms, key=lambda g: g.area)
-    return Polygon(pol.exterior) if isinstance(pol, Polygon) else Polygon()
-
-
-def _zonas(secs, s_ini, s_fin):
-    """Zonas a lo largo del limite: cada seccion manda hasta la mitad del camino a su vecina.
-    Vecinas con anchos casi iguales se juntan en una sola zona (con el mayor ancho)."""
-    zonas = []
-    for k, (s0, s1, ancho, _) in enumerate(secs):
-        a = s_ini if k == 0 else (secs[k - 1][1] + s0) / 2
-        b = s_fin if k == len(secs) - 1 else (s1 + secs[k + 1][0]) / 2
-        if zonas and abs(zonas[-1][2] - ancho) <= UNIR_ANCHOS:
-            zonas[-1] = (zonas[-1][0], b, max(zonas[-1][2], ancho))
-        else:
-            zonas.append((a, b, ancho))
-    return zonas
-
-
-def _franjas_contra_limite(res, base, revisar=None, indices=None, limites=None):
-    """Veredas pegadas al limite de propiedad (fachada) con forma de rectangulos.
-
-    Cada punto se asigna al limite mas cercano. A lo largo de ese limite se agrupan en tramos
-    (se corta donde no hay puntos en mas de hueco_max m) y en secciones. Cada seccion pone su
-    ancho: la distancia de su punto mas alejado. El borde exterior es paralelo a la fachada a ese
-    ancho (no va en diagonal de punto a punto); entre secciones de distinto ancho hay un escalon
-    recto, y el tramo cierra en escuadra en sus puntos extremos.
-
-    limites: lineas de referencia (por defecto los limites del plano base).
-    """
-    conf = res.conf
-    limites = base.limites if limites is None else limites
-    xy = np.array([(p.e, p.n) for p in res.puntos])
-    arbol = STRtree(limites) if limites else None
-    por_limite = {}
-    for i in (range(len(xy)) if indices is None else indices):
-        if arbol is None:
-            break
-        p = Point(*xy[i])
-        k = int(arbol.nearest(p))
-        ref = limites[k]
-        if ref.distance(p) <= conf.ancho_max + 1.0:
-            por_limite.setdefault(k, []).append((ref.project(p), ref.distance(p), i))
-    revisar = [] if revisar is None else revisar
-    areas, bordes, usados = [], [], set()
-    hueco = conf.hueco_max or min(conf.separacion_max, HUECO_MAX)
-    for k, lista in por_limite.items():
-        ref = limites[k]
-        largo = ref.length
-        cerrado = ref.is_closed
-        s = np.array([v[0] for v in lista])
-        d = np.array([v[1] for v in lista])
-        idx = np.array([v[2] for v in lista])
-        # En un limite cerrado, empezar a contar despues del mayor hueco sin puntos
-        corte = 0.0
-        if cerrado and len(s) > 1:
-            orden = np.sort(s)
-            huecos = np.diff(np.r_[orden, orden[0] + largo])
-            corte = orden[(np.argmax(huecos) + 1) % len(orden)]
-        sr = (s - corte) % largo if cerrado else s
-        o = np.argsort(sr)
-        sr, d, idx = sr[o], d[o], idx[o]
-        cortes = np.where(np.diff(sr) > hueco)[0]
-        ini = 0
-        for fin in list(cortes) + [len(sr) - 1]:
-            sel = slice(ini, fin + 1)
-            ini = fin + 1
-            ss, dd, ii = sr[sel], d[sel], idx[sel]
-            zz = np.array([res.puntos[i].z for i in ii])
-            fuera = {}
-            secs = _secciones_exteriores(ss, dd, zz, xy[ii], getattr(res, "orto", None), fuera)
-            for j, motivo in fuera.items():
-                p = res.puntos[ii[j]]
-                revisar.append((p.e, p.n, f"{p.num} {p.desc}: fuera de la vereda ({motivo})"))
-            usados.update(int(i) for i in ii)
-            if not secs:
-                continue
-            s_ini, s_fin = secs[0][0], secs[-1][1]
-            suelto = s_fin - s_ini < TRAMO_MIN
-            if suelto:
-                # Un solo punto (o seccion) en el tramo: se dibuja un pedazo corto y se marca
-                medio = (s_ini + s_fin) / 2
-                s_ini, s_fin = medio - LARGO_PUNTO_SUELTO / 2, medio + LARGO_PUNTO_SUELTO / 2
-                if not cerrado:
-                    s_ini, s_fin = max(s_ini, 0.0), min(s_fin, largo)
-                secs = [(s_ini, s_fin, max(sec[2] for sec in secs), [])]
-            zonas = [((a + corte) % largo if cerrado else a, (b + corte) % largo if cerrado else b, w)
-                     for a, b, w in _zonas(secs, s_ini, s_fin)]
-            lados = [_lado(ref, (sr_ + corte) % largo if cerrado else sr_, xy[i]) for sr_, i in zip(ss, ii)]
-            pol = _franja_paralela(ref, zonas, 1 if sum(lados) >= 0 else -1)
-            if pol.is_empty or pol.area < AREA_MIN:
-                continue
-            largo_tramo = sum(LineString(_tramo_de_limite(ref, a, b)).length for a, b, _ in zonas
-                              if len(_tramo_de_limite(ref, a, b)) >= 2)
-            ancho = pol.area / max(largo_tramo, 1e-6)
-            if ancho > conf.ancho_max * 1.2:
-                continue
-            areas.append(Area(res.codigo, conf, pol, "limite", float(ancho), largo_tramo, suelto,
-                              nota="un solo punto en el tramo: largo supuesto" if suelto else ""))
-            borde = pol.exterior.difference(ref.buffer(0.02))
-            bordes += [g for g in getattr(borde, "geoms", [borde]) if isinstance(g, LineString) and g.length > 0.1]
-    return areas, bordes, usados
 
 
 FIGURA_ENLACE = 2.5  # m: puntos mas cercanos que esto forman la misma figura

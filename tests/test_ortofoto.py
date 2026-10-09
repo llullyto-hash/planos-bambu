@@ -5,7 +5,7 @@ from ortofoto import areas, calce, exportar, unir
 from ortofoto.__main__ import CODIGOS_DEFECTO, Opciones, procesar
 from ortofoto.imagen import Ortofoto, afin_desde_dxf
 from ortofoto.topografia import Punto
-from shapely.geometry import Point
+from shapely.geometry import Point, Polygon
 
 AFIN = [0.05, 0.0, 550115.0, 0.0, -0.05, 9072960.0]
 
@@ -420,3 +420,71 @@ def test_arbol_sobre_la_vereda_no_la_corta(tmp_path):
     ver = [a for a in met.areas if a.codigo == "VER"]
     assert len(ver) == 1 and ver[0].poligono.bounds[1] < -2.7
     assert not any("fuera de la vereda" in m for *_, m in met.puntos_revisar)
+
+
+def _vereda_en(tmp_path, pts, orto=None, base=None):
+    ruta_base = base or _plano_base(tmp_path)
+    _, met, _ = procesar(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s"), plano_base=ruta_base,
+                                  orto=orto, calce_auto=False), avisar=lambda *a: None)
+    return met, [a for a in met.areas if a.codigo == "VER"]
+
+
+def test_esquina_ancho_perpendicular_a_cada_cara(tmp_path):
+    """Punto de esquina en diagonal al vertice: cada cara toma su ancho perpendicular y la esquina
+    exterior pasa por el punto (sin recuadro extra)."""
+    # manzana norte: esquina inferior derecha en (40, 0); caras: y=0 (abajo) y x=40 (derecha)
+    pts = [Punto(f"b{k}", x, -1.5, 0, "VER") for k, x in enumerate((30, 34, 38))]
+    pts += [Punto(f"r{k}", 41.0, y, 0, "VER") for k, y in enumerate((2, 6, 10))]
+    pts += [Punto("esq", 41.0, -1.5, 0, "VER")]  # en diagonal al vertice (a 1.8 m de el)
+    met, ver = _vereda_en(tmp_path, pts)
+    assert len(ver) == 1
+    pol = ver[0].poligono
+    x0, y0, x1, y1 = pol.bounds
+    assert abs(x1 - 41.0) < 1e-6 and abs(y0 + 1.5) < 1e-6  # la esquina exterior es el punto
+    assert pol.buffer(1e-6).contains(Point(41.0, -1.5))
+    assert abs(pol.area - (10 * 1.5 + 10 * 1.0 + 1.0 * 1.5)) < 1e-3  # dos rectangulos + la esquina
+
+
+def test_fachada_del_plano_corrida_usa_la_fachada_real(tmp_path):
+    """La FACHADA del plano esta 0.4 m hacia la calle; los CSH (fachada real) quedan detras: la
+    vereda llega hasta la fachada real, sin cuna ni punta."""
+    import ezdxf
+
+    doc = ezdxf.new("R2018")
+    doc.modelspace().add_lwpolyline([(0, -0.4), (40, -0.4), (40, 30), (0, 30)], close=True,
+                                     dxfattribs={"layer": "FACHADA"})
+    ruta = tmp_path / "base_corrida.dxf"
+    doc.saveas(ruta)
+    pts = [Punto(f"c{k}", x, 0.0, 0, "CSH") for k, x in enumerate(range(2, 39, 6))]
+    pts += [Punto(f"v{k}", x + 1, -1.6, 0, "VER") for k, x in enumerate(range(2, 39, 6))]
+    met, ver = _vereda_en(tmp_path, pts, base=str(ruta))
+    assert len(ver) == 1
+    x0, y0, x1, y1 = ver[0].poligono.bounds
+    assert abs(y1 - 0.0) < 0.05 and abs(y0 + 1.6) < 1e-6  # de la fachada real al borde
+    assert abs(ver[0].poligono.area - (x1 - x0) * 1.6) < 0.1  # rectangulo
+
+
+def test_lote_vacio_sin_vereda(tmp_path):
+    """Frente de un lote vacio (sin CSH, la foto ve tierra): el hueco entre las veredas de las
+    casas vecinas no se rellena."""
+    foto = _foto_franjas(tmp_path, [(0, -1.5, (190, 188, 182))])
+    img = np.asarray(Image.open(foto)).copy()
+    c0, c1 = int((14 + 5) / 0.05), int((24 + 5) / 0.05)
+    img[int(5 / 0.05):int(6.6 / 0.05), c0:c1] = (176, 146, 102)  # tierra frente al lote x=14..24
+    Image.fromarray(img).save(foto)
+    pts = [Punto(f"v{k}", x, -1.5, 0, "VER") for k, x in enumerate((2, 6, 10, 13, 25, 29, 33))]
+    pts += [Punto(f"c{k}", x, 0.0, 0, "CSH") for k, x in enumerate((3, 9, 12, 26, 32))]
+    met, ver = _vereda_en(tmp_path, pts, orto=foto)
+    assert len(ver) == 2
+    assert all(not a.poligono.intersects(Polygon([(14.5, 0), (23.5, 0), (23.5, -1.5), (14.5, -1.5)]))
+               for a in ver)
+
+
+def test_hueco_largo_se_une_si_la_foto_no_ve_suelo(tmp_path):
+    """Frente de una casa de 20 m con puntos solo en los extremos: mismo ancho y la foto ve
+    concreto -> una sola vereda (a revisar)."""
+    foto = _foto_franjas(tmp_path, [(0, -1.2, (190, 188, 182))])
+    pts = [Punto(f"v{k}", x, -1.2, 0, "VER") for k, x in enumerate((2, 5, 27, 30))]
+    met, ver = _vereda_en(tmp_path, pts, orto=foto)
+    assert len(ver) == 1 and ver[0].revisar
+    assert abs(ver[0].poligono.area - 28 * 1.2) < 0.5
