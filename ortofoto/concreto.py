@@ -236,8 +236,8 @@ def concreto_visible(orto, base, puntos_xy, area_min=AREA_MIN_VISIBLE, corredor=
 ANCHO_CORTE = 0.8  # m: tierra/pasto mas angosto que esto no corta la vereda (ruido, bordes)
 
 
-def _mascaras(sub):
-    """Pasto, tierra y sombra en un recorte de la foto (mascaras booleanas)."""
+def _mascaras(sub, con_textura=False):
+    """Pasto, tierra y sombra en un recorte de la foto (mascaras booleanas); con_textura agrega la textura."""
     tp = sub.tam_pixel
     lb = _lab(sub.rgb)
     L = ndi.gaussian_filter(lb[..., 0], 1)
@@ -255,12 +255,18 @@ def _mascaras(sub):
     # Tierra: beige/amarilla (b mayor que a), lisa. Los techos (rojizos o corrugados) no cuentan:
     # sobre la vereda son aleros y debajo puede haber concreto.
     tierra = (croma > CROMA_MAX + 4) & (b > 8) & (a < 0.8 * b) & (tex < TEXTURA_MAX * 1.5) & ~sombra
+    if con_textura:
+        return pasto, tierra, sombra, tex
     return pasto, tierra, sombra
 
 
-def no_concreto_entre(orto, p, q, ancho=0.3):
-    """Fraccion del tramo p-q (franja de `ancho` m) donde la foto muestra pasto o tierra.
+TEXTURA_COPA = 7.0  # las copas de arboles y palmeras son mas rugosas que esto; el cesped, mas liso
 
+
+def cesped_entre(orto, p, q, ancho=0.3):
+    """Fraccion del tramo p-q (franja de `ancho` m) donde la foto ve cesped a ras del suelo.
+
+    No cuenta copas de arboles ni palmeras (verde rugoso): debajo puede seguir la vereda.
     Devuelve None si la foto no alcanza o el tramo esta casi todo en sombra (no se puede decir).
     """
     from shapely.geometry import LineString
@@ -279,11 +285,12 @@ def no_concreto_entre(orto, p, q, ancho=0.3):
     dentro = _rasterizar(pol, sub.afin, sub.rgb.shape[:2])
     if dentro.sum() < 4:
         return None
-    pasto, tierra, sombra = _mascaras(sub)
+    pasto, _, sombra, tex = _mascaras(sub, con_textura=True)
     visible = dentro & ~sombra
     if visible.sum() < 0.4 * dentro.sum():
         return None
-    return float(((pasto | tierra) & visible).sum() / visible.sum())
+    cesped = pasto & (tex < TEXTURA_COPA)
+    return float((cesped & visible).sum() / visible.sum())
 
 
 def cortar_por_foto(orto, pol):

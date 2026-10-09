@@ -91,7 +91,8 @@ def test_vereda_por_secciones_con_fachada():
     veredas = [a for a in met.areas if a.codigo == "VER"]
     assert len(veredas) == 2
     for a in veredas:
-        assert abs(a.area - 1.9 * 40) < 1  # 1.9 m x 40 m (borde interior a 0.1 m de la fachada)
+        # 2 m x 40 m pegada a la fachada levantada (CSH), o 1.9 m x 40 m entre sus propios puntos
+        assert 1.9 * 40 - 1 < a.area < 2.0 * 40 + 1
         assert a.poligono.bounds[3] - a.poligono.bounds[1] < 2.5  # no se pega con la otra cuadra
     assert {a.etiqueta for a in veredas} == {"VD - 01", "VD - 02"}
 
@@ -376,4 +377,46 @@ def test_casa_elevada_con_concreto_continuo_no_se_corta(tmp_path):
                                   orto=foto, calce_auto=False), avisar=lambda *a: None)
     ver = [a for a in met.areas if a.codigo == "VER"]
     assert min(a.poligono.bounds[1] for a in ver) < -1.9
+    assert not any("fuera de la vereda" in m for *_, m in met.puntos_revisar)
+
+
+def test_vereda_rectangular_paralela_a_la_fachada(tmp_path):
+    """Puntos de borde a distintas distancias: el borde exterior va paralelo a la fachada (sin
+    diagonales) con escalones rectos; extremos en escuadra; un tramo de un solo punto tambien sale."""
+    ruta_base = _plano_base(tmp_path)
+    pts = [Punto("a", 2, -1.5, 0, "VER"), Punto("b", 6, -1.6, 0, "VER"), Punto("c", 10, -2.5, 0, "VER"),
+           Punto("d", 14, -2.4, 0, "VER"), Punto("e", 18, -1.5, 0, "VER"), Punto("solo", 33, -1.2, 0, "VER")]
+    _, met, _ = procesar(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s"), plano_base=ruta_base),
+                         avisar=lambda *a: None)
+    ver = sorted((a for a in met.areas if a.codigo == "VER"), key=lambda a: a.poligono.bounds[0])
+    assert len(ver) == 2
+    pol = ver[0].poligono
+    # todos los lados horizontales (paralelos a la fachada) o verticales (escalones/extremos)
+    c = np.array(pol.exterior.coords)
+    lados = np.diff(c, axis=0)
+    assert all(abs(dx) < 1e-6 or abs(dy) < 1e-6 for dx, dy in lados if np.hypot(dx, dy) > 1e-6)
+    assert abs(pol.bounds[0] - 2) < 1e-6 and abs(pol.bounds[2] - 18) < 1e-6  # escuadra en a y e
+    assert abs(pol.bounds[1] + 2.5) < 1e-6  # llega al punto mas alejado
+    assert all(pol.buffer(1e-6).contains(Point(p.e, p.n)) for p in pts[:5])
+    assert ver[1].revisar and abs(ver[1].largo - 2.0) < 1e-6  # punto suelto: 2 m, a revisar
+
+
+def test_arbol_sobre_la_vereda_no_la_corta(tmp_path):
+    """Una copa de arbol (verde rugoso) tapa la vereda: los puntos de afuera siguen siendo vereda."""
+    ruta_base = _plano_base(tmp_path)
+    foto = _foto_franjas(tmp_path, [(0, -3.0, (190, 188, 182))])
+    img = np.asarray(Image.open(foto)).astype(float)
+    rng = np.random.default_rng(3)
+    # copa de 8 m entre x=12 y x=20 sobre toda la vereda: hojas claras y oscuras (rugosa)
+    c0, c1, f0, f1 = int(17 / 0.05), int(25 / 0.05), int(5 / 0.05), int(8.5 / 0.05)
+    hojas = rng.choice([0, 1], size=(f1 - f0, c1 - c0, 1))
+    img[f0:f1, c0:c1] = np.where(hojas, (40, 90, 30), (110, 170, 70))
+    Image.fromarray(img.clip(0, 255).astype(np.uint8)).save(foto)
+    pts = []
+    for k, x in enumerate(np.arange(3, 37, 4.0)):
+        pts += [Punto(f"i{k}", x, -0.3, 97.2, "VER"), Punto(f"o{k}", x + 0.3, -2.8, 96.3, "VER")]
+    _, met, _ = procesar(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s"), plano_base=ruta_base,
+                                  orto=foto, calce_auto=False), avisar=lambda *a: None)
+    ver = [a for a in met.areas if a.codigo == "VER"]
+    assert len(ver) == 1 and ver[0].poligono.bounds[1] < -2.7
     assert not any("fuera de la vereda" in m for *_, m in met.puntos_revisar)

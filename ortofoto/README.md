@@ -76,11 +76,16 @@ Tipos:
 - **Con foto:** primero se unen los tramos que la foto confirma (hay un borde a lo largo). Lo que la foto
   no confirma (sombra, árbol) se une igual pero queda en la capa `REVISAR UNION`. Si no quiere eso,
   desmarque la opción en *Archivos*.
-- **La foto manda en el ancho de la vereda:** desde la fachada hacia afuera, la vereda termina donde la
-  foto ve pasto o tierra entre dos puntos VER (un jardín, una berma). Los puntos de más afuera no la
-  ensanchan y quedan marcados en `REVISAR PUNTO VS FOTO`. Un desnivel brusco entre puntos refuerza el
-  corte; en sombra o bajo alero no se corta (casas elevadas con gradas). Además, siempre que cargue la
-  foto, las áreas se parten donde se ve pasto o tierra atravesándolas.
+- **Veredas rectangulares:** cada punto VER pone el ancho de su tramo (la distancia del punto más
+  alejado a la fachada) y el borde exterior va **paralelo a la fachada**, no en diagonal de punto a
+  punto. Entre tramos de distinto ancho hay un escalón recto y cada vereda cierra en escuadra en su
+  primer y último punto. En las esquinas dobla con la fachada. Un tramo con un solo punto sale de 2 m
+  y queda en `REVISAR AREA`.
+- **Mandan los puntos:** árboles, palmeras, aleros, sombra o polvo sobre el concreto no cortan la vereda.
+  Solo se excluye un punto en un caso claro de jardín: césped a ras del suelo en la foto **y** un
+  desnivel brusco respecto del punto anterior (queda marcado en `REVISAR PUNTO VS FOTO`).
+- **Fachada lejana:** si el límite del plano está a más del ancho máximo (p.ej. dibujado bajo el techo),
+  la vereda se cierra contra la fachada levantada en campo (CSH/LP).
 
 Capas para revisar a mano:
 
