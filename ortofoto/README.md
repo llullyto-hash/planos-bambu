@@ -96,6 +96,23 @@ Tipos:
 - **Fachada lejana:** si el límite del plano está a más del ancho máximo (p.ej. dibujado bajo el techo),
   la vereda se cierra contra la fachada levantada en campo (CSH/LP).
 
+**Revisar y corregir antes de exportar (pestaña 4. Resultados):** con la casilla *Revisar y corregir en
+pantalla antes de exportar* (marcada por defecto), al procesar no se escribe nada: se abre el mapa con
+la ortofoto, las áreas y los puntos, y la lista de áreas con su metrado.
+
+| Acción | Cómo |
+|---|---|
+| Zoom / mover la vista | rueda del mouse / arrastrar con el botón derecho; *Ver todo* |
+| Ir a un área | clic en la lista (las marcadas a revisar salen en rojo; filtro *solo a revisar*) |
+| Mover un vértice | seleccionar el área y arrastrar el vértice (se pega a los puntos topográficos) |
+| Agregar / quitar vértice | doble clic sobre un borde / Shift + clic sobre el vértice |
+| Cortar un tramo | *Cortar tramo*: dos clics a través del área; luego clic en el pedazo que sobra y *Borrar* |
+| Dibujar un área que no salió | elegir el código, *Dibujar área*, clic en cada esquina, doble clic o Enter |
+| Borrar / deshacer | Supr / Ctrl+Z |
+| Dar por revisada | *Revisado* |
+
+Al final, **EXPORTAR DXF Y METRADO** escribe el DXF, el Excel y el resumen con las correcciones.
+
 **Enviar la ortofoto a revisar:** marque *Exportar la ortofoto en cuadros de 100 m* en la pestaña
 *Archivos*. El programa guarda en `muestras_ortofoto/` la foto (ya calzada) en cuadros de 100 m a 8 cm
 por píxel, solo donde hay puntos de veredas, canales o fachadas, cada uno con su `.jgw`, en archivos

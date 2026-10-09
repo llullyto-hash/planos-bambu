@@ -15,7 +15,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from . import topografia, unir
-from .__main__ import CODIGOS_DEFECTO, Opciones, procesar
+from .__main__ import CODIGOS_DEFECTO, Opciones, calcular, exportar_calculo, procesar
 
 TITULO = "Topografia -> polilineas, areas y metrados"
 COLUMNAS = [  # (clave, titulo, ancho, editable)
@@ -66,6 +66,7 @@ class App(tk.Tk):
         self.muestras = tk.BooleanVar(value=False)
         self.radio = tk.StringVar(value="3")
         self.resolucion = tk.StringVar(value="0")
+        self.revisar_antes = tk.BooleanVar(value=True)
         self._armar()
         self._llenar_tabla()
         self.after(150, self._leer_cola)
@@ -80,6 +81,10 @@ class App(tk.Tk):
         nb.add(self._pestana_archivos(nb), text="1. Archivos")
         nb.add(self._pestana_codigos(nb), text="2. Codigos y capas")
         nb.add(self._pestana_proceso(nb), text="3. Procesar")
+        from .visor import Visor
+
+        self.visor = Visor(nb, self._exportar)
+        nb.add(self.visor, text="4. Resultados (revisar y corregir)")
         self.nb = nb
 
     def _fila_archivo(self, padre, fila, texto, clave, tipos, carpeta=False, ayuda=""):
@@ -198,6 +203,8 @@ class App(tk.Tk):
         botones.pack(fill="x")
         self.btn = ttk.Button(botones, text="PROCESAR", command=self._procesar)
         self.btn.pack(side="left")
+        ttk.Checkbutton(botones, text="Revisar y corregir en pantalla antes de exportar",
+                        variable=self.revisar_antes).pack(side="left", padx=6)
         ttk.Button(botones, text="Abrir carpeta de resultados", command=self._abrir_salida).pack(side="left", padx=6)
         self.barra = ttk.Progressbar(botones, mode="indeterminate", length=240)
         self.barra.pack(side="left", padx=6)
@@ -358,10 +365,17 @@ class App(tk.Tk):
         self.barra.start(12)
         self._escribir("\n=== Procesando... ===\n")
 
+        revisar = self.revisar_antes.get()
+
         def trabajo():
             try:
-                procesar(op, avisar=lambda t: self.cola.put(str(t) + "\n"))
-                self.cola.put(("FIN", None))
+                avisar = lambda t: self.cola.put(str(t) + "\n")  # noqa: E731
+                if revisar:
+                    calc = calcular(op, avisar=avisar)
+                    self.cola.put(("CALCULO", calc))
+                else:
+                    procesar(op, avisar=avisar)
+                    self.cola.put(("FIN", None))
             except Exception as e:  # noqa: BLE001 - se muestra al usuario
                 self.cola.put(traceback.format_exc())
                 self.cola.put(("FIN", str(e)))
@@ -372,8 +386,15 @@ class App(tk.Tk):
         try:
             while True:
                 m = self.cola.get_nowait()
-                if isinstance(m, tuple):
+                if isinstance(m, tuple) and m[0] == "CALCULO":
                     self.barra.stop()
+                    self.btn.config(state="normal")
+                    self._escribir("\n=== Listo para revisar: pestana 4. Resultados ===\n")
+                    self.visor.cargar(m[1])
+                    self.nb.select(3)
+                elif isinstance(m, tuple):
+                    self.barra.stop()
+                    self.visor.btn_exportar.config(state="normal")
                     self.btn.config(state="normal")
                     if m[1]:
                         messagebox.showerror("Error", m[1])
@@ -386,6 +407,22 @@ class App(tk.Tk):
         except queue.Empty:
             pass
         self.after(150, self._leer_cola)
+
+    def _exportar(self, calc):
+        """Escribe el DXF y el metrado del calculo revisado (con las correcciones hechas a mano)."""
+        self.visor.btn_exportar.config(state="disabled")
+        self.barra.start(12)
+        self._escribir("\n=== Exportando lo revisado... ===\n")
+
+        def trabajo():
+            try:
+                exportar_calculo(calc, avisar=lambda t: self.cola.put(str(t) + "\n"))
+                self.cola.put(("FIN", None))
+            except Exception as e:  # noqa: BLE001 - se muestra al usuario
+                self.cola.put(traceback.format_exc())
+                self.cola.put(("FIN", str(e)))
+
+        threading.Thread(target=trabajo, daemon=True).start()
 
     def _escribir(self, texto):
         self.log.insert("end", texto)

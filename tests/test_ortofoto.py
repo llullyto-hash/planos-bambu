@@ -509,3 +509,20 @@ def test_exportar_muestras_en_cuadros_con_world_file(tmp_path):
     o = Ortofoto.cargar(str(tmp_path / "x" / "orto_1100_2100.jpg"))
     assert o.rgb.shape[:2] == (1250, 1250) and abs(o.tam_pixel - 0.08) < 1e-9
     assert np.allclose(o.a_terreno(0, 0), (1100.0, 2200.0), atol=1e-6)
+
+
+def test_calcular_corregir_y_exportar(tmp_path):
+    """La ventana calcula sin escribir nada; lo que se corrige a mano (borrar un area) es lo que se exporta."""
+    import ezdxf
+
+    from ortofoto.__main__ import calcular, exportar_calculo
+
+    pts = _vereda_por_secciones(n=3) + _vereda_por_secciones(y0=-20.0, n=3, cod="VER")
+    calc = calcular(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s")), avisar=lambda *a: None)
+    assert not (tmp_path / "s" / "resultado.dxf").exists()
+    ver = [a for a in calc.met.areas if a.codigo == "VER"]
+    assert len(ver) == 2
+    calc.met.areas.remove(ver[0])
+    exportar_calculo(calc, avisar=lambda *a: None)
+    doc = ezdxf.readfile(tmp_path / "s" / "resultado.dxf")
+    assert len(doc.modelspace().query('HATCH[layer=="Vereda a demoler"]')) == 1

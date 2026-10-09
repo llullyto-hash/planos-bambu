@@ -155,7 +155,24 @@ def exportar_muestras(orto, puntos, out, avisar=print, lado=MUESTRA_LADO, pixel=
     return zips
 
 
-def procesar(op, avisar=print):
+@dataclass
+class Calculo:
+    """Resultado del procesamiento antes de exportar (se puede revisar y corregir en la ventana)."""
+    op: object
+    puntos: list
+    resultados: list
+    met: object
+    orto: object
+    codigos: dict
+    alias: dict
+    base: object
+    log: list
+    sin_conf: dict
+    t0: float
+
+
+def calcular(op, avisar=print):
+    """Lee, calza, une y cierra areas. No escribe el DXF ni el metrado (ver exportar_calculo)."""
     t0 = time.time()
     out = Path(op.salida)
     out.mkdir(parents=True, exist_ok=True)
@@ -242,6 +259,16 @@ def procesar(op, avisar=print):
             log.append(f"Concreto visto en la foto y respaldado por puntos: {sum(a.codigo == 'CV' for a in met.areas)} "
                        f"areas (capa {conf_cv.capa_area}, metrado {conf_cv.prefijo}); sin puntos en su borde: "
                        f"{len(met.sin_puntos)} (capa REVISAR CONCRETO SIN PUNTOS, sin metrado)")
+    return Calculo(op, puntos, resultados, met, orto, codigos, alias, base, log, sin_conf, t0)
+
+
+def exportar_calculo(c, avisar=print):
+    """Escribe metrado (xlsx/csv), DXF, vista y resumen de un Calculo (corregido o no)."""
+    op, puntos, resultados, met, orto = c.op, c.puntos, c.resultados, c.met, c.orto
+    codigos, alias, log, sin_conf, t0 = c.codigos, c.alias, c.log, c.sin_conf, c.t0
+    out = Path(op.salida)
+    out.mkdir(parents=True, exist_ok=True)
+    xs, ys = [p.e for p in puntos], [p.n for p in puntos]
     resumen = areas.guardar_metrado(met, ruta_libre(out / "metrado.xlsx", avisar), ruta_libre(out / "metrado.csv", avisar))
     avisar("Guardando DXF...")
     exportar.guardar_dxf(ruta_libre(out / "resultado.dxf", avisar), puntos, resultados, met, codigos, alias, orto,
@@ -270,6 +297,12 @@ def procesar(op, avisar=print):
     ruta_libre(out / "resumen.md", avisar).write_text(texto, encoding="utf-8")
     avisar(texto)
     return resultados, met, orto
+
+
+def procesar(op, avisar=print):
+    return exportar_calculo(calcular(op, avisar), avisar)
+
+
 
 
 def main(argv=None):
