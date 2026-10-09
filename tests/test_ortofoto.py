@@ -488,3 +488,23 @@ def test_hueco_largo_se_une_si_la_foto_no_ve_suelo(tmp_path):
     met, ver = _vereda_en(tmp_path, pts, orto=foto)
     assert len(ver) == 1 and ver[0].revisar
     assert abs(ver[0].poligono.area - 28 * 1.2) < 0.5
+
+
+def test_exportar_muestras_en_cuadros_con_world_file(tmp_path):
+    """La ortofoto sale en cuadros de 100 m (solo donde hay puntos), reducida a 8 cm, en ZIP, y cada
+    cuadro conserva su georreferencia."""
+    import zipfile
+
+    from ortofoto.__main__ import exportar_muestras
+
+    img = (np.random.default_rng(4).random((5000, 5000, 3)) * 255).astype(np.uint8)  # 200 m a 4 cm
+    orto = Ortofoto(img, [0.04, 0, 1000.0, 0, -0.04, 2200.0])  # de (1000, 2000) a (1200, 2200)
+    pts = [Punto("a", 1050, 2050, 0, "VER"), Punto("b", 1150, 2150, 0, "ALC"), Punto("c", 1150, 2050, 0, "TN")]
+    zips = exportar_muestras(orto, pts, tmp_path, avisar=lambda *a: None)
+    nombres = zipfile.ZipFile(zips[0]).namelist()
+    assert sorted(nombres) == ["orto_1000_2000.jgw", "orto_1000_2000.jpg", "orto_1100_2100.jgw",
+                               "orto_1100_2100.jpg"]
+    zipfile.ZipFile(zips[0]).extractall(tmp_path / "x")
+    o = Ortofoto.cargar(str(tmp_path / "x" / "orto_1100_2100.jpg"))
+    assert o.rgb.shape[:2] == (1250, 1250) and abs(o.tam_pixel - 0.08) < 1e-9
+    assert np.allclose(o.a_terreno(0, 0), (1100.0, 2200.0), atol=1e-6)

@@ -47,6 +47,7 @@ class Opciones:
     capas_limite: tuple = basemod.CAPAS_LIMITE  # capas del limite de propiedad en el plano base
     veredas_foto: bool = False  # forma de las veredas segun el concreto visible en la ortofoto
     codigos_editados: tuple = None  # (codigos, alias) ya cargados desde la ventana
+    muestras: bool = False  # exportar la ortofoto en cuadros (ZIP) para enviarla a revisar
 
 
 def ruta_libre(ruta, avisar=print):
@@ -87,6 +88,71 @@ def guardar_muestra(orto, puntos, out, avisar=print, lado=150.0):
     rec.guardar(ruta)
     avisar(f"Muestra de la ortofoto guardada: {ruta.name} ({ruta.stat().st_size / 1e6:.1f} MB, "
            f"{rec.rgb.shape[1]}x{rec.rgb.shape[0]} px, centro {cx:.0f} E, {cy:.0f} N)")
+
+
+MUESTRA_LADO = 100.0  # m por cuadro
+MUESTRA_PIXEL = 0.08  # m por pixel de las muestras
+MUESTRA_ZIP_MB = 20.0  # tamano maximo de cada ZIP
+MUESTRA_CODIGOS = ("VER", "ALC", "CSH", "MAR", "ACC", "CNTA", "PTA")
+
+
+def exportar_muestras(orto, puntos, out, avisar=print, lado=MUESTRA_LADO, pixel=MUESTRA_PIXEL,
+                      max_mb=MUESTRA_ZIP_MB):
+    """Toda la ortofoto en cuadros de `lado` m (solo donde hay puntos de veredas, canales, etc.),
+    a `pixel` m por pixel, en JPG con world file, agrupados en ZIP de hasta `max_mb` MB.
+
+    Sirve para enviar la foto real completa a revisar sin subir el archivo original (varios GB).
+    """
+    import io
+    import zipfile
+
+    import numpy as np
+    from PIL import Image
+
+    sel = [p for p in puntos if p.codigo in MUESTRA_CODIGOS] or puntos
+    celdas = sorted({(int(np.floor(p.e / lado)), int(np.floor(p.n / lado))) for p in sel})
+    carpeta = Path(out) / "muestras_ortofoto"
+    carpeta.mkdir(parents=True, exist_ok=True)
+    zips, actual, tam, n = [], None, 0.0, 0
+    for kx, ky in celdas:
+        x0, y0 = kx * lado, ky * lado
+        try:
+            rec = orto.recortar(x0, y0, x0 + lado, y0 + lado)
+        except ValueError:
+            continue
+        h, w = rec.rgb.shape[:2]
+        if h < 10 or w < 10:
+            continue
+        img = Image.fromarray(rec.rgb)
+        escala = rec.tam_pixel / pixel
+        if escala < 1:  # la foto es mas fina que `pixel`: se reduce
+            img = img.resize((max(1, round(w * escala)), max(1, round(h * escala))), Image.LANCZOS)
+        a, b, c, d, e, f = rec.afin
+        fx, fy = w / img.width, h / img.height
+        a2, b2, d2, e2 = a * fx, b * fy, d * fx, e * fy
+        c0, f0 = c + a2 * 0.5 + b2 * 0.5, f + d2 * 0.5 + e2 * 0.5  # centro del pixel superior izquierdo
+        nombre = f"orto_{int(x0)}_{int(y0)}"
+        buf = io.BytesIO()
+        img.save(buf, "JPEG", quality=85)
+        datos = buf.getvalue()
+        jgw = "\n".join(f"{v:.10f}" for v in (a2, d2, b2, e2, c0, f0)) + "\n"
+        mb = len(datos) / 1e6
+        if actual is None or tam + mb > max_mb:
+            if actual is not None:
+                actual.close()
+            ruta = carpeta / f"muestras_{len(zips) + 1:02d}.zip"
+            zips.append(ruta)
+            actual = zipfile.ZipFile(ruta, "w", zipfile.ZIP_STORED)
+            tam = 0.0
+        actual.writestr(nombre + ".jpg", datos)
+        actual.writestr(nombre + ".jgw", jgw)
+        tam += mb
+        n += 1
+    if actual is not None:
+        actual.close()
+    avisar(f"Muestras de la ortofoto: {n} cuadros de {lado:.0f} m a {pixel * 100:.0f} cm/pixel en "
+           f"{len(zips)} ZIP (carpeta {carpeta.name}). Envie los ZIP para revisar con la foto real.")
+    return zips
 
 
 def procesar(op, avisar=print):
@@ -150,6 +216,12 @@ def procesar(op, avisar=print):
             else:
                 log.append(f"Calce automatico: el calce original ya es el mejor (apoyo {ini:.2f}); no se movio la foto")
             avisar(log[-1])
+    if orto is not None and op.muestras:
+        avisar("Exportando muestras de la ortofoto...")
+        try:
+            exportar_muestras(orto, puntos, out, avisar)
+        except Exception as e:  # noqa: BLE001 - las muestras son opcionales
+            avisar(f"(No se pudieron exportar las muestras: {e})")
 
     avisar("Uniendo puntos...")
     resultados, sin_conf = unir.unir_todo(puntos, codigos, orto, alias=alias, avisar=avisar,
@@ -220,6 +292,8 @@ def main(argv=None):
     ap.add_argument("--apagar", nargs="*", default=[], help="Capas que salen apagadas en el DXF")
     ap.add_argument("--veredas-foto", action="store_true",
                     help="Dibujar las veredas con la forma del concreto visible en la ortofoto (requiere plano base)")
+    ap.add_argument("--muestras", action="store_true",
+                    help="Exportar la ortofoto en cuadros de 100 m (ZIP) para enviarla a revisar")
     ap.add_argument("--solo-confirmadas", action="store_true",
                     help="Con foto: no unir lo que la foto no confirma (por defecto se une y se marca a revisar)")
     ap.add_argument("--ventana", type=float, nargs=4, metavar=("XMIN", "YMIN", "XMAX", "YMAX"))
@@ -230,7 +304,7 @@ def main(argv=None):
                   codigos=a.codigos, plantilla=a.plantilla, ventana=tuple(a.ventana) if a.ventana else None,
                   desactivados={c.upper() for c in a.desactivar}, capas_apagadas=set(a.apagar),
                   completar=not a.solo_confirmadas, plano_base=a.plano_base,
-                  capas_limite=tuple(a.capas_limite), veredas_foto=a.veredas_foto)
+                  capas_limite=tuple(a.capas_limite), veredas_foto=a.veredas_foto, muestras=a.muestras)
     return procesar(op)
 
 

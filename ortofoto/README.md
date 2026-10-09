@@ -96,6 +96,11 @@ Tipos:
 - **Fachada lejana:** si el límite del plano está a más del ancho máximo (p.ej. dibujado bajo el techo),
   la vereda se cierra contra la fachada levantada en campo (CSH/LP).
 
+**Enviar la ortofoto a revisar:** marque *Exportar la ortofoto en cuadros de 100 m* en la pestaña
+*Archivos*. El programa guarda en `muestras_ortofoto/` la foto (ya calzada) en cuadros de 100 m a 8 cm
+por píxel, solo donde hay puntos de veredas, canales o fachadas, cada uno con su `.jgw`, en archivos
+`muestras_01.zip`, `muestras_02.zip`, … de hasta 20 MB. Envíe esos ZIP.
+
 Capas para revisar a mano:
 
 | Capa | Qué tiene |

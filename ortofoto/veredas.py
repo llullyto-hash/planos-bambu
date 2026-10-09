@@ -275,17 +275,21 @@ def _esquina(f, g, hueco):
         return None
     a[1], b[0] = f.largo, 0.0
     v = f.p1
-    pa, pb = f.punto(f.largo, a[2]), g.punto(0.0, b[2])
     m = np.array([f.u, -g.u]).T
     if abs(np.linalg.det(m)) < 1e-6:
-        pol = Polygon([tuple(v), tuple(pa), tuple(pb)])
-    else:
+        return None  # sin quiebre: los rectangulos ya se tocan
+    for wa, wb in ((a[2], b[2]), (min(a[2], b[2]),) * 2):
+        pa, pb = f.punto(f.largo, wa), g.punto(0.0, wb)
         s_ = np.linalg.solve(m, pb - pa)
-        x = pa + f.u * s_[0]
-        if s_[0] < -1e-6 or np.hypot(*(x - v)) > 3 * max(a[2], b[2]) + 1:
+        if s_[0] < -1e-6:
             return None  # esquina hacia adentro: los rectangulos ya se cubren
-        pol = Polygon([tuple(v), tuple(pa), tuple(x), tuple(pb)])
-    return pol if pol.is_valid and pol.area > 0 else None
+        x = pa + f.u * s_[0]
+        # La esquina exterior no se aleja del vertice mas que la diagonal de los dos anchos: en un
+        # quiebre abierto con anchos distintos se cierra con el ancho menor (sin puntas)
+        if np.hypot(*(x - v)) <= np.hypot(wa, wb) * 1.05 + 0.01:
+            pol = Polygon([tuple(v), tuple(pa), tuple(x), tuple(pb)])
+            return pol if pol.is_valid and pol.area > 0 else None
+    return None
 
 
 def veredas_contra_fachada(res, limites, manzanas=None, csh=(), indices=None, revisar=None, alcance=None):
