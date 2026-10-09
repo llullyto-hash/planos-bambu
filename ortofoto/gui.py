@@ -31,6 +31,7 @@ COLUMNAS = [  # (clave, titulo, ancho, editable)
     ("ancho_min", "Ancho min", 70, True),
     ("ancho_max", "Ancho max", 70, True),
     ("referencia", "Referencia", 90, True),
+    ("ancho_defecto", "Ancho supuesto", 95, True),
     ("apagar", "Apagar en DXF", 90, False),
 ]
 AYUDA_TIPOS = ("linea: se une en polilinea abierta (metrado en m)\n"
@@ -207,12 +208,13 @@ class App(tk.Tk):
             c = self.codigos.get(cod)
             n = self.conteo.get(cod, "")
             if c is None:
-                valores = ["", cod, n, "(sin configurar)", "", "", "", "", "", "", "", "", ""]
+                valores = ["", cod, n, "(sin configurar)", "", "", "", "", "", "", "", "", "", ""]
                 self.tabla.insert("", "end", iid=cod, values=valores, tags=("nuevo",))
                 continue
             valores = ["si" if c.activo else "no", cod, n, c.nombre, c.tipo, c.capa, c.capa_area, c.prefijo,
                        c.separacion_max if c.tipo != "punto" else "", c.ancho_min if c.tipo == "franja" else "",
                        c.ancho_max if c.tipo == "franja" else "", " ".join(c.referencia),
+                       c.ancho_defecto or "",
                        "si" if cod in self.apagar else ""]
             self.tabla.insert("", "end", iid=cod, values=valores, tags=() if c.activo else ("off",))
         if self.alias:
@@ -263,7 +265,7 @@ class App(tk.Tk):
             valor = ed.get().strip()
             ed.destroy()
             try:
-                if clave in ("separacion_max", "ancho_min", "ancho_max"):
+                if clave in ("separacion_max", "ancho_min", "ancho_max", "ancho_defecto"):
                     valor = float(valor.replace(",", "."))
                 elif clave == "referencia":
                     valor = [v.upper() for v in valor.replace(",", " ").split()]

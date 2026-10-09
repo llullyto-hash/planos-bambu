@@ -112,7 +112,8 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
         for agujero in ar.poligono.interiors:
             h.paths.add_polyline_path(list(agujero.coords)[:-1], is_closed=True)
         x, y = punto_etiqueta(ar.poligono)
-        msp.add_mtext(f"{ar.etiqueta}\\PAREA= {ar.area:.2f} M2",
+        largo = f"\\PLONG= {ar.largo:.2f} M" if getattr(conf, "etiqueta_largo", False) and ar.largo else ""
+        msp.add_mtext(f"{ar.etiqueta}{largo}\\PAREA= {ar.area:.2f} M2",
                       dxfattribs={"layer": CAPA_ETIQUETAS, "char_height": ALTURA_TEXTO, "insert": (x, y),
                                   "attachment_point": 5})
         if ar.revisar:

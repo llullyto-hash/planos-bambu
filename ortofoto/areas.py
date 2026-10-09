@@ -257,6 +257,27 @@ def cerrar_areas(resultados, base=None, usar_foto=False):
             candidatas += ars + ars2
             met.lineas += [Linea(res.codigo, conf, b, borde=True) for b in bordes + bordes2]
             _unir_sobrantes(res, usados | usados2)
+        elif conf.tipo == "franja":
+            # Franja sin referencia (canal, cuneta, pista):
+            # 1) figuras cerradas levantadas por sus esquinas (cajas de alcantarilla)
+            ars, usados = _figuras_cerradas(res) if conf.ancho_defecto else ([], set())
+            # 2) secciones a lo ancho (dos bordes cada pocos metros), como las veredas
+            resto = [i for i in range(len(res.puntos)) if i not in usados]
+            ars2, bordes, usados2 = _franjas_por_estaciones(res, resto, res.barreras)
+            ars += ars2
+            usados |= usados2
+            # 3) lo demas se une a lo largo (eje) y, si hay ancho supuesto, se cierra con ese ancho
+            _unir_sobrantes(res, usados)
+            if conf.ancho_defecto:
+                ars3 = _franjas_por_eje(res)
+                ars += ars3
+                if ars3:
+                    met.lineas += [Linea(res.codigo, conf, LineString(res.xy(c)), borde=True) for c in res.cadenas]
+                    res.cadenas = []
+            if usar_foto and res.orto is not None:
+                ars = _cortar_con_foto(res.orto, ars)
+            candidatas += ars
+            met.lineas += [Linea(res.codigo, conf, b, borde=True) for b in bordes]
         if conf.tipo == "punto" or not res.cadenas:
             continue
         abiertos, cerrados = _bordes(res)
@@ -452,6 +473,87 @@ def _franjas_contra_limite(res, base):
             bordes.append(LineString(ce))
             usados.update(int(i) for i in ii)
     return areas, bordes, usados
+
+
+FIGURA_ENLACE = 2.5  # m: puntos mas cercanos que esto forman la misma figura
+FIGURA_MAX = 8.0  # m: una figura cerrada (caja) no mide mas que esto
+FIGURA_ANCHO_MIN = 0.4  # m: lado menor minimo para que el grupo sea una figura y no una linea
+
+
+def _figuras_cerradas(res):
+    """Grupos chicos de 3 o mas puntos que forman una figura (no una linea): se cierran con su forma.
+
+    El contorno recorre los puntos en orden alrededor de su centro (no la envolvente), asi respeta
+    la figura levantada. Devuelve (areas, indices_usados).
+    """
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    from shapely.geometry import MultiPoint
+
+    conf = res.conf
+    xy = np.array([(p.e, p.n) for p in res.puntos])
+    if len(xy) < 3:
+        return [], set()
+    pares = np.array(list(cKDTree(xy).query_pairs(FIGURA_ENLACE)) or [(0, 0)])
+    n, lab = connected_components(coo_matrix((np.ones(len(pares)), (pares[:, 0], pares[:, 1])),
+                                             shape=(len(xy), len(xy))), directed=False)
+    areas, usados = [], set()
+    for k in range(n):
+        idx = np.where(lab == k)[0]
+        if not 3 <= len(idx) <= 12:
+            continue
+        m = xy[idx]
+        rect = MultiPoint([tuple(q) for q in m]).minimum_rotated_rectangle
+        if not isinstance(rect, Polygon):
+            continue
+        c = np.array(rect.exterior.coords)[:4]
+        lados = sorted(np.hypot(*(c[1:] - c[:-1]).T).tolist() + [float(np.hypot(*(c[0] - c[3])))])
+        if lados[0] < FIGURA_ANCHO_MIN or lados[-1] > FIGURA_MAX:
+            continue
+        centro = m.mean(axis=0)
+        orden = np.argsort(np.arctan2(m[:, 1] - centro[1], m[:, 0] - centro[0]))
+        pol = _poligono_valido([tuple(q) for q in m[orden]])
+        if pol.is_empty or pol.area < AREA_MIN:
+            continue
+        areas.append(Area(res.codigo, conf, pol, "figura", lados[0], lados[-1], nota="figura cerrada por sus puntos"))
+        usados.update(int(i) for i in idx)
+    return areas, usados
+
+
+def _franjas_por_eje(res):
+    """Tramos levantados solo por su eje (pares inicio/fin, cadenas a lo largo): se cierran con el
+    ancho supuesto del codigo. El largo es el del eje."""
+    conf = res.conf
+    w = conf.ancho_defecto
+    areas = []
+    for cad in res.cadenas:
+        if len(cad) < 2:
+            continue
+        eje = LineString(res.xy(cad))
+        if eje.length < 0.3:
+            continue
+        pol = eje.buffer(w / 2, cap_style=2, join_style=2)
+        if isinstance(pol, MultiPolygon):
+            pol = max(pol.geoms, key=lambda g: g.area)
+        areas.append(Area(res.codigo, conf, pol, "eje", w, eje.length,
+                          nota=f"levantado por su eje: ancho supuesto {w:.2f} m"))
+    return areas
+
+
+def _cortar_con_foto(orto, ars):
+    """Corta cada area donde la foto muestra tierra o pasto atravesandola (cada pedazo queda cerrado)."""
+    from .concreto import cortar_por_foto
+
+    salida = []
+    for a in ars:
+        piezas, quitado = cortar_por_foto(orto, a.poligono)
+        if quitado < 0.3 or not piezas:
+            salida.append(a)
+            continue
+        for g in piezas:
+            salida.append(Area(a.codigo, a.conf, g, a.origen, a.ancho, a.largo * g.area / max(a.area, 1e-6),
+                               a.revisar, nota=f"cortada donde la foto no muestra concreto ({quitado:.1f} m2 quitados)"))
+    return salida
 
 
 def _ajustar_con_foto(res, base, ars_puntos, met):

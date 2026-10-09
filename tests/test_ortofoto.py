@@ -313,3 +313,20 @@ def test_vegetacion_en_sombra_corta_la_vereda():
     img[:, 60:100] = (55, 52, 50)  # sombra gris de alero: no corta
     piezas, quitado = cortar_por_foto(Ortofoto(img, [0.05, 0, 0, 0, -0.05, 3.0]), box(0, 0, 30, 3))
     assert len(piezas) == 2 and 27 < quitado < 33
+
+
+def test_canal_alc_figuras_secciones_y_eje(tmp_path):
+    codigos, alias = unir.cargar_codigos(CODIGOS_DEFECTO)
+    pts = []
+    # caja de alcantarilla levantada por sus 4 esquinas (1.2 x 2.0 m)
+    pts += [Punto(f"c{k}", x, y, 0, "ALC") for k, (x, y) in enumerate([(0, 0), (1.2, 0), (1.2, 2.0), (0, 2.0)])]
+    # canal levantado por su eje: pares inicio/fin a lo largo de la calle, en linea
+    pts += [Punto(f"e{k}", 40 + x, 0, 0, "ALC") for k, x in enumerate([0, 1.1, 5, 6.1, 10, 11.1])]
+    res, _ = unir.unir_todo(pts, codigos, None, alias=alias, avisar=lambda *a: None)
+    met = areas.cerrar_areas(res)
+    canales = [a for a in met.areas if a.codigo == "ALC"]
+    caja = [a for a in canales if a.origen == "figura"]
+    eje = [a for a in canales if a.origen == "eje"]
+    assert len(caja) == 1 and abs(caja[0].area - 2.4) < 0.01
+    assert len(eje) == 1 and abs(eje[0].largo - 11.1) < 0.01 and abs(eje[0].area - 11.1 * 0.8) < 0.01
+    assert all(a.etiqueta.startswith("CAN D - ") for a in canales)

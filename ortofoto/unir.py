@@ -51,6 +51,8 @@ class Codigo:
     referencia: list = field(default_factory=list)  # franja: codigos del borde interior (fachada, lote)
     misma_manzana: bool = False  # con plano base: solo une puntos de la misma manzana
     hueco_max: float = 0.0  # franja: m sin puntos a lo largo de la fachada que cortan el area (0 = 10 m)
+    etiqueta_largo: bool = False  # la etiqueta del area lleva tambien la longitud (canales)
+    ancho_defecto: float = 0.0  # franja: ancho supuesto para tramos levantados solo por su eje (0 = no)
 
 
 def cargar_codigos(ruta):
@@ -346,7 +348,8 @@ def unir_todo(puntos, codigos, orto=None, solo=None, alias=None, avisar=print, c
                 barreras.agregar(a, b)
     resultados = []
     for res, xy, uniones in preparados:
-        if res.conf.tipo != "punto" and not (res.conf.tipo == "franja" and res.conf.referencia):
+        # Las franjas (veredas, canales, cunetas) se arman por secciones al cerrar areas (areas.py)
+        if res.conf.tipo not in ("punto", "franja"):
             _resolver(res, xy, uniones, orto is not None, barreras, completar)
         resultados.append(res)
     resultados.sort(key=lambda r: r.codigo)
