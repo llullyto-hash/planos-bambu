@@ -5,3 +5,8 @@ salida_analisis/
 *.zip
 .venv/
 ortofoto/_version.py
+
+# paquetes descargados por pip
+*.whl
+*.tar.gz
+codigo_fuente_*.zip
