@@ -154,11 +154,30 @@ def _punto(g):
     return g.representative_point() if g.geom_type.endswith("Polygon") else g.interpolate(0.5, normalized=True)
 
 
-def dividir(met, conf, asignar=True):
+def _mejor_corrimiento(puntos, x0, y1, cw, ch, pasos=10):
+    """Corrimiento de la cuadricula (en fracciones de lamina) con el que se usan menos laminas."""
+    xs = np.array([p.x for p in puntos])
+    ys = np.array([p.y for p in puntos])
+    mejor = None
+    for fx in range(pasos):
+        for fy in range(pasos):
+            i = np.floor((xs - (x0 - fx / pasos * cw)) / cw).astype(int)
+            j = np.floor(((y1 + fy / pasos * ch) - ys) / ch).astype(int)
+            n = len(set(zip(i.tolist(), j.tolist())))
+            if mejor is None or n < mejor[0]:
+                mejor = (n, fx / pasos, fy / pasos)
+    return mejor
+
+
+def dividir(met, conf, asignar=True, ajustar=None):
     """Laminas que cubren las areas y lineas con metrado. Asigna cada elemento a una sola lamina.
-    Con conf.cantidad > 0 primero cambia conf.escala para que salgan esas laminas (o menos)."""
-    if getattr(conf, "cantidad", 0) and asignar:
-        conf.escala = escala_para(met, conf, int(conf.cantidad))
+    Con conf.cantidad > 0 primero cambia conf.escala para que salgan esas laminas (o menos), y la
+    cuadricula se corre para que el dibujo use la menor cantidad de laminas (ajustar)."""
+    cantidad = int(getattr(conf, "cantidad", 0) or 0)
+    if ajustar is None:
+        ajustar = cantidad > 0
+    if cantidad and asignar:
+        conf.escala = escala_para(met, conf, cantidad)
     elementos = list(met.areas) + [l for l in met.lineas if con_metrado(l)]
     geoms = [e.poligono if hasattr(e, "poligono") else e.linea for e in elementos]
     if not geoms:
@@ -171,11 +190,19 @@ def dividir(met, conf, asignar=True):
     girar = lambda g: affinity.rotate(g, -ang, origin=(0, 0), use_radians=True)  # noqa: E731
     marco_g = [girar(g) for g in geoms]
     x0, y0, x1, y1 = unary_union([g.envelope for g in marco_g]).bounds
-    # centrar la cuadricula sobre el dibujo
+    # centrar la cuadricula sobre el dibujo (o correrla para usar menos laminas)
     nc = max(1, math.ceil((x1 - x0) / cw))
     nf = max(1, math.ceil((y1 - y0) / ch))
     gx0 = (x0 + x1) / 2 - nc * cw / 2
     gy1 = (y0 + y1) / 2 + nf * ch / 2
+    if ajustar:
+        pts = [_punto(g) for g in marco_g]
+        centrada = len({(int((p.x - gx0) // cw), int((gy1 - p.y) // ch)) for p in pts})
+        n, fx, fy = _mejor_corrimiento(pts, x0, y1, cw, ch)
+        if n < centrada:
+            gx0, gy1 = x0 - fx * cw, y1 + fy * ch
+            nc = max(1, math.ceil((x1 - gx0) / cw))
+            nf = max(1, math.ceil((gy1 - y0) / ch))
     celdas = {}
     for g, el in zip(marco_g, elementos):
         p = _punto(g)
@@ -216,7 +243,7 @@ def escala_para(met, conf, cantidad):
 
     for esc in ESCALAS_NORMALES:
         prueba = replace(conf, escala=float(esc), cantidad=0)
-        if len(dividir(met, prueba, asignar=False)) <= cantidad:
+        if len(dividir(met, prueba, asignar=False, ajustar=True)) <= cantidad:
             return float(esc)
     return float(ESCALAS_NORMALES[-1])
 

@@ -546,7 +546,9 @@ def test_pagina_colaborativa_ida_y_vuelta(tmp_path):
     ver[1]["coords"] = [[0, 0], [10, 0], [10, 2], [0, 2]]  # redibujada
     ver[1]["largo"] = 0
     d["areas"].append({"id": "w1", "cod": "XXX", "coords": [[0, 0], [1, 0], [1, 1]]})
-    corr = {"formato": "planos-bambu/correcciones", "areas": d["areas"]}
+    corr = {"formato": "planos-bambu/correcciones", "areas": d["areas"],
+            "notas": [{"x": 5, "y": 1, "texto": "Revisar con el ingeniero", "hecha": False},
+                      {"x": 6, "y": 1, "texto": "ya resuelta", "hecha": True}]}
     ruta = tmp_path / "correcciones_web.json"
     ruta.write_text(json.dumps(corr), encoding="utf-8")
     n, desconocidos = colaborativo.importar_correcciones(calc, ruta)
@@ -554,6 +556,14 @@ def test_pagina_colaborativa_ida_y_vuelta(tmp_path):
     assert desconocidos == ["XXX"] and len(nuevas) == 1
     assert abs(nuevas[0].area - 20.0) < 1e-6 and abs(nuevas[0].largo - 10.0) < 1e-6
     assert nuevas[0].etiqueta
+    # las notas pendientes de la pagina salen en el DXF
+    import ezdxf
+
+    from ortofoto import exportar
+
+    exportar.guardar_dxf(tmp_path / "n.dxf", [], [], calc.met, calc.codigos)
+    textos = [m.text for m in ezdxf.readfile(tmp_path / "n.dxf").modelspace().query('MTEXT[layer=="NOTAS DE REVISION"]')]
+    assert textos == ["NOTA: Revisar con el ingeniero"]
 
 
 # ---------- mejoras v1.1: estilos PETRO, carteles, corte lineal, laminas, codigos ----------

@@ -15,6 +15,9 @@ CAPA_ORTOFOTO = "ORTOFOTO"
 ALTURA_TEXTO = 0.25
 
 
+CAPA_NOTAS = "NOTAS DE REVISION"
+
+
 def _capa(doc, nombre, color=7, tipo_linea="Continuous", plantilla=None, apagada=False):
     """Compatibilidad: crea una capa copiando sus propiedades de `plantilla` si la tiene."""
     from .estilo import Estilo
@@ -179,6 +182,20 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
         img.dxf.u_pixel = (a, d, 0)
         img.dxf.v_pixel = (-b, -e, 0)
         msp.set_redraw_order([(img.dxf.handle, "1")])
+
+    # Notas puestas en la pagina colaborativa (las pendientes): marca + texto, capa que no se plotea
+    notas = [n for n in (getattr(metrado, "notas", None) or []) if not n.get("hecha")]
+    if notas:
+        est.capa(CAPA_NOTAS, 2).dxf.plot = 0
+        alto = 2.5 * escala / 1000.0
+        for n in notas:
+            x, y = float(n["x"]), float(n["y"])
+            msp.add_circle((x, y), alto * 0.4, dxfattribs={"layer": CAPA_NOTAS})
+            msp.add_line((x, y), (x + alto, y + alto), dxfattribs={"layer": CAPA_NOTAS})
+            texto = str(n.get("texto") or "").replace("\r", "").replace("\n", "\\P")
+            mt = msp.add_mtext("NOTA: " + texto, dxfattribs={"layer": CAPA_NOTAS, "char_height": alto,
+                                                            "width": alto * 25})
+            mt.set_location((x + alto * 1.1, y + alto * 1.1), attachment_point=7)
 
     if limites:  # solo para la vista previa (sin el plano base completo)
         est.capa("LIMITE DE PROPIEDAD (PLANO BASE)", 5)

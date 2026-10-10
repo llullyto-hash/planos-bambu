@@ -109,4 +109,8 @@ def importar_correcciones(calc, ruta):
                                  bool(d.get("revisar")), nota=nota))
     calc.met.areas = nuevas
     areas._numerar(calc.met)
+    # Notas de la pagina: se dibujan en el DXF (capa NOTAS DE REVISION)
+    calc.met.notas = [{"x": float(n["x"]), "y": float(n["y"]), "texto": str(n.get("texto") or "")[:1000],
+                       "hecha": bool(n.get("hecha"))}
+                      for n in datos.get("notas", []) if isinstance(n, dict) and "x" in n and "y" in n]
     return len(nuevas), sorted(c for c in desconocidos if c)
