@@ -78,6 +78,10 @@ th:first-child,td:first-child{text-align:left}
 .nota{cursor:pointer}
 .nota p{margin:4px 0;white-space:pre-wrap;word-break:break-word}
 .nota.hecha{opacity:.6}
+.foto{display:flex;gap:8px;align-items:center;cursor:pointer}
+.foto img{width:64px;height:48px;object-fit:cover;border-radius:6px;background:#000;flex:none}
+.foto div{min-width:0;word-break:break-word}
+.fotoGrande{display:block;max-width:100%;max-height:65vh;margin:0 auto;border-radius:6px}
 .zonaOk{color:var(--ok);font-weight:700;margin:4px 0}
 @media (max-width:820px){
   header{padding:6px 16px}
@@ -129,6 +133,7 @@ th:first-child,td:first-child{text-align:left}
       <div class="tabs">
         <button data-pane="pArea" class="on">Áreas</button>
         <button data-pane="pNotas" id="tabNotas">Notas</button>
+        <button data-pane="pFotos" id="tabFotos">Fotos</button>
         <button data-pane="pZonas">Zonas</button>
         <button data-pane="pProy">Proyecto</button>
       </div>
@@ -149,6 +154,17 @@ th:first-child,td:first-child{text-align:left}
       <div class="pane" id="pNotas">
         <div class="fila"><label class="muted"><input type="checkbox" id="fNotasHechas"> mostrar también las resueltas</label></div>
         <div id="notas"></div>
+      </div>
+      <div class="pane" id="pFotos">
+        <div class="card">
+          <h3>Fotos de campo</h3>
+          <p class="muted">Sube el archivo de fotos (KMZ, KML con fotos, ZIP o JPG sueltos). Cada foto con ubicación GPS aparece en su lugar del plano; las que no traen ubicación quedan abajo para ponerlas con un clic. Las áreas y correcciones no se tocan.</p>
+          <div class="fila"><button class="prim" id="btnFotosCampo">Agregar fotos de campo…</button></div>
+          <input type="file" id="fileCampo" multiple hidden>
+          <p class="muted" id="fotosSinPermiso" hidden>Para subir fotos necesitas permiso de edición de la página (pídeselo al dueño). Puedes ver las fotos que ya están.</p>
+        </div>
+        <div class="fila"><label class="muted"><input type="checkbox" id="fFotos" checked> ver fotos en el plano</label></div>
+        <div id="fotos"></div>
       </div>
       <div class="pane" id="pZonas">
         <p class="muted" id="zonasAyuda"></p>
@@ -197,6 +213,7 @@ const AYUDA = {
   dibujar: "DIBUJAR: clic en cada esquina (se pega a puntos y límites). Doble clic o Enter: cerrar. Retroceso: quitar el último. Esc: cancelar",
   cota: "COTA: clic en el inicio y clic en el final (se pega a los puntos y límites; Ctrl: sin imán). La cota queda puesta para todos. Para quitarla: Seleccionar y clic sobre la cota. Esc: terminar",
   nota: "NOTA: clic en el lugar del plano donde va la nota y escribe el texto. Clic en una nota para verla, editarla o marcarla resuelta. Esc: terminar",
+  foto: "UBICAR FOTO: clic en el lugar del plano donde se tomó la foto. Esc: cancelar",
   zona: "NUEVA ZONA: clic en cada esquina de la zona de trabajo. Doble clic o Enter: cerrar. Esc: cancelar",
 };
 const $ = id => document.getElementById(id);
@@ -207,7 +224,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const S = {
   db:null, user:null, room:null, assets:null, downloads:null,
   uid:null, owner:false, soloLectura:false,
-  info:null, base:null, codigos:{}, tiles:[], areas:new Map(), zonas:new Map(), notas:new Map(), cotas:new Map(), personas:new Map(),
+  info:null, base:null, codigos:{}, tiles:[], areas:new Map(), zonas:new Map(), notas:new Map(), cotas:new Map(), fotos:new Map(), personas:new Map(),
   subsAreas:[], prefActual:null,
   vista:{cx:0, cy:0, s:1}, W:0, H:0, dpr:1,
   sel:null, vsel:-1, tool:"sel", temp:[], arr:null, iman:true, cursor:null, snapLim:null,
@@ -496,6 +513,11 @@ function dibujar(){
   }
   // cotas
   if ($("fCotas").checked) for (const ct of S.cotas.values()) if (vis(caja([ct.a, ct.b]))) dibujarCota(ct.a, ct.b, ct.id === S.cotaSel);
+  // fotos de campo
+  if ($("fFotos").checked) for (const f of S.fotos.values()){
+    if (typeof f.x !== "number" || f.x < vx0 - 20 / s || f.x > vx1 + 20 / s || f.y < vy0 - 20 / s || f.y > vy1 + 20 / s) continue;
+    dibujarCamara(aPantalla(f.x, f.y), f.id === S.fotoSel);
+  }
   // notas
   const verHechas = $("fNotasHechas").checked;
   for (const n of S.notas.values()){
@@ -746,6 +768,7 @@ function deshacer(){
 // ---------------------------------------------------------------- herramientas
 function herramienta(t){
   if (t === "zona" && !S.owner) return;
+  if (t !== "foto") S.fotoUbicar = null;
   S.tool = t; S.temp = []; S.snapLim = null;
   for (const b of document.querySelectorAll("[data-tool]")) b.classList.toggle("on", b.dataset.tool === t);
   $("ayuda").textContent = AYUDA[t]; botones(); pedirDibujo();
@@ -988,6 +1011,11 @@ cv.addEventListener("pointerdown", e => {
     S.arr = {tipo:"pan", x:px[0], y:px[1], v:Object.assign({}, S.vista), movio:false, clic:iman(w, libre)};
     return;
   }
+  if (S.tool === "foto"){
+    S.arr = {tipo:"pan", x:px[0], y:px[1], v:Object.assign({}, S.vista), movio:false, clic:w};
+    return;
+  }
+  { const f = fotoEn(px); if (f){ S.arr = {tipo:"pan", x:px[0], y:px[1], v:Object.assign({}, S.vista), movio:false, foto:f}; return; } }
   { const n = notaEn(px); if (n){ S.arr = {tipo:"pan", x:px[0], y:px[1], v:Object.assign({}, S.vista), movio:false, nota:n}; return; } }
   const a = S.sel && S.areas.get(S.sel);
   if (a && !a.borrado){
@@ -1048,6 +1076,8 @@ function soltar(e){
   if (A.tipo === "pan"){
     if (A.movio) return;
     if (A.clic && (S.tool === "dibujar" || S.tool === "zona")){ S.temp.push(A.clic); S.cursor = null; botones(); pedirDibujo(); return; }
+    if (A.clic && S.tool === "foto"){ ubicarFoto(A.clic); return; }
+    if (A.foto){ abrirFoto(A.foto); return; }
     if (A.nota){ abrirNota(A.nota); return; }
     if (A.clic && S.tool === "nota"){ nuevaNota(A.clic); return; }
     if (A.clic && S.tool === "cota"){
@@ -1204,6 +1234,232 @@ async function pintarNotas(){
     const p = document.createElement("p"); p.textContent = n.texto || "";
     c.appendChild(m); c.appendChild(p);
     c.onclick = () => { const v = S.vista; v.cx = n.x; v.cy = n.y; v.s = Math.max(v.s, 6); cerrarLadoMovil(); abrirNota(n); };
+    cont.appendChild(c);
+  }
+}
+
+// ---------------------------------------------------------------- fotos de campo (opcional)
+// Se suben a la página (KMZ/KML con fotos, ZIP o imágenes sueltas). La ubicación sale del KMZ o del GPS de la foto
+// (EXIF) y se pasa a UTM; las que no traen ubicación se ponen a mano. Se guardan en la colección "fotoscampo".
+const COLOR_FOTO = "#ea80fc";
+function dibujarCamara(q, sel){
+  const x = q[0], y = q[1] - 14;
+  ctx.fillStyle = sel ? "#ff9100" : COLOR_FOTO; ctx.strokeStyle = "#000"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(x - 5, y + 6); ctx.lineTo(x + 5, y + 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.rect(x - 10, y - 7, 20, 14); ctx.rect(x - 4, y - 10, 8, 3); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#222"; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, 7); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x - 1.5, y - 1.5, 1.3, 0, 7); ctx.fill();
+}
+function fotoEn(px){
+  if (!$("fFotos").checked) return null;
+  let mejor = null, md = 15;
+  for (const f of S.fotos.values()){
+    if (typeof f.x !== "number") continue;
+    const q = aPantalla(f.x, f.y); const d = Math.hypot(q[0] - px[0], q[1] - 14 - px[1]);
+    if (d <= md){ md = d; mejor = f; }
+  }
+  return mejor;
+}
+// GPS de una foto JPEG (bloque EXIF): {lat, lon} o null
+function gpsExif(buf){
+  try {
+    const v = new DataView(buf); if (v.byteLength < 4 || v.getUint16(0) !== 0xFFD8) return null;
+    let o = 2;
+    while (o + 10 < v.byteLength){
+      const m = v.getUint16(o); if ((m & 0xFF00) !== 0xFF00) return null;
+      if (m === 0xFFDA) return null;
+      const len = v.getUint16(o + 2);
+      if (m === 0xFFE1 && v.getUint32(o + 4) === 0x45786966) return gpsTiff(v, o + 10);
+      o += 2 + len;
+    }
+  } catch (e) {}
+  return null;
+}
+function gpsTiff(v, t){
+  const le = v.getUint16(t) === 0x4949;
+  const u16 = p => v.getUint16(p, le), u32 = p => v.getUint32(p, le);
+  const buscar = (ifd, tag) => { const n = u16(ifd); for (let i = 0; i < n; i++){ const e = ifd + 2 + i * 12; if (u16(e) === tag) return e; } return -1; };
+  const g = buscar(t + u32(t + 4), 0x8825); if (g < 0) return null;
+  const gi = t + u32(g + 8);
+  const letra = tag => { const e = buscar(gi, tag); return e < 0 ? "" : String.fromCharCode(v.getUint8(e + 8)); };
+  const grados = tag => {
+    const e = buscar(gi, tag); if (e < 0) return null;
+    const p = t + u32(e + 8); let r = 0;
+    for (let i = 0; i < 3; i++){ const d = u32(p + i * 8 + 4); if (d) r += u32(p + i * 8) / d / [1, 60, 3600][i]; }
+    return r;
+  };
+  let lat = grados(2), lon = grados(4); if (lat == null || lon == null || (!lat && !lon)) return null;
+  if (letra(1) === "S") lat = -lat; if (letra(3) === "W") lon = -lon;
+  return {lat, lon};
+}
+// Latitud/longitud (WGS84) a UTM en el huso indicado (sur: +10 000 000)
+function aUtm(lat, lon, huso){
+  const a = 6378137, f = 1 / 298.257223563, k0 = 0.9996, e2 = f * (2 - f), ep2 = e2 / (1 - e2);
+  const rad = Math.PI / 180, fi = lat * rad, l0 = (huso * 6 - 183) * rad;
+  const sn = Math.sin(fi), cs = Math.cos(fi), tn = Math.tan(fi);
+  const N = a / Math.sqrt(1 - e2 * sn * sn), T = tn * tn, C = ep2 * cs * cs, A = cs * (lon * rad - l0);
+  const M = a * ((1 - e2 / 4 - 3 * e2 ** 2 / 64 - 5 * e2 ** 3 / 256) * fi - (3 * e2 / 8 + 3 * e2 ** 2 / 32 + 45 * e2 ** 3 / 1024) * Math.sin(2 * fi)
+    + (15 * e2 ** 2 / 256 + 45 * e2 ** 3 / 1024) * Math.sin(4 * fi) - (35 * e2 ** 3 / 3072) * Math.sin(6 * fi));
+  const x = k0 * N * (A + (1 - T + C) * A ** 3 / 6 + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * A ** 5 / 120) + 500000;
+  let y = k0 * (M + N * tn * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A ** 4 / 24 + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * A ** 6 / 720));
+  if (lat < 0) y += 10000000;
+  return [x, y];
+}
+// Pasa a las coordenadas del plano; si queda lejos del proyecto (más de 20 km) se deja sin ubicar
+function aPlano(lat, lon){
+  if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 84) return null;
+  const cen = S.pts && S.pts.n ? [(S.pts.x0 + S.pts.x1) / 2, (S.pts.y0 + S.pts.y1) / 2] : null;
+  const h = Math.floor((lon + 180) / 6) + 1; let mejor = null, md = Infinity;
+  for (const z of [h, h - 1, h + 1]){
+    if (z < 1 || z > 60) continue;
+    const p = aUtm(lat, lon, z); const d = cen ? Math.hypot(p[0] - cen[0], p[1] - cen[1]) : (z === h ? 0 : 1);
+    if (d < md){ md = d; mejor = p; }
+  }
+  return cen && md > 20000 ? null : mejor;
+}
+const ES_IMAGEN = /\.(jpe?g|png|webp)$/i;
+async function cabecera(blob){ const b = new Uint8Array(await blob.slice(0, 4).arrayBuffer()); return b; }
+// Junta las fotos de lo que se eligió: [{nombre, blob, lat?, lon?}]
+async function juntarFotos(files){
+  const out = [];
+  for (const f of files){
+    const h = await cabecera(f);
+    if (h[0] === 0x50 && h[1] === 0x4B) await fotosDeZip(await JSZip.loadAsync(f), out);
+    else if (h[0] === 0xFF && h[1] === 0xD8 || h[0] === 0x89 && h[1] === 0x50 || ES_IMAGEN.test(f.name)) out.push({nombre:f.name, blob:f});
+    else if (/\.kml$/i.test(f.name) || String.fromCharCode(...h).trimStart().startsWith("<")) await fotosDeKml(await f.text(), null, out);
+  }
+  return out;
+}
+async function fotosDeZip(z, out){
+  const usadas = new Set();
+  for (const n of Object.keys(z.files).filter(n => /\.kml$/i.test(n) && !z.files[n].dir)){
+    await fotosDeKml(await z.file(n).async("string"), {z, base:n.includes("/") ? n.slice(0, n.lastIndexOf("/") + 1) : "", usadas}, out);
+  }
+  for (const n of Object.keys(z.files)){
+    const e = z.files[n]; if (e.dir || usadas.has(n) || !ES_IMAGEN.test(n) || /(^|\/)(__MACOSX|\.)/.test(n)) continue;
+    if (/\.kmz$/i.test(n)) continue;
+    out.push({nombre:n.split("/").pop(), blob:new Blob([await e.async("uint8array")], {type:/\.png$/i.test(n) ? "image/png" : "image/jpeg"})});
+  }
+  for (const n of Object.keys(z.files).filter(n => /\.(kmz|zip)$/i.test(n) && !z.files[n].dir)){
+    try { await fotosDeZip(await JSZip.loadAsync(await z.file(n).async("uint8array")), out); } catch (e) {}
+  }
+}
+// Placemark (punto) o PhotoOverlay con su imagen (en la descripción o en el ícono)
+async function fotosDeKml(txt, kmz, out){
+  const doc = new DOMParser().parseFromString(txt, "application/xml");
+  const hijos = (el, nom) => [...el.getElementsByTagName("*")].filter(x => x.localName === nom);
+  const texto = (el, nom) => { const x = hijos(el, nom)[0]; return x ? x.textContent.trim() : ""; };
+  const buscarEnKmz = ref => {
+    if (!kmz || !ref) return null;
+    let r = ref.trim().replace(/^files?:\/\/\/?/i, "").replace(/^\.\//, "");
+    try { r = decodeURIComponent(r); } catch (e) {}
+    for (const c of [kmz.base + r, r]) if (kmz.z.file(c)) return c;
+    const fin = r.split("/").pop().toLowerCase();
+    return Object.keys(kmz.z.files).find(n => n.split("/").pop().toLowerCase() === fin) || null;
+  };
+  for (const pm of [...hijos(doc, "Placemark"), ...hijos(doc, "PhotoOverlay")]){
+    let lon = NaN, lat = NaN;
+    const co = texto(pm, "coordinates");
+    if (co){ const v = co.split(/\s+/)[0].split(",").map(Number); lon = v[0]; lat = v[1]; }
+    else { lon = +texto(pm, "longitude"); lat = +texto(pm, "latitude"); }
+    const refs = [];
+    const desc = texto(pm, "description");
+    for (const m of desc.matchAll(/<img[^>]+src\s*=\s*["']?([^"' >]+)/gi)) refs.push(m[1]);
+    const ic = hijos(pm, "Icon")[0]; if (ic && pm.localName === "PhotoOverlay") refs.push(texto(ic, "href"));
+    for (const ref of refs){
+      const n = buscarEnKmz(ref); if (!n || (kmz.usadas.has(n) && pm.localName !== "PhotoOverlay")) continue;
+      kmz.usadas.add(n);
+      const blob = new Blob([await kmz.z.file(n).async("uint8array")], {type:/\.png$/i.test(n) ? "image/png" : "image/jpeg"});
+      out.push({nombre:texto(pm, "name") || n.split("/").pop(), blob, lat, lon});
+    }
+  }
+}
+// Achica fotos grandes (máximo 2048 px) para que carguen rápido en obra
+async function achicar(blob){
+  let bmp; try { bmp = await createImageBitmap(blob); } catch (e) { return {blob, w:0, h:0}; }
+  const w = bmp.width, h = bmp.height, k = Math.min(1, 2048 / Math.max(w, h));
+  if (k === 1 && blob.size < 1.5e6 && /jpe?g|png/.test(blob.type)){ bmp.close && bmp.close(); return {blob, w, h}; }
+  const c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
+  c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height); bmp.close && bmp.close();
+  const b = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+  return {blob:b || blob, w:c.width, h:c.height};
+}
+async function agregarFotosCampo(files){
+  if (!S.assets || !puedeEditar()){ toast("Para subir fotos necesitas permiso de edición de la página."); return; }
+  const prog = progreso("Leyendo el archivo de fotos…");
+  let lista;
+  try { lista = await juntarFotos(files); }
+  catch (e) { prog.cerrar(); toast("No se pudo leer el archivo (" + (e.message || e) + ")."); return; }
+  if (!lista.length){ prog.cerrar(); await modal("No encontré fotos en lo que elegiste. Si es un archivo de una aplicación de fotos con GPS, envíame uno de muestra.", [["Cerrar", true, "prim"]]); return; }
+  let con = 0, sin = 0, fallas = 0;
+  for (let i = 0; i < lista.length; i++){
+    const it = lista[i];
+    prog.set(i / lista.length, "Subiendo foto " + (i + 1) + " de " + lista.length + "…");
+    try {
+      let pos = isFinite(it.lat) && isFinite(it.lon) ? aPlano(it.lat, it.lon) : null;
+      if (!pos){ const g = gpsExif(await it.blob.slice(0, 262144).arrayBuffer()); if (g) pos = aPlano(g.lat, g.lon); }
+      const ch = await achicar(it.blob);
+      const r = await reintentar(() => S.assets.upload(ch.blob, {type:ch.blob.type || "image/jpeg"}));
+      const id = "f" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const body = {asset:r.id, nombre:String(it.nombre || "foto").slice(0, 120), por:S.uid, t:Date.now(), w:ch.w, h:ch.h};
+      if (pos){ body.x = r3(pos[0]); body.y = r3(pos[1]); con++; } else sin++;
+      S.fotos.set(id, Object.assign({id}, body));
+      await reintentar(() => S.db.doc("fotoscampo/" + id).set(body));
+    } catch (e) { fallas++; }
+  }
+  prog.cerrar(); pintarFotos(); pedirDibujo(); abrirPane("pFotos");
+  await modal("Fotos subidas: " + (con + sin) + ". " + (con ? con + " quedaron en su ubicación. " : "") + (sin ? sin + " no traen ubicación: en la pestaña Fotos usa \"Ubicar\" y haz clic en el plano. " : "") + (fallas ? fallas + " no se pudieron subir." : ""), [["Cerrar", true, "prim"]]);
+}
+function empezarUbicar(f){
+  if (!puedeEditar()) return;
+  herramienta("foto"); S.fotoUbicar = f.id; cerrarLadoMovil();
+  toast("Haz clic en el plano donde se tomó \"" + f.nombre + "\".", 5000);
+}
+function ubicarFoto(w){
+  const f = S.fotoUbicar && S.fotos.get(S.fotoUbicar); herramienta("sel");
+  if (!f) return;
+  const cambios = {x:r3(w[0]), y:r3(w[1]), ult:S.uid};
+  Object.assign(f, cambios); pintarFotos(); pedirDibujo(); toast("Foto ubicada.");
+  escribir("fotoscampo/" + f.id, () => S.db.doc("fotoscampo/" + f.id).update(cambios)).catch(() => {});
+}
+async function abrirFoto(f){
+  S.fotoSel = f.id; pedirDibujo();
+  if (f.por) await resolverPerfiles([f.por]);
+  const quien = (f.por && S.perfiles[f.por] && S.perfiles[f.por].name) || "alguien";
+  const img = document.createElement("img"); img.className = "fotoGrande"; img.src = "/_blob/" + f.asset; img.alt = f.nombre || "foto";
+  const bots = [["Borrar", "borrar", "peligro"], [typeof f.x === "number" ? "Mover" : "Ubicar", "mover"], ["Abrir aparte", "abrir"], ["Cerrar", "cerrar", "prim"]];
+  const r = await modal((f.nombre || "Foto") + " · subida por " + quien + " · " + hace(f.t), puedeEditar() ? bots : bots.slice(2), img);
+  S.fotoSel = null; pedirDibujo();
+  if (r === "abrir"){ window.open("/_blob/" + f.asset, "_blank"); return; }
+  if (r === "mover"){ empezarUbicar(f); return; }
+  if (r === "borrar"){
+    if (!await modal("¿Borrar esta foto de la página?", [["Cancelar", false], ["Borrar", true, "prim"]])) return;
+    S.fotos.delete(f.id); pintarFotos(); pedirDibujo();
+    escribir("fotoscampo/" + f.id, () => S.db.doc("fotoscampo/" + f.id).delete()).catch(() => {});
+  }
+}
+async function pintarFotos(){
+  const cont = $("fotos");
+  const l = [...S.fotos.values()].sort((a, b) => (typeof a.x === "number") - (typeof b.x === "number") || (b.t || 0) - (a.t || 0));
+  const sin = l.filter(f => typeof f.x !== "number").length;
+  $("tabFotos").textContent = l.length ? "Fotos (" + l.length + ")" : "Fotos";
+  $("btnFotosCampo").hidden = !S.assets || S.soloLectura; $("fotosSinPermiso").hidden = !!S.assets && !S.soloLectura;
+  cont.innerHTML = "";
+  if (!l.length){ const p = document.createElement("p"); p.className = "muted"; p.textContent = "Todavía no hay fotos de campo."; cont.appendChild(p); return; }
+  if (sin){ const p = document.createElement("p"); p.className = "muted"; p.textContent = sin + " foto(s) sin ubicación: toca \"Ubicar\" y haz clic en el plano."; cont.appendChild(p); }
+  for (const f of l){
+    const c = document.createElement("div"); c.className = "card foto";
+    const im = document.createElement("img"); im.loading = "lazy"; im.src = "/_blob/" + f.asset; im.alt = "";
+    const d = document.createElement("div");
+    const t = document.createElement("div"); t.textContent = f.nombre || "Foto";
+    const m = document.createElement("div"); m.className = "muted";
+    m.textContent = typeof f.x === "number" ? hace(f.t) + (laminaDe([f.x, f.y]) ? " · lámina " + laminaDe([f.x, f.y]) : "") : "Sin ubicación";
+    d.appendChild(t); d.appendChild(m); c.appendChild(im); c.appendChild(d);
+    if (typeof f.x !== "number" && puedeEditar()){
+      const b = document.createElement("button"); b.textContent = "Ubicar"; b.style.marginLeft = "auto";
+      b.onclick = e => { e.stopPropagation(); empezarUbicar(f); }; c.appendChild(b);
+    }
+    c.onclick = () => { if (typeof f.x === "number"){ const v = S.vista; v.cx = f.x; v.cy = f.y; v.s = Math.max(v.s, 6); cerrarLadoMovil(); pedirDibujo(); } abrirFoto(f); };
     cont.appendChild(c);
   }
 }
@@ -1474,6 +1730,9 @@ function enlazar(){
   $("btnLado").onclick = () => $("lado").classList.toggle("abierto");
   $("fCod").onchange = llenarLista; $("fRev").onchange = llenarLista; $("fPend").onchange = llenarLista; $("fZona").onchange = llenarLista; $("fLam").onchange = pedirDibujo; $("fLotes").onchange = pedirDibujo; $("fCotas").onchange = pedirDibujo;
   $("fNotasHechas").onchange = () => { pintarNotas(); pedirDibujo(); };
+  $("fFotos").onchange = pedirDibujo;
+  $("btnFotosCampo").onclick = () => $("fileCampo").click();
+  $("fileCampo").onchange = e => { const f = [...e.target.files]; e.target.value = ""; if (f.length) agregarFotosCampo(f); };
   $("lista").onclick = e => { const tr = e.target.closest("tr"); if (tr){ seleccionar(tr.dataset.p, true); cerrarLadoMovil(); } };
   $("btnCargar").onclick = () => $("fileProy").click();
   $("btnFotos").onclick = () => $("fileFotos").click();
@@ -1513,6 +1772,11 @@ async function iniciar(){
     S.notas.clear(); for (const d of snap.docs){ const n = Object.assign({id:d.id}, d.data()); if (typeof n.x === "number" && typeof n.y === "number") S.notas.set(d.id, n); }
     pintarNotas(); pedirDibujo();
   }, () => {});
+  db.collection("fotoscampo").onSnapshot(snap => {
+    S.fotos.clear(); for (const d of snap.docs){ const f = Object.assign({id:d.id}, d.data()); if (f.asset) S.fotos.set(d.id, f); }
+    pintarFotos(); pedirDibujo();
+  }, () => {});
+  pintarFotos();
   db.collection("personas").onSnapshot(snap => {
     S.personas.clear(); for (const d of snap.docs) S.personas.set(d.id, d.data());
     if (S.uid && !S.soloLectura && !S.personas.has(S.uid) && !S.yaAnotado){ S.yaAnotado = true; reintentar(() => db.doc("personas/" + S.uid).set({desde:Date.now()})).catch(() => {}); }

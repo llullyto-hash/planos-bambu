@@ -163,6 +163,7 @@ Todo lo anterior sigue igual; lo nuevo se puede apagar y entonces el resultado e
 | Cantidad fija de láminas (p. ej. 4): la escala se ajusta sola (`laminas.escala_para`) | `laminas.py`, `gui.py` | ventana 3 / `--cantidad-laminas` |
 | Cotas de la página colaborativa en el DXF (capa COTAS, cotas alineadas) | `colaborativo.py`, `exportar.py` | — |
 | Notas de la página colaborativa en el DXF (capa NOTAS DE REVISION, no se plotea; solo las pendientes) | `colaborativo.py`, `exportar.py` | — |
+| Fotos de campo en la página colaborativa (pestaña Fotos: KMZ/KML/ZIP/JPG; ubicación por KMZ o GPS de la foto, pasada a UTM; las sin ubicación se ponen con un clic; colección `fotoscampo`) | `web/revision_colaborativa.html` | — |
 | Numeración por lámina (VD-1… siguen el orden de las láminas) | `laminas.dividir` | ventana 3 |
 | Metrado con perímetro, lámina, reglas aplicadas y hoja *Por lamina* (columnas nuevas al final) | `areas.guardar_metrado` | — |
 | Verificación: etiquetas repetidas, áreas que se tocan, cartel vs. área (`revision_carteles.csv`) | `__main__.verificar`, `revisar_plano.py` | ventana 4 |
