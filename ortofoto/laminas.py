@@ -12,6 +12,7 @@ En el modelo se dibujan los limites de cada lamina (capa LIMITE DE LAMINA).
 """
 import json
 import math
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -163,10 +164,12 @@ def _mejor_corrimiento(puntos, x0, y1, cw, ch, pasos=10):
         for fy in range(pasos):
             i = np.floor((xs - (x0 - fx / pasos * cw)) / cw).astype(int)
             j = np.floor(((y1 + fy / pasos * ch) - ys) / ch).astype(int)
-            n = len(set(zip(i.tolist(), j.tolist())))
-            if mejor is None or n < mejor[0]:
-                mejor = (n, fx / pasos, fy / pasos)
-    return mejor
+            celdas = Counter(zip(i.tolist(), j.tolist()))
+            # menos laminas; a igual cantidad, la mas pareja (que ninguna quede casi vacia)
+            clave = (len(celdas), -min(celdas.values()))
+            if mejor is None or clave < mejor[0]:
+                mejor = (clave, fx / pasos, fy / pasos)
+    return mejor[0][0], mejor[1], mejor[2]
 
 
 def dividir(met, conf, asignar=True, ajustar=None):
