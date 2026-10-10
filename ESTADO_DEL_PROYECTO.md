@@ -160,6 +160,7 @@ Todo lo anterior sigue igual; lo nuevo se puede apagar y entonces el resultado e
 | Láminas A1 con membrete, leyenda, plano clave, cuadro, "VER LÁMINA", PDF | `laminas.py` | ventana 3 / sin `--laminas` |
 | Membrete: llenarlo en la ventana, escudo/logo propio, guardar/abrir por proyecto (.json) y **aplicarlo a un DXF ya generado** sin reprocesar (`laminas.actualizar_membrete`) | `laminas.py`, `gui.py` | — |
 | Revisión: herramienta *Agregar vértice*; área nueva pegada a otra se puede unir o dejar sin superponer; botón *Unir con vecinas* (también en la página colaborativa) | `visor.py`, `areas.unir_poligonos/separar_poligono`, `web/` | — |
+| Cantidad fija de láminas (p. ej. 4): la escala se ajusta sola (`laminas.escala_para`) | `laminas.py`, `gui.py` | ventana 3 / `--cantidad-laminas` |
 | Numeración por lámina (VD-1… siguen el orden de las láminas) | `laminas.dividir` | ventana 3 |
 | Metrado con perímetro, lámina, reglas aplicadas y hoja *Por lamina* (columnas nuevas al final) | `areas.guardar_metrado` | — |
 | Verificación: etiquetas repetidas, áreas que se tocan, cartel vs. área (`revision_carteles.csv`) | `__main__.verificar`, `revisar_plano.py` | ventana 4 |
@@ -170,7 +171,7 @@ Todo lo anterior sigue igual; lo nuevo se puede apagar y entonces el resultado e
 | Ventana didáctica: pasos, ayudas, guía, barra de estado, botones de resultados | `gui.py` | — |
 
 Línea de comandos nueva: `--escala`, `--cartel`, `--sin-corte-lineal`, `--laminas`, `--orientacion norte|auto`,
-`--traslape`, `--prefijo-lamina`, `--membrete datos.json`, `--sin-vista-pdf`, `--carpeta-por-corrida`,
+`--traslape`, `--cantidad-laminas N`, `--prefijo-lamina`, `--membrete datos.json`, `--sin-vista-pdf`, `--carpeta-por-corrida`,
 `--numero-separa`, `--codigos-control`.
 
 Programa, instalador y página colaborativa se llaman **WambriDemoliciones**. La página publicada (mismo enlace) ya tiene la versión 1.1.

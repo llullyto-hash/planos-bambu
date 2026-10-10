@@ -101,6 +101,7 @@ class ConfLaminas:
     numerar_por_lamina: bool = True
     membrete: dict = field(default_factory=lambda: dict(MEMBRETE_PETRO))
     vista_pdf: bool = True
+    cantidad: int = 0  # 0: segun la escala elegida | N: la escala se ajusta para que salgan N laminas o menos
 
 
 @dataclass
@@ -153,8 +154,11 @@ def _punto(g):
     return g.representative_point() if g.geom_type.endswith("Polygon") else g.interpolate(0.5, normalized=True)
 
 
-def dividir(met, conf):
-    """Laminas que cubren las areas y lineas con metrado. Asigna cada elemento a una sola lamina."""
+def dividir(met, conf, asignar=True):
+    """Laminas que cubren las areas y lineas con metrado. Asigna cada elemento a una sola lamina.
+    Con conf.cantidad > 0 primero cambia conf.escala para que salgan esas laminas (o menos)."""
+    if getattr(conf, "cantidad", 0) and asignar:
+        conf.escala = escala_para(met, conf, int(conf.cantidad))
     elementos = list(met.areas) + [l for l in met.lineas if con_metrado(l)]
     geoms = [e.poligono if hasattr(e, "poligono") else e.linea for e in elementos]
     if not geoms:
@@ -188,6 +192,8 @@ def dividir(met, conf):
         devolver = lambda g: affinity.rotate(g, ang, origin=(0, 0), use_radians=True)  # noqa: E731
         lam = Lamina(f"{conf.prefijo}{conf.inicio + k:02d}", j, i, ang, devolver(nucleo_l), devolver(marco_l), (cx, cy))
         for el in celdas[(j, i)]:
+            if not asignar:
+                continue
             el.lamina = lam.nombre
             (lam.areas if hasattr(el, "poligono") else lam.lineas).append(el)
         laminas.append(lam)
@@ -198,6 +204,21 @@ def dividir(met, conf):
             if v is not None:
                 l.vecinos[nombre] = v.nombre
     return laminas
+
+
+ESCALAS_NORMALES = (200, 250, 300, 400, 500, 600, 750, 800, 1000, 1250, 1500, 2000, 2500, 3000, 4000, 5000,
+                    7500, 10000)
+
+
+def escala_para(met, conf, cantidad):
+    """La escala normal mas grande (mas detalle) con la que el dibujo entra en `cantidad` laminas o menos."""
+    from dataclasses import replace
+
+    for esc in ESCALAS_NORMALES:
+        prueba = replace(conf, escala=float(esc), cantidad=0)
+        if len(dividir(met, prueba, asignar=False)) <= cantidad:
+            return float(esc)
+    return float(ESCALAS_NORMALES[-1])
 
 
 def clave_orden(laminas):

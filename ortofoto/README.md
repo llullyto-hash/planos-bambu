@@ -73,6 +73,8 @@ Tipos:
 
 **3. Láminas y membrete**
 - Tipo de cartel (PETRO o texto suelto como antes), líneas de corte, escala (1:500 por defecto).
+- **Cantidad de láminas:** *Según la escala* (las que hagan falta) o un número fijo (por ejemplo 4): el programa
+  elige la escala con más detalle que entra en esa cantidad y usa esa escala también para los carteles.
 - Láminas: norte arriba o giradas según las calles, traslape, prefijo (`D-`) y primer número,
   numerar las áreas lámina por lámina, PDF de vista previa.
 - Datos del membrete (proyecto, CUI, entidad, ubicación, plano, fecha, profesional).

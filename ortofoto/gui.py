@@ -46,6 +46,7 @@ AYUDA_TIPOS = ("linea: se une en polilinea abierta (metrado en m)\n"
                "contorno: un borde que se cierra solo (martillo, acceso)\n"
                "punto: solo puntos (arboles, cajas, postes)")
 ESCALAS = ("200", "250", "500", "750", "1000")
+CANTIDADES = ("Segun la escala", "1", "2", "3", "4", "5", "6", "8", "10")
 GUIA = """COMO USAR EL PROGRAMA (paso a paso)
 
 1. ARCHIVOS
@@ -145,6 +146,7 @@ class App(tk.Tk):
         self.lam_traslape = tk.StringVar(value="5")
         self.lam_prefijo = tk.StringVar(value="D-")
         self.lam_inicio = tk.StringVar(value="1")
+        self.lam_cantidad = tk.StringVar(value="Segun la escala")
         self.lam_numerar = tk.BooleanVar(value=True)
         self.lam_pdf = tk.BooleanVar(value=True)
         self.carpeta_por_corrida = tk.BooleanVar(value=False)
@@ -155,7 +157,8 @@ class App(tk.Tk):
         self._armar()
         self._llenar_tabla()
         for v in list(self.var.values()) + [self.calce, self.cartel, self.corte_lineal, self.escala, self.lam_activar,
-                                            self.lam_orientacion, self.lam_prefijo, self.carpeta_por_corrida]:
+                                            self.lam_orientacion, self.lam_prefijo, self.carpeta_por_corrida,
+                                            self.lam_cantidad]:
             v.trace_add("write", lambda *_: self._actualizar_estado())
         self._actualizar_estado()
         self.protocol("WM_DELETE_WINDOW", self._cerrar)
@@ -166,7 +169,7 @@ class App(tk.Tk):
         return {"var": {k: v.get() for k, v in self.var.items()}, "capas_limite": self.capas_limite.get(),
                 "calce": self.calce.get(), "escala": self.escala.get(), "cartel": self.cartel.get(),
                 "orientacion": self.lam_orientacion.get(), "traslape": self.lam_traslape.get(),
-                "prefijo": self.lam_prefijo.get(), "revisar_antes": self.revisar_antes.get()}
+                "prefijo": self.lam_prefijo.get(), "cantidad": self.lam_cantidad.get(), "revisar_antes": self.revisar_antes.get()}
 
     def _cargar_ventana(self):
         try:
@@ -178,7 +181,8 @@ class App(tk.Tk):
                 self.var[k].set(v)
         for clave, var in (("capas_limite", self.capas_limite), ("calce", self.calce), ("escala", self.escala),
                            ("cartel", self.cartel), ("orientacion", self.lam_orientacion),
-                           ("traslape", self.lam_traslape), ("prefijo", self.lam_prefijo)):
+                           ("traslape", self.lam_traslape), ("prefijo", self.lam_prefijo),
+                           ("cantidad", self.lam_cantidad)):
             if d.get(clave):
                 var.set(d[clave])
         if "revisar_antes" in d:
@@ -423,6 +427,13 @@ class App(tk.Tk):
         ttk.Checkbutton(izq, text="Dividir en laminas con membrete", variable=self.lam_activar).grid(
             row=r, column=0, columnspan=2, sticky="w")
         r += 1
+        ttk.Label(izq, text="Cantidad de laminas:").grid(row=r, column=0, sticky="w", pady=2)
+        cb = ttk.Combobox(izq, textvariable=self.lam_cantidad, values=CANTIDADES, width=14)
+        cb.grid(row=r, column=1, sticky="w")
+        Ayuda(cb, "'Segun la escala': salen las laminas que hagan falta a la escala elegida. Si elige un numero "
+                  "(por ejemplo 4), el programa busca la escala con mas detalle que entra en esas laminas y usa esa "
+                  "misma escala para los carteles. Escriba el numero que quiera si no esta en la lista.")
+        r += 1
         ttk.Label(izq, text="Orientacion:").grid(row=r, column=0, sticky="w")
         ttk.Radiobutton(izq, text="Norte arriba", variable=self.lam_orientacion, value="norte").grid(
             row=r, column=1, sticky="w")
@@ -608,7 +619,9 @@ class App(tk.Tk):
                "  • Carteles " + ("con area y perimetro (PETRO)" if self.cartel.get() == "petro" else "simples")
                + (" y lineas de corte CL" if self.corte_lineal.get() else "")]
         if self.lam_activar.get():
-            lin.append(f"  • Laminas A1 a 1:{self.escala.get()} con membrete, prefijo {self.lam_prefijo.get()}"
+            cant = str(self.lam_cantidad.get()).strip()
+            lin.append((f"  • {cant.split()[0]} laminas A1 (la escala se ajusta sola)" if cant[:1].isdigit()
+                        else f"  • Laminas A1 a 1:{self.escala.get()}") + f" con membrete, prefijo {self.lam_prefijo.get()}"
                        + (", giradas segun las calles" if self.lam_orientacion.get() == "auto" else ", norte arriba"))
         lin.append("  • Guardar en " + (self.var["salida"].get() or "(sin carpeta)")
                    + (" \\ corrida_fecha_hora" if self.carpeta_por_corrida.get() else ""))
@@ -685,7 +698,16 @@ class App(tk.Tk):
             activar=True, escala=self._numero(self.escala.get(), 500), traslape=self._numero(self.lam_traslape.get(), 5),
             orientacion=self.lam_orientacion.get(), prefijo=self.lam_prefijo.get(),
             inicio=int(self._numero(self.lam_inicio.get(), 1)), numerar_por_lamina=self.lam_numerar.get(),
-            membrete=self._leer_membrete(), vista_pdf=self.lam_pdf.get())
+            membrete=self._leer_membrete(), vista_pdf=self.lam_pdf.get(), cantidad=self._cantidad())
+
+    def _cantidad(self):
+        texto = str(self.lam_cantidad.get()).strip()
+        if not texto or not texto[0].isdigit():
+            return 0
+        n = int(self._numero(texto.split()[0], 0))
+        if n < 1:
+            raise ValueError("La cantidad de laminas debe ser 1 o mas")
+        return n
 
     @staticmethod
     def _numero(texto, defecto):

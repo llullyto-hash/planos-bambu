@@ -295,6 +295,8 @@ def exportar_calculo(c, avisar=print):
         avisar(f"Lineas de corte (CL): {len(cortes)} tramos, {sum(l.linea.length for l in cortes):,.2f} m")
     conf_lam = getattr(op, "laminas", None)
     lams = lammod.dividir(met, conf_lam) if conf_lam is not None and conf_lam.activar else []
+    if lams and conf_lam.cantidad:
+        op.escala = conf_lam.escala  # carteles y textos a la escala que dio esa cantidad de laminas
     if lams and conf_lam.numerar_por_lamina:
         areas._numerar(met, lammod.clave_orden(lams))
     else:
@@ -459,6 +461,8 @@ def main(argv=None):
     ap.add_argument("--laminas", action="store_true", help="Dividir en laminas A1 con membrete (layouts)")
     ap.add_argument("--orientacion", choices=("norte", "auto"), default="norte",
                     help="Laminas con el norte arriba o giradas segun la direccion principal del dibujo")
+    ap.add_argument("--cantidad-laminas", type=int, default=0,
+                    help="Dividir en esta cantidad de laminas (o menos): la escala se ajusta sola. 0 = segun --escala")
     ap.add_argument("--traslape", type=float, default=5.0, help="m que se repiten entre laminas vecinas")
     ap.add_argument("--prefijo-lamina", default="D-", help="Prefijo del numero de lamina (D-01, D-02...)")
     ap.add_argument("--membrete", default="", help="JSON con los datos del membrete (proyecto, fecha, ...)")
@@ -478,7 +482,8 @@ def main(argv=None):
 
             membrete.update(json.loads(Path(a.membrete).read_text(encoding="utf-8")))
         conf_lam = lammod.ConfLaminas(escala=a.escala, traslape=a.traslape, orientacion=a.orientacion,
-                                      prefijo=a.prefijo_lamina, membrete=membrete, vista_pdf=not a.sin_vista_pdf)
+                                      prefijo=a.prefijo_lamina, membrete=membrete, vista_pdf=not a.sin_vista_pdf,
+                                      cantidad=a.cantidad_laminas)
     op = Opciones(puntos=a.puntos, salida=a.salida, orto=a.orto, calce_dxf=a.calce_dxf, control=a.control,
                   calce_auto=not a.sin_calce_auto, radio_calce=a.radio_calce, resolucion=a.resolucion,
                   codigos=a.codigos, plantilla=a.plantilla, ventana=tuple(a.ventana) if a.ventana else None,

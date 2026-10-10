@@ -688,3 +688,25 @@ def test_unir_y_separar_areas_dibujadas_a_mano():
         assert abs(piezas[0].bounds[0] - 10.0) < 1e-6
     lista = [areas.Area("VER", None, a, "manual")]
     assert areas.vecinas(box(10.25, 0, 12, 2), lista) and not areas.vecinas(box(11, 0, 12, 2), lista)
+
+
+def test_laminas_en_cantidad_fija_ajusta_la_escala():
+    from types import SimpleNamespace
+
+    from shapely.geometry import box as caja
+
+    from ortofoto import laminas as lammod
+
+    # areas repartidas en 1200 m x 300 m: a 1/500 salen muchas laminas
+    met = SimpleNamespace(areas=[SimpleNamespace(poligono=caja(x, y, x + 5, y + 5))
+                                 for x in range(0, 1200, 40) for y in range(0, 300, 60)], lineas=[])
+    normal = lammod.dividir(met, lammod.ConfLaminas(vista_pdf=False))
+    assert len(normal) > 4
+    conf = lammod.ConfLaminas(vista_pdf=False, cantidad=4)
+    cuatro = lammod.dividir(met, conf)
+    assert 1 <= len(cuatro) <= 4 and conf.escala > 500
+    # es la escala con mas detalle posible: la anterior de la lista ya no entra en 4
+    previa = lammod.ESCALAS_NORMALES[lammod.ESCALAS_NORMALES.index(int(conf.escala)) - 1]
+    assert len(lammod.dividir(met, lammod.ConfLaminas(vista_pdf=False, escala=previa))) > 4
+    # todas las areas quedan en alguna de las 4
+    assert sum(len(l.areas) for l in cuatro) == len(met.areas)
