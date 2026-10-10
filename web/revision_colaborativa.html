@@ -137,6 +137,7 @@ th:first-child,td:first-child{text-align:left}
           <label class="muted"><input type="checkbox" id="fRev"> solo a revisar</label>
           <label class="muted"><input type="checkbox" id="fZona"> solo mi zona</label>
           <label class="muted"><input type="checkbox" id="fLam" checked> ver láminas</label>
+          <label class="muted"><input type="checkbox" id="fLotes" checked> ver lotes</label>
         </div>
         <table><thead><tr><th>Área</th><th>m²</th><th>Perím.</th><th>Largo</th><th>Lám.</th><th>Rev.</th></tr></thead><tbody id="lista"></tbody></table>
       </div>
@@ -182,7 +183,7 @@ th:first-child,td:first-child{text-align:left}
 // ---------------------------------------------------------------- constantes
 const IMAN_PX = 10, VERTICE_PX = 14, AREA_MIN = 0.15, POR_COLECCION = 800, EN_LIMITE = 0.02;
 const COLOR_PUNTO = {VER:"#ff9f1c", CSH:"#3a86ff", ALC:"#00d2ff", OCHV:"#3a86ff", LP:"#3a86ff"};
-const COLOR_LIMITE = "#ff3df5";
+const COLOR_LIMITE = "#ff3df5", COLOR_LOTE = "#e8f4ff";
 const PALETA = ["#e6194b","#3cb44b","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45"];
 const AYUDA = {
   sel: "Clic: seleccionar · arrastrar vértice: moverlo (Ctrl: sin imán) · doble clic en borde: agregar vértice · Shift+clic en vértice: quitarlo · arrastrar fondo: mover · rueda: zoom",
@@ -204,7 +205,7 @@ const S = {
   vista:{cx:0, cy:0, s:1}, W:0, H:0, dpr:1,
   sel:null, vsel:-1, tool:"sel", temp:[], arr:null, iman:true, cursor:null, snapLim:null,
   pila:[], peers:[], perfiles:{}, img:new Map(),
-  pts:null, grid:null, segs:[],
+  pts:null, grid:null, segs:[], lotes:[],
   ultimoToque:{t:0,x:0,y:0},
 };
 
@@ -406,6 +407,16 @@ function dibujar(){
     const q = aPantalla(z.bb[0], z.bb[3]); ctx.font = "bold 13px system-ui"; ctx.fillStyle = z.color || "#fff";
     ctx.fillText(z.nombre || "Zona", q[0] + 4, q[1] + 15);
   }
+  // líneas de lotes (capa "lotes" del plano base)
+  if (S.lotes.length && $("fLotes").checked){
+    ctx.strokeStyle = COLOR_LOTE; ctx.globalAlpha = 0.75; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const ln of S.lotes){
+      if (!vis(ln.bb)) continue;
+      ln.c.forEach((p, i) => { const q = aPantalla(p[0], p[1]); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
+    }
+    ctx.stroke(); ctx.globalAlpha = 1;
+  }
   // límites de propiedad
   ctx.strokeStyle = COLOR_LIMITE; ctx.lineWidth = 1.2;
   for (const ln of S.segs){
@@ -524,7 +535,7 @@ function dibujar(){
 
 // ---------------------------------------------------------------- imán (puntos y límites)
 function armarIndices(){
-  const b = S.base; S.pts = null; S.grid = null; S.segs = [];
+  const b = S.base; S.pts = null; S.grid = null; S.segs = []; S.lotes = [];
   if (!b) return;
   const n = b.puntos.length;
   const P = {n, x:new Float64Array(n), y:new Float64Array(n), col:new Array(n), imp:new Uint8Array(n), num:new Array(n), desc:new Array(n), x0:Infinity, y0:Infinity, x1:-Infinity, y1:-Infinity};
@@ -537,6 +548,7 @@ function armarIndices(){
   });
   S.pts = P; S.grid = grid;
   S.segs = (b.limites || []).filter(c => c.length > 1).map(c => ({c, bb:caja(c)}));
+  S.lotes = (b.lotes || []).filter(c => c.length > 1).map(c => ({c, bb:caja(c)}));
   S.laminas = (b.laminas || []).filter(l => l && l.coords && l.coords.length > 2).map(l => ({nombre:l.nombre, c:l.coords, bb:caja(l.coords)}));
   for (const a of S.areas.values()) a.lam = laminaDe(a.cen);
 }
@@ -1295,7 +1307,7 @@ function pintarProyecto(){
   const box = $("proyInfo"); box.innerHTML = "";
   const h = document.createElement("h3"); h.textContent = S.info ? (S.info.nombre || "Proyecto") : "Sin proyecto"; box.appendChild(h);
   const p = document.createElement("p"); p.className = "muted";
-  p.textContent = S.info ? (S.info.n + " áreas importadas · " + (S.info.tiles || []).length + " fotos · cargado " + hace(S.info.creado) + (S.base ? " · " + S.base.puntos.length + " puntos, " + S.base.limites.length + " límites" + ((S.base.laminas || []).length ? ", " + S.base.laminas.length + " láminas" : "") : "")) : (S.owner ? "Carga el proyecto abajo." : "El dueño aún no ha cargado el proyecto.");
+  p.textContent = S.info ? (S.info.n + " áreas importadas · " + (S.info.tiles || []).length + " fotos · cargado " + hace(S.info.creado) + (S.base ? " · " + S.base.puntos.length + " puntos, " + S.base.limites.length + " límites" + ((S.base.lotes || []).length ? ", " + S.base.lotes.length + " líneas de lotes" : "") + ((S.base.laminas || []).length ? ", " + S.base.laminas.length + " láminas" : "") : "")) : (S.owner ? "Carga el proyecto abajo." : "El dueño aún no ha cargado el proyecto.");
   box.appendChild(p);
   if (S.soloLectura){ const r = document.createElement("p"); r.className = "muted"; r.textContent = "Estás en solo lectura."; box.appendChild(r); }
   $("proyDueno").hidden = !S.owner;
@@ -1354,7 +1366,7 @@ function enlazar(){
   $("btnTodo").onclick = verTodo;
   $("btnMiZona").onclick = irMiZona;
   $("btnLado").onclick = () => $("lado").classList.toggle("abierto");
-  $("fCod").onchange = llenarLista; $("fRev").onchange = llenarLista; $("fZona").onchange = llenarLista; $("fLam").onchange = pedirDibujo;
+  $("fCod").onchange = llenarLista; $("fRev").onchange = llenarLista; $("fZona").onchange = llenarLista; $("fLam").onchange = pedirDibujo; $("fLotes").onchange = pedirDibujo;
   $("fNotasHechas").onchange = () => { pintarNotas(); pedirDibujo(); };
   $("lista").onclick = e => { const tr = e.target.closest("tr"); if (tr){ seleccionar(tr.dataset.p, true); cerrarLadoMovil(); } };
   $("btnCargar").onclick = () => $("fileProy").click();
