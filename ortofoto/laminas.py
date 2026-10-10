@@ -449,7 +449,7 @@ def dibujar_laminas(doc, laminas, conf, estilo):
     for lam in laminas:
         # limite y nombre de la lamina en el modelo
         msp.add_lwpolyline(list(lam.nucleo.exterior.coords)[:-1], close=True, dxfattribs={"layer": CAPA_LIMITE})
-        esq = list(lam.nucleo.exterior.coords)[3]  # arriba-izquierda
+        esq = list(lam.nucleo.exterior.coords)[2]  # arriba-izquierda
         msp.add_mtext("{\\fArial|b1|i0|c0|p34;LÁMINA " + lam.nombre + "}",
                       dxfattribs={"layer": CAPA_LIMITE, "char_height": 3.0 * s, "insert": esq, "attachment_point": 1,
                                   "rotation": math.degrees(lam.angulo), "style": ESTILO_TEXTO})

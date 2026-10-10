@@ -54,9 +54,19 @@ def exportar_proyecto(calc, ruta, nombre=""):
         for ln in calc.base.limites:
             c = np.asarray(ln.coords)[:, :2]
             limites.append([[_r(x), _r(y)] for x, y in c])
+    # Laminas para plotear (si estan activadas): la pagina dibuja sus limites y dice en cual cae cada area
+    laminas = []
+    conf_lam = getattr(calc.op, "laminas", None)
+    if conf_lam is not None and conf_lam.activar:
+        from . import laminas as lammod
+
+        for lam in lammod.dividir(met, conf_lam):
+            laminas.append({"nombre": lam.nombre, "coords": _coords(lam.nucleo)})
+    for d, a in zip(lista, met.areas):
+        d["perimetro"] = _r(a.poligono.exterior.length)
     datos = {"formato": "planos-bambu/proyecto", "version": VERSION_FORMATO,
              "nombre": nombre or Path(calc.op.puntos).stem, "codigos": codigos, "areas": lista,
-             "puntos": puntos, "limites": limites}
+             "puntos": puntos, "limites": limites, "laminas": laminas}
     Path(ruta).write_text(json.dumps(datos, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     return datos
 

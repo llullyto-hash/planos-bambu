@@ -128,8 +128,9 @@ th:first-child,td:first-child{text-align:left}
           <select id="fCod"><option value="">Todos</option></select>
           <label class="muted"><input type="checkbox" id="fRev"> solo a revisar</label>
           <label class="muted"><input type="checkbox" id="fZona"> solo mi zona</label>
+          <label class="muted"><input type="checkbox" id="fLam" checked> ver láminas</label>
         </div>
-        <table><thead><tr><th>Área</th><th>m²</th><th>Largo</th><th>Rev.</th></tr></thead><tbody id="lista"></tbody></table>
+        <table><thead><tr><th>Área</th><th>m²</th><th>Perím.</th><th>Largo</th><th>Lám.</th><th>Rev.</th></tr></thead><tbody id="lista"></tbody></table>
       </div>
       <div class="pane" id="pZonas">
         <p class="muted" id="zonasAyuda"></p>
@@ -259,6 +260,8 @@ function hace(t){
 
 // ---------------------------------------------------------------- geometría
 function areaAnillo(c){ let s = 0; for (let i = 0, n = c.length; i < n; i++){ const a = c[i], b = c[(i + 1) % n]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; }
+function perimetro(c){ let s = 0; for (let i = 0, n = c.length; i < n; i++){ const a = c[i], b = c[(i + 1) % n]; s += Math.hypot(b[0] - a[0], b[1] - a[1]); } return s; }
+function laminaDe(p){ for (const l of (S.laminas || [])) if (dentro(p, l.c)) return l.nombre; return ""; }
 function centroide(c){
   const A = areaAnillo(c); if (Math.abs(A) < 1e-9){ let x = 0, y = 0; for (const p of c){ x += p[0]; y += p[1]; } return [x / c.length, y / c.length]; }
   const x0 = c[0][0], y0 = c[0][1]; let cx = 0, cy = 0;
@@ -323,6 +326,8 @@ function derivar(a){
   a.bb = caja(c);
   a.largo = a.largo0 ? a.largo0 * a.area / Math.max(a.area0 || a.area, 1e-6) : largoRect(c);
   a.ancho = a.largo ? a.area / a.largo : 0;
+  a.perim = perimetro(c);
+  a.lam = laminaDe(a.cen);
 }
 function vivas(){ const r = []; for (const a of S.areas.values()) if (!a.borrado) r.push(a); return r; }
 function numerar(){
@@ -393,6 +398,17 @@ function dibujar(){
     if (!vis(ln.bb)) continue;
     ctx.beginPath(); ln.c.forEach((p, i) => { const q = aPantalla(p[0], p[1]); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke();
   }
+  // láminas para plotear (las arma el programa)
+  if (S.laminas && S.laminas.length && $("fLam").checked){
+    ctx.setLineDash([14, 6, 3, 6]); ctx.lineWidth = 1.6; ctx.strokeStyle = "#ffd600";
+    ctx.font = "bold 14px system-ui"; ctx.fillStyle = "#ffd600"; ctx.textAlign = "left";
+    for (const l of S.laminas){
+      if (!vis(l.bb)) continue;
+      trazar(l.c); ctx.stroke();
+      const q = aPantalla(l.c[2][0], l.c[2][1]); ctx.fillText("LÁMINA " + l.nombre, q[0] + 6, q[1] + 18);
+    }
+    ctx.setLineDash([]);
+  }
   // áreas
   const visibles = [];
   for (const a of S.areas.values()){
@@ -425,9 +441,10 @@ function dibujar(){
     for (const a of visibles){
       const c = coordsVivas(a); const ar = c === a.coords ? a.area : Math.abs(areaAnillo(c)); const cen = c === a.coords ? a.cen : centroide(c);
       const q = aPantalla(cen[0], cen[1]); const t1 = a.etq || a.cod, t2 = fmt(ar) + " m²";
-      const w = Math.max(ctx.measureText(t1).width, ctx.measureText(t2).width) + 8;
-      ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(q[0] - w / 2, q[1] - 14, w, 28);
-      ctx.fillStyle = "#fff"; ctx.fillText(t1, q[0], q[1] - 2); ctx.fillText(t2, q[0], q[1] + 11);
+      const t3 = "P " + fmt(c === a.coords ? a.perim : perimetro(c)) + " m";
+      const w = Math.max(ctx.measureText(t1).width, ctx.measureText(t2).width, ctx.measureText(t3).width) + 8;
+      ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(q[0] - w / 2, q[1] - 14, w, 41);
+      ctx.fillStyle = "#fff"; ctx.fillText(t1, q[0], q[1] - 2); ctx.fillText(t2, q[0], q[1] + 11); ctx.fillText(t3, q[0], q[1] + 24);
     }
     ctx.textAlign = "start";
   }
@@ -488,6 +505,8 @@ function armarIndices(){
   });
   S.pts = P; S.grid = grid;
   S.segs = (b.limites || []).filter(c => c.length > 1).map(c => ({c, bb:caja(c)}));
+  S.laminas = (b.laminas || []).filter(l => l && l.coords && l.coords.length > 2).map(l => ({nombre:l.nombre, c:l.coords, bb:caja(l.coords)}));
+  for (const a of S.areas.values()) a.lam = laminaDe(a.cen);
 }
 function puntoCercano(p, tol){
   if (!S.grid || tol > 6) return null;
@@ -569,9 +588,9 @@ async function pintarSel(){
   box.innerHTML = "";
   const h = document.createElement("h3"); h.textContent = (a.etq || a.cod) + "  ·  " + (cf.nombre || a.cod); box.appendChild(h);
   const t = document.createElement("div");
-  t.innerHTML = '<table><tr><td>Área</td><td></td></tr><tr><td>Largo</td><td></td></tr><tr><td>Ancho medio</td><td></td></tr></table>';
+  t.innerHTML = '<table><tr><td>Área</td><td></td></tr><tr><td>Perímetro</td><td></td></tr><tr><td>Largo</td><td></td></tr><tr><td>Ancho medio</td><td></td></tr><tr><td>Lámina</td><td></td></tr></table>';
   const td = t.querySelectorAll("td:nth-child(2)");
-  td[0].textContent = fmt(a.area) + " m²"; td[1].textContent = fmt(a.largo) + " m"; td[2].textContent = fmt(a.ancho) + " m";
+  td[0].textContent = fmt(a.area) + " m²"; td[1].textContent = fmt(a.perim) + " m"; td[2].textContent = fmt(a.largo) + " m"; td[3].textContent = fmt(a.ancho) + " m"; td[4].textContent = a.lam || "—";
   box.appendChild(t);
   const f = document.createElement("div"); f.className = "fila";
   const sc = document.createElement("select");
@@ -595,7 +614,7 @@ function llenarLista(){
   const fr2 = document.createDocumentFragment();
   for (const a of l){
     const tr = document.createElement("tr"); tr.dataset.p = a.path; if (a.revisar) tr.className = "rev";
-    for (const v of [a.etq || a.cod, fmt(a.area), (S.codigos[a.cod] || {}).largo ? fmt(a.largo) : "", a.revisar ? "sí" : ""]){ const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
+    for (const v of [a.etq || a.cod, fmt(a.area), fmt(a.perim), (S.codigos[a.cod] || {}).largo ? fmt(a.largo) : "", a.lam || "", a.revisar ? "sí" : ""]){ const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
     fr2.appendChild(tr);
   }
   tb.appendChild(fr2); marcarLista();
@@ -607,14 +626,14 @@ function marcarLista(){
 }
 function totales(){
   const t = {};
-  for (const a of vivas()){ const k = a.cod; const e = t[k] ||= {n:0, m2:0, ml:0, rev:0}; e.n++; e.m2 += a.area; e.ml += a.largo; if (a.revisar) e.rev++; }
-  const tb = $("totales"); tb.innerHTML = "<tr><th>Código</th><th>N.º</th><th>m²</th><th>ml</th><th>Rev.</th></tr>";
+  for (const a of vivas()){ const k = a.cod; const e = t[k] ||= {n:0, m2:0, ml:0, per:0, rev:0}; e.n++; e.m2 += a.area; e.ml += a.largo; e.per += a.perim || 0; if (a.revisar) e.rev++; }
+  const tb = $("totales"); tb.innerHTML = "<tr><th>Código</th><th>N.º</th><th>m²</th><th>Perím.</th><th>ml</th><th>Rev.</th></tr>";
   let resumen = [];
   for (const [k, e] of Object.entries(t).sort()){
     const cf = S.codigos[k] || {};
     const tr = document.createElement("tr");
     const c0 = document.createElement("td"); const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = colorCod(k); c0.appendChild(sw); c0.append(cf.prefijo || k); tr.appendChild(c0);
-    for (const v of [e.n, fmt(e.m2), cf.largo ? fmt(e.ml) : "", e.rev || ""]){ const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
+    for (const v of [e.n, fmt(e.m2), fmt(e.per), cf.largo ? fmt(e.ml) : "", e.rev || ""]){ const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
     tb.appendChild(tr);
     resumen.push((cf.prefijo || k) + " " + fmt(e.m2, 1) + " m²");
   }
@@ -986,7 +1005,7 @@ async function cargarProyecto(files){
   }
   const prog = progreso("Preparando…");
   try {
-    const base = {formato:"planos-bambu/base", nombre:d.nombre || "", codigos:d.codigos || {}, puntos:d.puntos || [], limites:d.limites || []};
+    const base = {formato:"planos-bambu/base", nombre:d.nombre || "", codigos:d.codigos || {}, puntos:d.puntos || [], limites:d.limites || [], laminas:d.laminas || []};
     prog.set(0.02, "Subiendo puntos y límites…");
     const rb = await reintentar(() => S.assets.upload(new Blob([JSON.stringify(base)], {type:"application/json"}), {type:"application/json"}));
     const tiles = zips.length ? await leerFotos(zips, prog, 0.05, 0.6) : (S.info ? S.info.tiles || [] : []);
@@ -1043,8 +1062,8 @@ function bajarCsv(){
   numerar();
   const l = vivas().sort((a, b) => (a.etq || "").localeCompare(b.etq || "", "es", {numeric:true}));
   const q = v => '"' + String(v).replace(/"/g, '""') + '"';
-  const filas = [["Etiqueta", "Codigo", "Descripcion", "Area m2", "Largo m", "Ancho m", "Revisar", "Nota", "Este", "Norte"].map(q).join(",")];
-  for (const a of l) filas.push([a.etq, a.cod, (S.codigos[a.cod] || {}).nombre || "", a.area.toFixed(2), a.largo.toFixed(2), a.ancho.toFixed(2), a.revisar ? "SI" : "", a.nota || "", a.cen[0].toFixed(3), a.cen[1].toFixed(3)].map(q).join(","));
+  const filas = [["Etiqueta", "Codigo", "Descripcion", "Area m2", "Largo m", "Ancho m", "Revisar", "Nota", "Este", "Norte", "Perimetro m", "Lamina"].map(q).join(",")];
+  for (const a of l) filas.push([a.etq, a.cod, (S.codigos[a.cod] || {}).nombre || "", a.area.toFixed(2), a.largo.toFixed(2), a.ancho.toFixed(2), a.revisar ? "SI" : "", a.nota || "", a.cen[0].toFixed(3), a.cen[1].toFixed(3), (a.perim || 0).toFixed(2), a.lam || ""].map(q).join(","));
   bajar("metrado_web.csv", "﻿" + filas.join("\r\n"), "text/csv");
 }
 
@@ -1058,7 +1077,7 @@ function pintarProyecto(){
   const box = $("proyInfo"); box.innerHTML = "";
   const h = document.createElement("h3"); h.textContent = S.info ? (S.info.nombre || "Proyecto") : "Sin proyecto"; box.appendChild(h);
   const p = document.createElement("p"); p.className = "muted";
-  p.textContent = S.info ? (S.info.n + " áreas importadas · " + (S.info.tiles || []).length + " fotos · cargado " + hace(S.info.creado) + (S.base ? " · " + S.base.puntos.length + " puntos, " + S.base.limites.length + " límites" : "")) : (S.owner ? "Carga el proyecto abajo." : "El dueño aún no ha cargado el proyecto.");
+  p.textContent = S.info ? (S.info.n + " áreas importadas · " + (S.info.tiles || []).length + " fotos · cargado " + hace(S.info.creado) + (S.base ? " · " + S.base.puntos.length + " puntos, " + S.base.limites.length + " límites" + ((S.base.laminas || []).length ? ", " + S.base.laminas.length + " láminas" : "") : "")) : (S.owner ? "Carga el proyecto abajo." : "El dueño aún no ha cargado el proyecto.");
   box.appendChild(p);
   if (S.soloLectura){ const r = document.createElement("p"); r.className = "muted"; r.textContent = "Estás en solo lectura."; box.appendChild(r); }
   $("proyDueno").hidden = !S.owner;
@@ -1116,7 +1135,7 @@ function enlazar(){
   $("btnTodo").onclick = verTodo;
   $("btnMiZona").onclick = irMiZona;
   $("btnLado").onclick = () => $("lado").classList.toggle("abierto");
-  $("fCod").onchange = llenarLista; $("fRev").onchange = llenarLista; $("fZona").onchange = llenarLista;
+  $("fCod").onchange = llenarLista; $("fRev").onchange = llenarLista; $("fZona").onchange = llenarLista; $("fLam").onchange = pedirDibujo;
   $("lista").onclick = e => { const tr = e.target.closest("tr"); if (tr){ seleccionar(tr.dataset.p, true); cerrarLadoMovil(); } };
   $("btnCargar").onclick = () => $("fileProy").click();
   $("btnFotos").onclick = () => $("fileFotos").click();

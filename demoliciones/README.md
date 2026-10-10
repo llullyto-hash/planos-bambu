@@ -7,6 +7,9 @@ pip install -r requirements.txt
 python demoliciones/analizar_plano.py "1.2. PLANO DEMOLICIONES - PETRO.dxf" -o salida_analisis
 ```
 
+El código vive ahora en `ortofoto/revisar_plano.py` (este script lo llama); también se usa desde la
+ventana (pestaña *Herramientas*) y al exportar, para verificar los carteles generados.
+
 Salida: `resumen.md`, `etiquetas.csv` (cada etiqueta VD/MT/CL/DPV/CAN D/SAR D comparada
 con la geometría a la que apunta su flecha) y `vista_demoliciones.png`.
 

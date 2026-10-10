@@ -1,6 +1,6 @@
 # Estado del proyecto: plano de demoliciones desde topografía + ortofoto
 
-Versión publicada: **1.0.19** o posterior (instalador en GitHub → Releases → `instalador-v1.0.N` más reciente).
+Versión publicada: **1.0.19** o posterior. Código con las mejoras 1.1 (sección 9): pendiente de subir al repositorio (instalador en GitHub → Releases → `instalador-v1.0.N` más reciente).
 Repositorio: `llullyto-hash/planos-bambu`, rama `claude/demolition-plans-automation-h0etwe`.
 
 Este archivo resume todo lo necesario para retomar el trabajo (con Claude u otra persona) sin perder
@@ -14,13 +14,18 @@ Entrada: puntos topográficos (CSV PNEZD exportado de Civil 3D), plano del proye
 FACHADA), ortofoto (TIF/JPG, calce tomado del DXF donde está insertada).
 
 Salida (sobre una copia del plano del proyecto):
-- Áreas a demoler con achurado y etiqueta tipo PETRO (`VD - 01 / AREA= x M2`, canales con `LONG=`).
+- Áreas a demoler con achurado y **cartel tipo PETRO**: recuadro, flecha y `VD - 01 / AREA= x M2 / PERIM= y M`
+  (canales con `LONG=`). Capas, tipos de línea y estilos de texto copiados de PETRO.
+- **Líneas de corte (CL)** donde la vereda toca el límite de propiedad.
+- **Láminas A1** (layouts `D-01`, `D-02`…) con el marco y membrete de PETRO, leyenda, plano clave y cuadro de metrados.
 - Puntos en capas propias `PT-<código>` (para apagarlos y corregir a mano).
 - Capas de revisión: `REVISAR AREA`, `REVISAR PUNTO VS FOTO`, `REVISAR UNION`, `REVISAR BORDE SIN CERRAR`.
-- `metrado.xlsx` / `metrado.csv`, `resumen.md`, `vista.png`.
+- `metrado.xlsx` / `metrado.csv` (con perímetro, lámina y reglas aplicadas; hoja *Por lamina*), `resumen.md`,
+  `vista.png`, `laminas_vista_previa.pdf`, `revision_carteles.csv`.
 
-Flujo en la ventana: **1. Archivos → 2. Códigos y capas → 3. Procesar → 4. Resultados** (revisar y
-corregir sobre la foto; nada se escribe hasta **EXPORTAR DXF Y METRADO**).
+Flujo en la ventana: **1. Archivos → 2. Códigos y capas → 3. Láminas y membrete → 4. Procesar →
+5. Revisar y corregir** (sobre la foto; nada se escribe hasta **EXPORTAR DXF Y METRADO**). Pestaña
+*Herramientas*: revisar un plano DXF ya dibujado.
 
 ## 2. Cómo ejecutarlo
 
@@ -31,7 +36,7 @@ corregir sobre la foto; nada se escribe hasta **EXPORTAR DXF Y METRADO**).
   pip install -r requirements.txt
   python -m ortofoto.gui            # ventana
   python -m ortofoto --help         # línea de comandos
-  python -m pytest -q tests         # 29 pruebas automáticas (deben pasar todas)
+  python -m pytest -q tests         # 35 pruebas automáticas (deben pasar todas)
   ```
 - Instalador: cada `git push` a la rama dispara `.github/workflows/instalador-windows.yml`
   (pruebas → PyInstaller → prueba del .exe → Inno Setup → Release `instalador-v1.0.N`).
@@ -41,8 +46,8 @@ corregir sobre la foto; nada se escribe hasta **EXPORTAR DXF Y METRADO**).
 | Archivo | Qué hace |
 |---|---|
 | `ortofoto/__main__.py` | `calcular()` (todo el proceso, sin escribir) y `exportar_calculo()`; `procesar()` = ambos; línea de comandos; `exportar_muestras()` (foto en cuadros ZIP) |
-| `ortofoto/gui.py` | Ventana (pestañas 1–3) |
-| `ortofoto/visor.py` | Pestaña 4: mapa con la foto, límites de propiedad, lista de áreas, corrección por tramos |
+| `ortofoto/gui.py` | Ventana (pestañas 1–4 y Herramientas, ayudas y guía rápida) |
+| `ortofoto/visor.py` | Pestaña 5: mapa con la foto, límites de propiedad, lista de áreas, corrección por tramos |
 | `ortofoto/colaborativo.py` | `proyecto_web.json` (para la página colaborativa) y lectura de `correcciones_web.json` |
 | `web/revision_colaborativa.html` | Copia de la página colaborativa publicada en claude.ai (ver sección 8) |
 | `ortofoto/veredas.py` | **Veredas pegadas a la fachada, por caras** (la parte más ajustada) |
@@ -52,7 +57,12 @@ corregir sobre la foto; nada se escribe hasta **EXPORTAR DXF Y METRADO**).
 | `ortofoto/concreto.py` | Lectura de la foto: pasto, tierra, concreto, sombra (`fracciones_suelo`) |
 | `ortofoto/base.py` | Lee el plano del proyecto (FACHADA → límites y manzanas) |
 | `ortofoto/imagen.py`, `calce.py` | Carga de ortofotos grandes por ventanas; calce |
-| `ortofoto/exportar.py` | DXF (capas, achurados, etiquetas) y vista PNG |
+| `ortofoto/exportar.py` | DXF (capas, achurados, carteles, CL, láminas) y vista PNG |
+| `ortofoto/estilo.py` | Capas y estilos de texto desde la plantilla (`plantilla_petro.dxf`) |
+| `ortofoto/carteles.py` | Carteles tipo PETRO y su ubicación sin encimarse |
+| `ortofoto/laminas.py` | División en láminas, membrete, leyenda, plano clave, cuadro, PDF de vista previa |
+| `ortofoto/revisar_plano.py` | Revisión de un plano DXF (etiquetas contra el dibujo); `demoliciones/analizar_plano.py` lo llama |
+| `herramientas/crear_plantilla.py` | Regenera `ortofoto/plantilla_petro.dxf` desde el plano PETRO |
 | `tests/test_ortofoto.py` | Pruebas de cada criterio (ver sección 4) |
 
 ## 4. Criterios acordados con el usuario (no cambiarlos sin consultar)
@@ -86,12 +96,14 @@ Canal (ALC): cajas por sus esquinas, secciones, o por el eje con ancho supuesto 
 
 ## 5. Pendientes conocidos
 
-1. **Lote vacío 7888–7893 (Bambú)**: sigue saliendo vereda; el frente del lote es una cara corta de la
-   FACHADA y la vereda llega por la unión de esquinas (la regla de lote vacío no revisa esa unión).
+1. **Lote vacío 7888–7893 (Bambú)**: la unión de esquinas ahora revisa la regla de lote vacío (1.1);
+   falta probarlo con el plano y la ortofoto de Bambú.
 2. **Jardín 7480/7474**: la foto ve concreto en 7480→7473 y 7543→7542 y sombra en 7485→7488; falta
    que el usuario indique el borde real.
 3. **Pasaje VD-203 (puntos 1083…)** y fachadas del plano con quiebres raros: formas torcidas.
-4. Códigos sin configurar en Bambú: FD, MRTE, PM, LD, IE, LC, GA.
+4. Códigos sin configurar en Bambú: FD, MRTE, PM, LD, IE, LC, GA (falta que el usuario diga qué son).
+6. Carteles encimados en zonas muy densas (Bambú sin plano base: 26 de ~800): quedan en la capa
+   `REVISAR CARTEL ENCIMADO` (no se plotea) para moverlos a mano.
 5. El modo "EN PRUEBA" (veredas con la forma de la foto) todavía recorta píxel por píxel: dejarlo
    desmarcado.
 
@@ -135,3 +147,28 @@ como archivo), áreas en colecciones `<pref><k>` (una por cada 800) y `<pref>x` 
 `personas/*`. Reglas: solo el dueño escribe `proyecto`, `zonas` y `personas` (cada uno escribe su propia
 ficha en `personas`); las áreas las escribe cualquier invitado con permiso de edición. Invitados de fuera
 de la organización: invitarlos por correo como **Editor** y sin enlace público.
+
+## 9. Mejoras 1.1 (octubre 2026)
+
+Todo lo anterior sigue igual; lo nuevo se puede apagar y entonces el resultado es el de antes.
+
+| Mejora | Dónde | Cómo apagarla |
+|---|---|---|
+| Capas, tipos de línea y 34 estilos de texto de PETRO | `estilo.py`, `plantilla_petro.dxf` | elegir otra plantilla (manda ella) |
+| Cartel PETRO: recuadro + flecha + AREA + PERIM, sin encimarse, hacia la calle | `carteles.py` | ventana 3 / `--cartel simple` |
+| Líneas de corte CL sobre el límite de propiedad (o CSH/LP sin plano base) | `areas.cortes_lineales` | ventana 3 / `--sin-corte-lineal` |
+| Láminas A1 con membrete, leyenda, plano clave, cuadro, "VER LÁMINA", PDF | `laminas.py` | ventana 3 / sin `--laminas` |
+| Numeración por lámina (VD-1… siguen el orden de las láminas) | `laminas.dividir` | ventana 3 |
+| Metrado con perímetro, lámina, reglas aplicadas y hoja *Por lamina* (columnas nuevas al final) | `areas.guardar_metrado` | — |
+| Verificación: etiquetas repetidas, áreas que se tocan, cartel vs. área (`revision_carteles.csv`) | `__main__.verificar`, `revisar_plano.py` | ventana 4 |
+| Sugerencia de alias para códigos mal escritos (VERD→VER, CHS→CSH) | `topografia.sugerir_alias` | — |
+| VER1/VER2 como bordes distintos; códigos de control I/F/CLS | `unir.py`, `topografia.py` | apagados por defecto |
+| Cada corrida en su subcarpeta con fecha y hora | `__main__.calcular` | apagado por defecto |
+| Página colaborativa: perímetro y límites de lámina | `web/revision_colaborativa.html` | casilla "ver láminas" |
+| Ventana didáctica: pasos, ayudas, guía, barra de estado, botones de resultados | `gui.py` | — |
+
+Línea de comandos nueva: `--escala`, `--cartel`, `--sin-corte-lineal`, `--laminas`, `--orientacion norte|auto`,
+`--traslape`, `--prefijo-lamina`, `--membrete datos.json`, `--sin-vista-pdf`, `--carpeta-por-corrida`,
+`--numero-separa`, `--codigos-control`.
+
+La página publicada en claude.ai todavía es la versión anterior; la nueva está en `web/revision_colaborativa.html`.

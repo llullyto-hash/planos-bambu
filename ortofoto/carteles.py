@@ -31,7 +31,7 @@ ALTO_MM = 2.5  # alto del texto en la lamina
 ANCHO_LETRA = 0.68  # ancho medio de una letra Arial negrita, en altos de texto
 MARGEN_MM = 1.5
 RENGLON_MM = 2.9
-DISTANCIAS_MM = (6, 10, 15, 21, 28, 36, 46, 58)
+DISTANCIAS_MM = (6, 10, 15, 21, 28, 36, 46, 58, 72, 90)
 DIRECCIONES = 16
 CELDA = 25.0  # m, indice de cajas y flechas ya colocadas
 
@@ -86,6 +86,8 @@ class Colocador:
         self.s = escala / 1000.0  # m de modelo por mm de lamina
         self.angulo = angulo  # rad: carteles alineados con laminas giradas
         self.indice = {}
+        obstaculos = list(obstaculos)
+        self._obs_de = {id(g): k for k, g in enumerate(obstaculos)}
         self.obstaculos = [self._a_local(g) for g in obstaculos]
         if manzanas is not None:
             manzanas = self._a_local(manzanas)
@@ -96,6 +98,8 @@ class Colocador:
             self._arbol = STRtree(self.obstaculos)
         self.manzanas = manzanas
         self.encimados = 0
+        self._puntas = {}  # id(geom) -> punta (coordenadas de la lamina) reservada antes de colocar
+        self._reservas = {}  # celda -> [(id(geom), circulo)]: ninguna flecha ni caja pasa por la punta de otro
 
     # --- giro: se trabaja en coordenadas de la lamina y se devuelve al modelo ---
     def _a_local(self, g):
@@ -109,6 +113,29 @@ class Colocador:
             return tuple(xy)
         c, s_ = math.cos(self.angulo), math.sin(self.angulo)
         return (xy[0] * c - xy[1] * s_, xy[0] * s_ + xy[1] * c)
+
+    def _punta(self, geom):
+        return punto_interior(geom) if geom.geom_type.endswith("Polygon") else geom.interpolate(0.5, normalized=True)
+
+    def reservar(self, geoms):
+        """Marca de antemano donde apunta cada cartel, para que las flechas y cajas de los demas no
+        pasen por encima de esos puntos (una flecha que cruza otra area parece senalarla)."""
+        for g in geoms:
+            p = self._punta(self._a_local(g))
+            self._puntas[id(g)] = p
+            circ = p.buffer(1.0 * self.s, 8)
+            for c in self._celdas(circ):
+                self._reservas.setdefault(c, []).append((id(g), circ))
+
+    def _pisa_reserva(self, geom, dueno):
+        vistos = set()
+        n = 0
+        for c in self._celdas(geom):
+            for d, circ in self._reservas.get(c, ()):
+                if d != dueno and id(circ) not in vistos:
+                    vistos.add(id(circ))
+                    n += circ.intersects(geom)
+        return n
 
     # --- indice espacial simple por celdas ---
     def _celdas(self, geom):
@@ -141,6 +168,13 @@ class Colocador:
             tapado += self.obstaculos[int(k)].intersection(caja).area
         return tapado / max(caja.area, 1e-9)
 
+    def _cruza(self, flecha, propio):
+        """Cuantas otras areas cruza la flecha."""
+        if self._arbol is None:
+            return 0
+        return sum(1 for k in self._arbol.query(flecha)
+                   if int(k) != propio and self.obstaculos[int(k)].intersects(flecha))
+
     def tamano(self, lineas):
         """(ancho, alto) del recuadro en m de modelo."""
         n = max(len(t) for t in lineas)
@@ -166,21 +200,26 @@ class Colocador:
 
     def colocar(self, geom, lineas, punta=None):
         """Coloca un cartel para `geom` (poligono o linea). Devuelve Colocado (en el modelo)."""
-        c = self._colocar(self._a_local(geom), lineas, None if punta is None else self._a_local(punta))
+        if punta is None and id(geom) in self._puntas:
+            local = self._puntas[id(geom)]
+        else:
+            local = None if punta is None else self._a_local(punta)
+        c = self._colocar(self._a_local(geom), lineas, local, id(geom), self._obs_de.get(id(geom), -1))
         if not self.angulo:
             return c
         return Colocado(self._a_modelo(c.caja), self._pt_modelo(c.centro), self._pt_modelo(c.punta),
                         self._pt_modelo(c.enganche), c.flecha, c.encimado)
 
-    def _colocar(self, geom, lineas, punta=None):
+    def _colocar(self, geom, lineas, punta=None, dueno=None, propio=-1):
         ancho, alto = self.tamano(lineas)
         if punta is None:
-            punta = punto_interior(geom) if geom.geom_type.endswith("Polygon") else geom.interpolate(0.5, normalized=True)
+            punta = self._punta(geom)
         px, py = punta.x, punta.y
         # Adentro, sin flecha, si el area es grande y el cartel cabe completo
         if geom.geom_type.endswith("Polygon"):
             caja = box(px - ancho / 2, py - alto / 2, px + ancho / 2, py + alto / 2)
-            if geom.buffer(-0.1 * self.s).contains(caja) and not self._choca(caja):
+            if geom.buffer(-0.1 * self.s).contains(caja) and not self._choca(caja) \
+                    and not self._pisa_reserva(caja, dueno):
                 self._agregar(caja)
                 return Colocado(caja, (px, py), (px, py), (px, py), False, False)
         pref = self._preferida(punta, geom)
@@ -198,7 +237,8 @@ class Colocador:
                 eng = self._enganche(caja, px, py)
                 flecha = LineString([(px, py), eng])
                 choca = self._choca(caja) or self._choca(flecha)
-                costo = d_mm + 12 * desvio + 40 * self._tapa(caja) + (1e4 if choca else 0)
+                pisa = self._pisa_reserva(caja, dueno) + self._pisa_reserva(flecha, dueno) if self._reservas else 0
+                costo = d_mm + 12 * desvio + 40 * self._tapa(caja) + 300 * pisa + 60 * self._cruza(flecha, propio) + (1e4 if choca else 0)
                 if costo < mejor_costo:
                     mejor, mejor_costo = (caja, (cx, cy), eng, choca), costo
             if mejor_costo < DISTANCIAS_MM[0] + 1:

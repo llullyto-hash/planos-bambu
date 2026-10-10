@@ -11,6 +11,7 @@ if not getattr(sys, "frozen", False):  # ejecutado como script: usar el paquete 
 
 
 def prueba(carpeta):
+    from ortofoto import laminas
     from ortofoto.__main__ import Opciones, procesar
 
     out = Path(carpeta)
@@ -31,9 +32,15 @@ def prueba(carpeta):
     img[0:40, :] = 200  # franja clara = vereda (2 m a 5 cm/px)
     Image.fromarray(img).save(out / "foto.png")
     (out / "foto.pgw").write_text("0.05\n0\n0\n-0.05\n995.025\n1999.975\n")
-    _, met, orto = procesar(Opciones(puntos=str(pts), salida=str(out / "salida"), orto=str(out / "foto.png"), calce_auto=False),
+    _, met, orto = procesar(Opciones(puntos=str(pts), salida=str(out / "salida"), orto=str(out / "foto.png"), calce_auto=False,
+                                    laminas=laminas.ConfLaminas(vista_pdf=False)),
                             avisar=lambda *a: None)
     ok = orto is not None and len(met.areas) == 1 and (out / "salida" / "metrado.xlsx").exists() and (out / "salida" / "resultado.dxf").exists()
+    if ok:  # la plantilla PETRO viaja dentro del .exe: capas, carteles y lamina con membrete
+        import ezdxf
+
+        doc = ezdxf.readfile(out / "salida" / "resultado.dxf")
+        ok = "LETRERO" in doc.layers and "D-01" in doc.layouts.names()
     (out / ("PRUEBA_OK.txt" if ok else "PRUEBA_FALLO.txt")).write_text(f"areas={len(met.areas)}\n")
     return 0 if ok else 1
 

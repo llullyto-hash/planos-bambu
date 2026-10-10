@@ -6,8 +6,11 @@ Lee los puntos topográficos y, si la tiene, la ortofoto. Con eso:
    para que pueda apagar las que no necesita y unir a mano sin confundirse.
 2. **Une los puntos de cada código** en polilíneas (bordes de vereda, fachadas, lotes…).
 3. **Cierra las áreas** de veredas, cunetas, pistas, martillos y accesos, con su achurado
-   y su etiqueta como en el plano PETRO (`VD - 01 / AREA= 54.24 M2`).
-4. **Calcula el metrado** (`metrado.xlsx`: resumen + detalle por área).
+   y su cartel como en el plano PETRO (recuadro, flecha, `VD - 01 / AREA= 54.24 M2 / PERIM= 31.20 M`),
+   con las capas y estilos de texto de PETRO.
+4. **Dibuja las líneas de corte (CL)** donde la vereda toca el límite de propiedad.
+5. **Divide en láminas A1** con el membrete de PETRO, leyenda, plano clave y cuadro de metrados.
+6. **Calcula el metrado** (`metrado.xlsx`: resumen, detalle por área con perímetro, y por lámina).
 
 La ortofoto se lee **en su PC**: no importa que pese varios GB.
 
@@ -58,7 +61,7 @@ Tipos:
 | `linea` | fachada, lote, sardinel | polilínea (m si tiene prefijo) |
 | `punto` | árboles, cajas, postes, terreno | solo puntos en su capa |
 
-**4. Resultados (revisar antes de exportar)**
+**5. Revisar y corregir (antes de exportar)**
 - Los límites de propiedad (FACHADA) se ven en magenta; los vértices se pegan a los puntos y, si no hay
   punto cerca, al límite (a su esquina si está cerca). Un rombo verde marca el vértice que ya llegó al
   límite y un círculo verde aparece mientras se arrastra sobre él.
@@ -66,12 +69,21 @@ Tipos:
   entre varias personas). **Importar correcciones**: carga el `correcciones_web.json` que se baja de la
   página; luego EXPORTAR DXF Y METRADO. Ver `ESTADO_DEL_PROYECTO.md`, sección 8.
 
-**3. Procesar** → en la carpeta de resultados quedan:
+**3. Láminas y membrete**
+- Tipo de cartel (PETRO o texto suelto como antes), líneas de corte, escala (1:500 por defecto).
+- Láminas: norte arriba o giradas según las calles, traslape, prefijo (`D-`) y primer número,
+  numerar las áreas lámina por lámina, PDF de vista previa.
+- Datos del membrete (proyecto, CUI, entidad, ubicación, plano, fecha, profesional).
+  **Guardar como predeterminado** los recuerda para la próxima vez.
+
+**4. Procesar** → en la carpeta de resultados quedan:
 - `resultado.dxf`: puntos por capa, bordes, áreas con achurado, etiquetas y la ortofoto de fondo
   (se enlaza la foto original, no se copia);
 - `metrado.xlsx` / `metrado.csv`;
 - `vista.png`: vista rápida;
-- `resumen.md`.
+- `laminas_vista_previa.pdf`: las láminas como saldrían al plotear;
+- `revision_carteles.csv`: cada cartel comparado con su área;
+- `resumen.md`: avisos, reglas aplicadas, carteles encimados y códigos que parecen mal escritos.
 
 ## Cómo decide qué unir (para que no se pegue a otro tramo)
 
@@ -145,6 +157,7 @@ Las veredas se arman de estas formas, en este orden:
 ```
 python -m ortofoto --puntos CVS.txt --orto "ORTF BAMBU.tif" --calce-dxf "PLANO TOP.dxf" -o salida/
 python -m ortofoto --puntos CVS.txt -o salida/ --desactivar PTA --apagar PT-TN
+python -m ortofoto --puntos CVS.txt --plano-base "PLANO TOP.dxf" -o salida/ --laminas --orientacion auto --membrete datos.json
 python -m ortofoto.gui
 ```
 

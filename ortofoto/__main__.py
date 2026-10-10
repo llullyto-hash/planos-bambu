@@ -55,6 +55,7 @@ class Opciones:
     carpeta_por_corrida: bool = False  # cada corrida en una subcarpeta nueva con fecha y hora
     numero_separa: bool = False  # VER1 y VER2 son lineas distintas (el numero del codigo separa bordes)
     codigos_control: bool = False  # respetar VER I (inicio), VER F (fin), MAR CLS (cerrar)
+    verificar: bool = True  # al exportar, revisar que cada cartel corresponda a su area
 
 
 def ruta_libre(ruta, avisar=print):
@@ -314,21 +315,44 @@ def exportar_calculo(c, avisar=print):
     if encimados:
         avisos.append(f"{encimados} carteles no encontraron un lugar libre y quedaron encimados: moverlos a mano "
                       "(marcados en la capa REVISAR CARTEL ENCIMADO, que no se plotea)")
-    if creados and conf_lam.vista_pdf:
-        avisar("Vista previa de las laminas (PDF)...")
-        try:
-            # Se dibuja una copia liviana (sin el plano base ni los puntos) para que sea rapida
-            import tempfile
+    # Copia liviana (sin el plano base ni los puntos) para revisar los carteles y la vista previa
+    if getattr(op, "verificar", True) or (creados and conf_lam.vista_pdf):
+        import tempfile
 
-            with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
                 lim = c.base.limites if c.base is not None and not c.base.vacio else None
                 previa, nombres, _ = exportar.guardar_dxf(
                     Path(tmp) / "previa.dxf", [], resultados, met, codigos, alias, None, op.plantilla or None, (),
                     escala=getattr(op, "escala", 500.0), cartel=getattr(op, "cartel", "petro"), laminas=lams,
                     conf_laminas=conf_lam, base=c.base, limites=lim)
-                lammod.vista_pdf(previa, nombres, ruta_libre(out / "laminas_vista_previa.pdf", avisar), avisar=avisar)
-        except Exception as e:  # noqa: BLE001 - la vista previa es opcional
-            avisar(f"(No se pudo crear la vista previa de las laminas: {e})")
+            except Exception as e:  # noqa: BLE001 - la revision y la vista previa son opcionales
+                previa, nombres = None, []
+                avisar(f"(No se pudo preparar la revision de carteles: {e})")
+            if previa is not None and getattr(op, "verificar", True) and getattr(op, "cartel", "petro") == "petro":
+                avisar("Revisando que cada cartel corresponda a su area...")
+                try:
+                    from .revisar_plano import analizar
+
+                    estados = analizar(Path(tmp) / "previa.dxf", Path(tmp) / "revision", "Model", avisar=lambda *_: None)
+                    import shutil
+
+                    shutil.copy(Path(tmp) / "revision" / "etiquetas.csv", ruta_libre(out / "revision_carteles.csv", avisar))
+                    malos = {k: v for k, v in estados.items() if k != "OK"}
+                    log.append(f"Revision de carteles: {estados.get('OK', 0)} OK" +
+                               (", " + ", ".join(f"{v} {k}" for k, v in malos.items()) if malos else ""))
+                    avisar(log[-1])
+                    if malos:
+                        avisos.append("Carteles que no calzan con su area (ver revision_carteles.csv): " +
+                                      ", ".join(f"{v} {k}" for k, v in malos.items()))
+                except Exception as e:  # noqa: BLE001
+                    avisar(f"(No se pudo revisar los carteles: {e})")
+            if previa is not None and nombres and conf_lam.vista_pdf:
+                avisar("Vista previa de las laminas (PDF)...")
+                try:
+                    lammod.vista_pdf(previa, nombres, ruta_libre(out / "laminas_vista_previa.pdf", avisar), avisar=avisar)
+                except Exception as e:  # noqa: BLE001
+                    avisar(f"(No se pudo crear la vista previa de las laminas: {e})")
     del doc
     exportar.guardar_vista(resultados, ruta_libre(out / "vista.png", avisar), orto, metrado=met,
                            ventana=(min(xs) - 5, min(ys) - 5, max(xs) + 5, max(ys) + 5))

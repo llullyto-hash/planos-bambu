@@ -35,6 +35,7 @@ jobs:
         run: >
           pyinstaller --noconfirm --windowed --name TopografiaMetrados --paths .
           --add-data "ortofoto/codigos.json;ortofoto"
+          --add-data "ortofoto/plantilla_petro.dxf;ortofoto"
           --collect-all rasterio --collect-all shapely
           --collect-submodules ezdxf --hidden-import openpyxl
           instalador/topografia_app.py

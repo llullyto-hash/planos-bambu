@@ -5,7 +5,7 @@ from ortofoto import areas, calce, exportar, unir
 from ortofoto.__main__ import CODIGOS_DEFECTO, Opciones, procesar
 from ortofoto.imagen import Ortofoto, afin_desde_dxf
 from ortofoto.topografia import Punto
-from shapely.geometry import Point, Polygon
+from shapely.geometry import LineString, Point, Polygon
 
 AFIN = [0.05, 0.0, 550115.0, 0.0, -0.05, 9072960.0]
 
@@ -554,3 +554,95 @@ def test_pagina_colaborativa_ida_y_vuelta(tmp_path):
     assert desconocidos == ["XXX"] and len(nuevas) == 1
     assert abs(nuevas[0].area - 20.0) < 1e-6 and abs(nuevas[0].largo - 10.0) < 1e-6
     assert nuevas[0].etiqueta
+
+
+# ---------- mejoras v1.1: estilos PETRO, carteles, corte lineal, laminas, codigos ----------
+
+def test_codigo_numero_control_y_tildes():
+    p = Punto("1", 0, 0, 0, "VÉR2 I")
+    assert p.codigo == "VER" and p.numero == "2" and p.control == "inicio"
+    assert Punto("2", 0, 0, 0, "MAR CLS").control == "cerrar"
+    assert Punto("3", 0, 0, 0, "VER").numero == "" and Punto("3", 0, 0, 0, "VER").control == ""
+
+
+def test_sugerir_alias_errores_de_escritura():
+    from ortofoto.topografia import sugerir_alias
+
+    s = sugerir_alias(["VERD", "CHS", "VAR", "FD"], {"VER", "CSH", "VA", "PTA"})
+    assert s.get("VERD") == "VER" and s.get("CHS") == "CSH"
+    assert "VAR" not in s and "FD" not in s  # VAR -> VA seria una adivinanza; FD no se parece a nada
+
+
+def test_texto_del_cartel_como_petro():
+    from ortofoto import carteles
+
+    t = carteles.texto_petro("VD - 35", carteles.filas_area(8.14, 12.4))
+    assert t.startswith("\\pxqc;{\\fArial|b1") and t.endswith("}")
+    assert "VD - 35" in t and "AREA=" in t and "8.14 M2" in t and "PERIM=" in t and "12.40 M" in t
+
+
+def test_carteles_no_se_enciman():
+    from shapely.geometry import box as caja
+
+    from ortofoto import carteles
+
+    areas = [caja(x, 0, x + 2, 1.5) for x in range(0, 60, 6)]
+    col = carteles.Colocador(escala=500, obstaculos=areas)
+    col.reservar(areas)
+    puestos = [col.colocar(a, ["VD - 1", "AREA= 3.00 M2", "PERIM= 7.00 M"]) for a in areas]
+    assert col.encimados == 0
+    for i, a in enumerate(puestos):
+        assert all(not a.caja.intersects(b.caja) for b in puestos[i + 1:])
+        # ninguna flecha pasa por encima de otra area
+        flecha = LineString([a.punta, a.enganche])
+        assert all(not flecha.intersects(b) for k, b in enumerate(areas) if k != i)
+
+
+def test_plano_con_carteles_corte_lineal_y_laminas(tmp_path):
+    import ezdxf
+    import openpyxl
+
+    from ortofoto import laminas as lammod
+
+    ruta_base = _plano_base(tmp_path)
+    pts = []
+    for k, x in enumerate(np.arange(2, 39, 6)):
+        pts += [Punto(f"n{k}a", x, -0.2, 0, "VER"), Punto(f"n{k}b", x + 0.3, -1.8, 0, "VER")]
+    membrete = dict(lammod.MEMBRETE_PETRO, proyecto="PROYECTO DE PRUEBA", fecha="OCTUBRE 2026")
+    conf = lammod.ConfLaminas(vista_pdf=False, membrete=membrete)
+    procesar(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s"), plano_base=ruta_base,
+                      laminas=conf), avisar=lambda *a: None)
+    doc = ezdxf.readfile(tmp_path / "s" / "resultado.dxf")
+    msp = doc.modelspace()
+    # capas y estilos copiados de PETRO
+    assert "LETRERO" in doc.layers and "TEXTO EN MARTILLO" in doc.layers and "arial" in doc.styles
+    # cartel con area y perimetro, recuadro y flecha
+    textos = [m.text for m in msp.query('MTEXT[layer=="TEXTO EN MARTILLO"]')]
+    assert any("AREA=" in t and "PERIM=" in t for t in textos)
+    assert len(msp.query('LWPOLYLINE[layer=="LETRERO"]')) >= 1
+    # linea de corte sobre el limite de propiedad (y = 0)
+    cortes = msp.query('LWPOLYLINE[layer=="LINEA CORTE"]')
+    assert cortes and all(abs(y) < 0.05 for c in cortes for _, y in c.get_points("xy"))
+    assert any("LONG=" in t for t in textos)
+    # lamina con ventana y membrete lleno
+    assert "D-01" in doc.layouts.names()
+    ps = doc.layouts.get("D-01")
+    assert len(ps.query("VIEWPORT")) >= 1
+    texto_ps = " ".join(e.dxf.text if e.dxftype() == "TEXT" else e.text for e in ps.query("TEXT MTEXT"))
+    assert "PROYECTO DE PRUEBA" in texto_ps and "%%PROYECTO%%" not in texto_ps
+    # metrado con perimetro y hoja por lamina, sin cambiar las columnas de antes
+    wb = openpyxl.load_workbook(tmp_path / "s" / "metrado.xlsx")
+    assert "Por lamina" in wb.sheetnames
+    cab = [c.value for c in next(wb["Detalle"].iter_rows(max_row=1))]
+    assert "Perimetro (m)" in cab and "Lamina" in cab
+
+
+def test_cartel_simple_como_antes(tmp_path):
+    import ezdxf
+
+    pts = _vereda_por_secciones(n=3)
+    procesar(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s"), cartel="simple"),
+             avisar=lambda *a: None)
+    msp = ezdxf.readfile(tmp_path / "s" / "resultado.dxf").modelspace()
+    assert not any("PERIM=" in m.text for m in msp.query("MTEXT"))
+    assert not msp.query('LWPOLYLINE[layer=="LETRERO"]')

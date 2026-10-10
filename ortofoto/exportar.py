@@ -96,6 +96,10 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
     giro = laminas[0].angulo if laminas else 0.0
     colocador = carteles.Colocador(escala, [a.poligono for a in metrado.areas], manzanas, giro)
 
+    if cartel == "petro":
+        colocador.reservar([ln.linea for ln in metrado.lineas if ln.etiqueta and not ln.borde and not ln.sin_pareja]
+                           + [ar.poligono for ar in metrado.areas])
+
     def etiqueta(geom, titulo, filas, simple):
         if cartel == "petro":
             lineas_txt = [titulo] + [f"{n} {v}" for n, v in filas]
