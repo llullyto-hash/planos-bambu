@@ -854,13 +854,23 @@ function recorte(op, c, otras){
   return res.map(pg => pg[0].slice(0, -1).map(v => [r3(v[0] + ox), r3(v[1] + oy)])).filter(k => k.length >= 3 && Math.abs(areaAnillo(k)) >= AREA_MIN)
             .sort((x, y) => Math.abs(areaAnillo(y)) - Math.abs(areaAnillo(x)));
 }
+function areaComun(c1, c2){
+  const ox = Math.floor(Math.min(c1[0][0], c2[0][0])), oy = Math.floor(Math.min(c1[0][1], c2[0][1]));
+  const loc = k => [k.map(v => [v[0] - ox, v[1] - oy])];
+  return polygonClipping.intersection(loc(c1), loc(c2)).reduce((s, pg) => s + Math.abs(areaAnillo(pg[0])) - pg.slice(1).reduce((h, r) => h + Math.abs(areaAnillo(r)), 0), 0);
+}
 // c: anillo nuevo (o el del área "propia"); las vecinas del mismo código se juntan en la mayor
 function unirAreas(c, cod, mismas, propia){
   if (!puedeEditar()) return true;
   const pc = pegarAnillo(c, mismas);
   let piezas;
   try { piezas = recorte("union", pc, mismas); } catch (e) { piezas = []; }
-  if (piezas.length !== 1){ toast("No se pudieron unir en una sola figura (queda un espacio entre ellas); se dejaron separadas."); return false; }
+  // Se unen si cada figura queda (casi toda) dentro de la pieza mayor. Pedazos sueltos que ya
+  // traía alguna de las áreas (un piquito separado) se guardan aparte para no perder metrado.
+  const enMayor = k => { try { return areaComun(k, piezas[0]) / Math.max(Math.abs(areaAnillo(k)), 1e-9); } catch (e) { return 0; } };
+  if (!piezas.length || ![pc].concat(mismas.map(a => a.coords)).every(k => enMayor(k) >= 0.5)){
+    toast("No se pudieron unir en una sola figura (queda un espacio entre ellas); se dejaron separadas."); return false;
+  }
   const todas = (propia ? [propia] : []).concat(mismas);
   todas.sort((x, y) => y.area - x.area);
   const base = todas[0], ahora = Date.now(), ops = [];
@@ -869,8 +879,13 @@ function unirAreas(c, cod, mismas, propia){
     const cambios = a === base ? {coords:piezas[0], origen:"manual", nota:"unida a mano", largo0:0} : {borrado:true};
     escribirArea(a.path, Object.assign(cuerpo(a), cambios, {por:S.uid, t:ahora}));
   }
+  for (const k of piezas.slice(1)){
+    const path = coleccionNueva() + "/" + nuevoId();
+    ops.push({path, antes:null});
+    escribirArea(path, Object.assign(cuerpo(base), {coords:k, origen:"manual", nota:"pedazo suelto al unir", largo0:0, area0:0, revisar:true, borrado:false, id0:"", por:S.uid, t:ahora}));
+  }
   guardarPila(ops); seleccionar(base.path);
-  toast("Áreas unidas en una sola (" + fmt(Math.abs(areaAnillo(piezas[0]))) + " m²).");
+  toast("Áreas unidas en una sola (" + fmt(Math.abs(areaAnillo(piezas[0]))) + " m²)." + (piezas.length > 1 ? " Quedó " + (piezas.length - 1) + " pedazo suelto aparte, marcado a revisar." : ""));
   return true;
 }
 function separarArea(c, cod, vec){
