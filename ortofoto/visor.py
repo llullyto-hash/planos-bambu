@@ -5,6 +5,10 @@
   (se pega a los puntos topograficos cercanos; con Ctrl apretado se mueve libre).
 - Cortar tramo: dos clics a traves del area; queda partida en pedazos (luego Borrar el que sobra).
 - Dibujar area: clic en cada esquina (se pega a los puntos), doble clic o Enter para cerrar.
+- Agregar vertice: con un area seleccionada, clic sobre su borde (tambien doble clic en modo Seleccionar).
+- Un area dibujada pegada a otra (a menos de 30 cm) pregunta si se unen en una sola o quedan separadas
+  compartiendo la linea, sin superponerse. "Unir con vecinas" une el area seleccionada con las del mismo
+  codigo que la tocan.
 - Supr: borrar el area seleccionada. Ctrl+Z: deshacer. Esc: cancelar la herramienta.
 - Los limites de propiedad (FACHADA del plano) se ven en magenta. Los vertices tambien se pegan a ellos;
   un rombo verde marca el vertice que ya llego al limite.
@@ -46,7 +50,9 @@ AYUDA = {
            "Shift+clic en vertice: quitarlo | rueda: zoom | boton derecho: mover vista | Supr: borrar | Ctrl+Z",
     "cortar": "CORTAR TRAMO: clic a un lado del area y clic al otro lado (la linea la parte). Esc: cancelar",
     "dibujar": "DIBUJAR AREA: clic en cada esquina (se pega a los puntos). Doble clic o Enter: cerrar. "
-               "Esc: cancelar",
+               "Si queda pegada a otra area, pregunta si se unen. Esc: cancelar",
+    "vertice": "AGREGAR VERTICE: clic en un area para elegirla y luego clic sobre su borde donde quiere el vertice "
+               "nuevo (despues puede arrastrarlo en Seleccionar). Esc: terminar",
 }
 
 
@@ -69,8 +75,8 @@ class Visor(ttk.Frame):
         barra = ttk.Frame(self)
         barra.pack(fill="x")
         self.btn_modo = {}
-        for clave, texto in (("sel", "Seleccionar / mover vertices"), ("cortar", "Cortar tramo"),
-                             ("dibujar", "Dibujar area")):
+        for clave, texto in (("sel", "Seleccionar / mover vertices"), ("vertice", "Agregar vertice"),
+                             ("cortar", "Cortar tramo"), ("dibujar", "Dibujar area")):
             b = ttk.Button(barra, text=texto, command=lambda c=clave: self._herramienta(c))
             b.pack(side="left", padx=2)
             self.btn_modo[clave] = b
@@ -78,6 +84,7 @@ class Visor(ttk.Frame):
         self.cod_nuevo = ttk.Combobox(barra, width=8, state="readonly")
         self.cod_nuevo.pack(side="left")
         ttk.Button(barra, text="Borrar (Supr)", command=self._borrar).pack(side="left", padx=(10, 2))
+        ttk.Button(barra, text="Unir con vecinas", command=self._unir_vecinas).pack(side="left", padx=2)
         ttk.Button(barra, text="Revisado", command=self._marcar_revisado).pack(side="left", padx=2)
         ttk.Button(barra, text="Deshacer (Ctrl+Z)", command=self._deshacer).pack(side="left", padx=2)
         ttk.Button(barra, text="Ver todo", command=self._ver_todo).pack(side="left", padx=2)
@@ -457,6 +464,15 @@ class Visor(ttk.Frame):
                 self.temp = []
                 self._mostrar_temp()
             return
+        if self.modo == "vertice" and self.sel is not None:
+            c = np.array(self.sel.poligono.exterior.coords)[:-1]
+            borde = self._borde_cercano(c, ev, factor=1.5)
+            if borde is not None:
+                k, punto = borde
+                punto = self._iman(punto[0], punto[1], True)
+                self._guardar_estado()
+                self._reemplazar(self.sel, [Polygon(np.insert(c, k + 1, punto, axis=0))], "vertice agregado a mano")
+                return
         # seleccionar, agarrar / quitar un vertice o agregar uno en un borde
         if self.sel is not None:
             c = np.array(self.sel.poligono.exterior.coords)[:-1]
@@ -519,10 +535,10 @@ class Visor(ttk.Frame):
             self.arrastre = ("vertice", k, self.arrastre[2], c)
             self._pintar_dinamicos()
 
-    def _borde_cercano(self, c, ev):
+    def _borde_cercano(self, c, ev, factor=1.0):
         """(indice del lado, punto sobre el lado) si el clic esta a menos de VERTICE_PX de un borde."""
         p = np.array([ev.xdata, ev.ydata])
-        tol = VERTICE_PX * self._m_por_px()
+        tol = VERTICE_PX * factor * self._m_por_px()
         mejor = None
         for k in range(len(c)):
             a, b = c[k], c[(k + 1) % len(c)]
@@ -673,13 +689,73 @@ class Visor(ttk.Frame):
         if conf is None or pol.is_empty or pol.area < areas.AREA_MIN:
             return
         self._guardar_estado()
+        met = self.calc.met
+        vec = areas.vecinas(pol, met.areas)
+        if vec:
+            iguales = [a for a in vec if a.codigo == cod]
+            nombres = ", ".join(a.etiqueta or a.codigo for a in vec[:6]) + (" ..." if len(vec) > 6 else "")
+            if iguales:
+                resp = messagebox.askyesnocancel(
+                    "Area pegada a otra",
+                    f"El area nueva toca o queda muy cerca de: {nombres}.\n\n"
+                    f"Si = unirla con {', '.join(a.etiqueta or a.codigo for a in iguales[:6])} en una sola area\n"
+                    "No = dejarla separada, compartiendo la linea (sin superponerse)\n"
+                    "Cancelar = dejarla tal como la dibujo")
+            else:
+                resp = None if not messagebox.askyesno(
+                    "Area pegada a otra",
+                    f"El area nueva toca o queda muy cerca de: {nombres}.\n\n"
+                    "Recortarla para que comparta la linea y no se superponga?") else False
+            if resp is True:
+                unida = areas.unir_poligonos([pol] + [a.poligono for a in iguales])
+                if unida is not None and unida.area >= areas.AREA_MIN:
+                    base = max(iguales, key=lambda a: a.area)
+                    for a in iguales:
+                        if a is not base:
+                            met.areas.remove(a)
+                    self._reemplazar(base, [unida], "unida a mano con el area dibujada")
+                    return
+            elif resp is False:
+                piezas = areas.separar_poligono(pol, [a.poligono for a in vec])
+                if not piezas:
+                    messagebox.showinfo("Dibujar area", "El area nueva queda toda dentro de otras; no se agrego.")
+                    self.deshacer_pila.pop()
+                    return
+                pol = max(piezas, key=lambda g: g.area)
         r = pol.minimum_rotated_rectangle
         lados = sorted(np.hypot(*np.diff(np.array(r.exterior.coords), axis=0).T))
         largo = float(lados[-1]) if len(lados) else 0.0
         nueva = areas.Area(cod, conf, pol, "manual", pol.area / max(largo, 1e-6), largo, False, nota="dibujada a mano")
-        self.calc.met.areas.append(nueva)
+        met.areas.append(nueva)
         self.sel = nueva
         self._despues_de_cambio()
+
+    def _unir_vecinas(self):
+        """Une el area seleccionada con las del mismo codigo que la tocan o quedan a menos de 30 cm."""
+        if self.sel is None:
+            messagebox.showinfo("Unir con vecinas", "Primero seleccione un area.")
+            return
+        met = self.calc.met
+        iguales = [a for a in areas.vecinas(self.sel.poligono, met.areas, excluir=self.sel)
+                   if a.codigo == self.sel.codigo]
+        if not iguales:
+            messagebox.showinfo("Unir con vecinas", "No hay areas del mismo codigo pegadas a la seleccionada.")
+            return
+        nombres = ", ".join(a.etiqueta or a.codigo for a in iguales)
+        if not messagebox.askyesno("Unir con vecinas", f"Unir {self.sel.etiqueta or self.sel.codigo} con {nombres}?"):
+            return
+        unida = areas.unir_poligonos([self.sel.poligono] + [a.poligono for a in iguales])
+        if unida is None:
+            return
+        self._guardar_estado()
+        for a in iguales:
+            met.areas.remove(a)
+        largo = self.sel.largo + sum(a.largo for a in iguales)
+        self._reemplazar(self.sel, [unida], "unida a mano con sus vecinas")
+        if self.sel is not None and largo:
+            self.sel.largo = largo
+            self.sel.ancho = self.sel.area / largo
+            self._llenar_lista()
 
     # ---------- lista ----------
     def _seleccionar(self, a, centrar=False):

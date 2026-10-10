@@ -131,9 +131,11 @@ la ortofoto, las áreas y los puntos, y la lista de áreas con su metrado.
 | Zoom / mover la vista | rueda del mouse / arrastrar con el botón derecho; *Ver todo* |
 | Ir a un área | clic en la lista (las marcadas a revisar salen en rojo; filtro *solo a revisar*) |
 | Mover un vértice | seleccionar el área y arrastrar el vértice (se pega a los puntos topográficos) |
-| Agregar / quitar vértice | doble clic sobre un borde / Shift + clic sobre el vértice |
+| Agregar / quitar vértice | botón *Agregar vértice* y clic sobre el borde (o doble clic sobre el borde) / Shift + clic sobre el vértice |
 | Cortar un tramo | *Cortar tramo*: dos clics a través del área; luego clic en el pedazo que sobra y *Borrar* |
 | Dibujar un área que no salió | elegir el código, *Dibujar área*, clic en cada esquina, doble clic o Enter |
+| Área nueva pegada a otra | al cerrarla, si queda a menos de 0,30 m de otra del mismo código pregunta: *Sí* = unirlas en una sola, *No* = dejarlas separadas sin superponer líneas, *Cancelar* = como se dibujó. Si la vecina es de otro código ofrece recortar la nueva |
+| Unir áreas que ya existen | seleccionar una y *Unir con vecinas* (junta las del mismo código pegadas a ella) |
 | Borrar / deshacer | Supr / Ctrl+Z |
 | Dar por revisada | *Revisado* |
 

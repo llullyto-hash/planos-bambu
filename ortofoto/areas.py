@@ -638,6 +638,59 @@ def agregar_concreto_visible(met, poligonos, conf, puntos_xy=()):
     _numerar(met)
 
 
+# ---------------------------------------------------------------- edicion a mano: unir y no superponer
+
+TOL_VECINA = 0.30  # m: un area dibujada a menos de esto de otra se considera pegada a ella
+
+
+def vecinas(pol, lista, tol=TOL_VECINA, excluir=None):
+    """Areas de `lista` que tocan, se superponen o quedan a menos de `tol` del poligono."""
+    return [a for a in lista if a is not excluir and a.poligono.distance(pol) <= tol]
+
+
+def _mayor(g):
+    if isinstance(g, MultiPolygon):
+        return max(g.geoms, key=lambda x: x.area)
+    return g if isinstance(g, Polygon) else None
+
+
+def unir_poligonos(pols, tol=TOL_VECINA):
+    """Une poligonos que se tocan o quedan a menos de `tol`, cerrando la ranura entre ellos sin
+    engordar el resto del borde. Devuelve un Polygon (el mayor si quedaran separados)."""
+    r = tol / 2
+    g = unary_union([p.buffer(r, join_style=2, mitre_limit=10) for p in pols]).buffer(-r, join_style=2,
+                                                                                       mitre_limit=10)
+    g = _mayor(g.simplify(0.005))
+    if g is not None and not g.is_valid:
+        g = _mayor(g.buffer(0))
+    return g
+
+
+def separar_poligono(pol, otros, tol=TOL_VECINA):
+    """El poligono sin lo que pisa de los otros; los vertices a menos de `tol` del borde vecino se
+    pegan a el, asi comparten la linea en vez de superponerse o dejar una ranura."""
+    from shapely import snap
+
+    if not otros:
+        return [pol]
+    union = unary_union(otros)
+    borde = union.boundary
+    # pegar cada vertice cercano al borde vecino (al vertice si esta cerca, si no al lado)
+    coords = []
+    for x, y in list(pol.exterior.coords)[:-1]:
+        q = Point(x, y)
+        if borde.distance(q) <= tol:
+            q = borde.interpolate(borde.project(q))
+        coords.append((q.x, q.y))
+    nuevo = Polygon(coords)
+    if not nuevo.is_valid:
+        nuevo = _mayor(nuevo.buffer(0)) or pol
+    nuevo = snap(nuevo, union, 0.01)
+    resto = nuevo.difference(union)
+    piezas = list(resto.geoms) if isinstance(resto, MultiPolygon) else [resto] if isinstance(resto, Polygon) else []
+    return [g for g in piezas if g.area >= AREA_MIN]
+
+
 def _numerar(met, clave=None):
     """VD - 01, VD - 02... ordenadas de norte a sur y de oeste a este.
 

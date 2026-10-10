@@ -672,3 +672,19 @@ def test_actualizar_membrete_de_un_plano_ya_generado(tmp_path):
     assert not [e for e in lay.query("INSERT") if e.dxf.name.upper().startswith("ESCUDO")]
     # el original no se toca
     assert "PROYECTO BAMBU" not in " ".join(e.text for e in ezdxf.readfile(ruta).layouts.get("D-01").query("MTEXT"))
+
+
+def test_unir_y_separar_areas_dibujadas_a_mano():
+    from shapely.geometry import box
+
+    a = box(0, 0, 10, 2)
+    # a 20 cm: se unen en una sola, cerrando la ranura, sin engordar el resto
+    u = areas.unir_poligonos([a, box(10.2, 0, 20, 2)])
+    assert abs(u.area - 40.0) < 0.05 and u.bounds == (0.0, 0.0, 20.0, 2.0)
+    # separadas: la nueva no pisa a la otra y comparte la linea (sin ranura)
+    for nueva in (box(9, 0, 15, 2), box(10.2, 0, 15, 2)):
+        piezas = areas.separar_poligono(nueva, [a])
+        assert len(piezas) == 1 and piezas[0].intersection(a).area < 1e-6
+        assert abs(piezas[0].bounds[0] - 10.0) < 1e-6
+    lista = [areas.Area("VER", None, a, "manual")]
+    assert areas.vecinas(box(10.25, 0, 12, 2), lista) and not areas.vecinas(box(11, 0, 12, 2), lista)

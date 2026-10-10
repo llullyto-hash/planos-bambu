@@ -93,6 +93,7 @@ th:first-child,td:first-child{text-align:left}
   </header>
   <div id="barra">
     <button data-tool="sel" class="on" title="Seleccionar y mover vértices">Seleccionar</button>
+    <button data-tool="vertice" title="Agregar vértices al área seleccionada: clic sobre su borde">Agregar vértice</button>
     <button data-tool="cortar" title="Partir un área con una línea">Cortar</button>
     <button data-tool="dibujar" title="Dibujar un área nueva">Dibujar</button>
     <select id="codNuevo" title="Código del área nueva"></select>
@@ -100,6 +101,7 @@ th:first-child,td:first-child{text-align:left}
     <button id="btnBorrar" title="Borrar el área seleccionada (Supr)">Borrar</button>
     <button id="btnRevisado" title="Quitar o poner la marca 'a revisar'">Revisado</button>
     <button id="btnQuitarV" title="Quitar el vértice marcado">Quitar vértice</button>
+    <button id="btnUnir" title="Unir el área seleccionada con las áreas pegadas del mismo código">Unir con vecinas</button>
     <button id="btnCerrar" title="Cerrar la figura que se dibuja (Enter)">Cerrar figura</button>
     <button id="btnDeshacer" title="Deshacer (Ctrl+Z)">Deshacer</button>
     <span class="sep"></span>
@@ -174,6 +176,7 @@ const COLOR_LIMITE = "#ff3df5";
 const PALETA = ["#e6194b","#3cb44b","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45"];
 const AYUDA = {
   sel: "Clic: seleccionar · arrastrar vértice: moverlo (Ctrl: sin imán) · doble clic en borde: agregar vértice · Shift+clic en vértice: quitarlo · arrastrar fondo: mover · rueda: zoom",
+  vertice: "AGREGAR VÉRTICE: toca un área para elegirla y luego clic sobre su borde para poner un vértice nuevo (después puedes arrastrarlo). Esc: volver a Seleccionar",
   cortar: "CORTAR: clic a un lado del área y clic al otro lado. Esc: terminar",
   dibujar: "DIBUJAR: clic en cada esquina (se pega a puntos y límites). Doble clic o Enter: cerrar. Retroceso: quitar el último. Esc: cancelar",
   zona: "NUEVA ZONA: clic en cada esquina de la zona de trabajo. Doble clic o Enter: cerrar. Esc: cancelar",
@@ -697,6 +700,7 @@ function botones(){
   const a = S.sel && S.areas.get(S.sel);
   $("btnBorrar").disabled = !a; $("btnRevisado").disabled = !a;
   $("btnQuitarV").disabled = !(a && S.vsel >= 0 && a.coords.length > 3);
+  $("btnUnir").disabled = !a;
   $("btnCerrar").disabled = !((S.tool === "dibujar" || S.tool === "zona") && S.temp.length >= 3);
   $("btnDeshacer").disabled = !S.pila.length;
   $("btnRevisado").textContent = a && !a.revisar ? "Marcar a revisar" : "Revisado";
@@ -754,10 +758,112 @@ async function cerrarFigura(){
   if (Math.abs(areaAnillo(c)) < AREA_MIN){ toast("Área demasiado pequeña."); return; }
   if (!puedeEditar()) return;
   const cod = $("codNuevo").value; if (!cod){ toast("Elige un código"); return; }
+  const vec = vecinasDe(c, null);
+  if (vec.length){
+    const mismas = vec.filter(a => a.cod === cod);
+    let r;
+    if (mismas.length) r = await modal("El área nueva queda pegada a " + mismas.length + (mismas.length > 1 ? " áreas" : " área") + " del mismo código (" + cod + "). ¿Qué hago?",
+      [["Unirlas en una sola", "unir", "prim"], ["Dejarlas separadas sin superponer", "separar"], ["Dejar como la dibujé", "nada"]]);
+    else r = await modal("El área nueva queda pegada a " + vec.length + (vec.length > 1 ? " áreas" : " área") + " de otro código. ¿La recorto para que no se superpongan las líneas?",
+      [["Sí, recortar", "separar", "prim"], ["Dejar como la dibujé", "nada"]]);
+    if (r === "unir" && unirAreas(c, cod, mismas, null)) return;
+    if (r === "separar"){ separarArea(c, cod, vec); return; }
+  }
   const path = coleccionNueva() + "/" + nuevoId();
   guardarPila([{path, antes:null}]);
   escribirArea(path, {cod, coords:c, revisar:false, nota:"dibujada a mano", largo0:0, area0:0, origen:"manual", borrado:false, por:S.uid, t:Date.now(), id0:""});
   seleccionar(path);
+}
+
+// ---------------------------------------------------------------- áreas pegadas: unir o separar sin superponer
+const TOL_VECINA = 0.30;
+function distAnillos(c1, c2){
+  if (dentro(c1[0], c2) || dentro(c2[0], c1)) return 0;
+  let m = Infinity;
+  for (let i = 0; i < c1.length; i++){
+    const a = c1[i], b = c1[(i + 1) % c1.length];
+    for (let j = 0; j < c2.length; j++){
+      const p = c2[j], q = c2[(j + 1) % c2.length];
+      if (cruza(a, b, p, q)) return 0;
+      m = Math.min(m, distSeg(a, p, q)[0], distSeg(p, a, b)[0]);
+    }
+  }
+  return m;
+}
+function vecinasDe(c, excluir){
+  const bb = caja(c), t = TOL_VECINA;
+  return vivas().filter(a => a.path !== excluir && a.bb[0] <= bb[2] + t && a.bb[2] >= bb[0] - t && a.bb[1] <= bb[3] + t && a.bb[3] >= bb[1] - t && distAnillos(c, a.coords) <= t);
+}
+// Pega el anillo a los bordes vecinos: sus vértices cercanos van al borde vecino
+// y los vértices vecinos cercanos se agregan a su borde, para que el límite sea uno solo.
+function pegarAnillo(c, otras){
+  const t = TOL_VECINA;
+  let r = c.map(v => {
+    let m = null;
+    for (const a of otras) for (const w of a.coords){ const d = Math.hypot(w[0] - v[0], w[1] - v[1]); if (d <= t && (!m || d < m[0])) m = [d, w]; }
+    if (!m) for (const a of otras) for (let i = 0; i < a.coords.length; i++){
+      const [d, q] = distSeg(v, a.coords[i], a.coords[(i + 1) % a.coords.length]); if (d <= t && (!m || d < m[0])) m = [d, q];
+    }
+    return m ? [r3(m[1][0]), r3(m[1][1])] : v;
+  });
+  for (const a of otras) for (const w of a.coords){
+    if (r.some(v => Math.hypot(v[0] - w[0], v[1] - w[1]) < 0.01)) continue;
+    let m = null;
+    for (let i = 0; i < r.length; i++){
+      const p = r[i], q = r[(i + 1) % r.length]; const [d, x] = distSeg(w, p, q);
+      if (d <= t && Math.hypot(x[0] - p[0], x[1] - p[1]) > 0.01 && Math.hypot(x[0] - q[0], x[1] - q[1]) > 0.01 && (!m || d < m[0])) m = [d, i];
+    }
+    if (m) r.splice(m[1] + 1, 0, [w[0], w[1]]);
+  }
+  r = r.filter((v, i) => { const u = r[(i + 1) % r.length]; return Math.hypot(u[0] - v[0], u[1] - v[1]) > 0.005; });
+  return r.length >= 3 && !seCruza(r) ? r : c;
+}
+function recorte(op, c, otras){
+  const ox = Math.floor(Math.min(c[0][0], ...otras.map(a => a.bb[0]))), oy = Math.floor(Math.min(c[0][1], ...otras.map(a => a.bb[1])));
+  const loc = k => k.map(v => [v[0] - ox, v[1] - oy]);
+  const res = polygonClipping[op]([loc(c)], ...otras.map(a => [loc(a.coords)]));
+  return res.map(pg => pg[0].slice(0, -1).map(v => [r3(v[0] + ox), r3(v[1] + oy)])).filter(k => k.length >= 3 && Math.abs(areaAnillo(k)) >= AREA_MIN)
+            .sort((x, y) => Math.abs(areaAnillo(y)) - Math.abs(areaAnillo(x)));
+}
+// c: anillo nuevo (o el del área "propia"); las vecinas del mismo código se juntan en la mayor
+function unirAreas(c, cod, mismas, propia){
+  if (!puedeEditar()) return true;
+  const pc = pegarAnillo(c, mismas);
+  let piezas;
+  try { piezas = recorte("union", pc, mismas); } catch (e) { piezas = []; }
+  if (piezas.length !== 1){ toast("No se pudieron unir en una sola figura (queda un espacio entre ellas); se dejaron separadas."); return false; }
+  const todas = (propia ? [propia] : []).concat(mismas);
+  todas.sort((x, y) => y.area - x.area);
+  const base = todas[0], ahora = Date.now(), ops = [];
+  for (const a of todas){
+    ops.push({path:a.path, antes:cuerpo(a)});
+    const cambios = a === base ? {coords:piezas[0], origen:"manual", nota:"unida a mano", largo0:0} : {borrado:true};
+    escribirArea(a.path, Object.assign(cuerpo(a), cambios, {por:S.uid, t:ahora}));
+  }
+  guardarPila(ops); seleccionar(base.path);
+  toast("Áreas unidas en una sola (" + fmt(Math.abs(areaAnillo(piezas[0]))) + " m²).");
+  return true;
+}
+function separarArea(c, cod, vec){
+  if (!puedeEditar()) return;
+  const pc = pegarAnillo(c, vec);
+  let piezas;
+  try { piezas = recorte("difference", pc, vec); } catch (e) { piezas = []; }
+  if (!piezas.length){ toast("El área nueva queda toda encima de las otras; no se guardó."); return; }
+  const ops = [], ahora = Date.now(); let primera = null;
+  for (const k of piezas){
+    const path = coleccionNueva() + "/" + nuevoId(); primera ||= path;
+    ops.push({path, antes:null});
+    escribirArea(path, {cod, coords:k, revisar:false, nota:"dibujada a mano", largo0:0, area0:0, origen:"manual", borrado:false, por:S.uid, t:ahora, id0:""});
+  }
+  guardarPila(ops); seleccionar(primera);
+  toast("Área guardada sin superponerse con sus vecinas" + (piezas.length > 1 ? " (quedó en " + piezas.length + " pedazos)." : "."));
+}
+function unirConVecinas(){
+  const a = S.sel && S.areas.get(S.sel); if (!a) return;
+  const mismas = vecinasDe(a.coords, a.path).filter(b => b.cod === a.cod);
+  if (!mismas.length){ toast("No hay áreas del mismo código pegadas a esta (a menos de " + fmt(TOL_VECINA) + " m)."); return; }
+  unirAreas(a.coords, a.cod, mismas, a);
 }
 
 // ---------------------------------------------------------------- ratón / táctil
@@ -776,8 +882,8 @@ function verticeCerca(a, px){
   a.coords.forEach((v, i) => { const q = aPantalla(v[0], v[1]); const d = Math.hypot(q[0] - px[0], q[1] - px[1]); if (d <= md){ md = d; k = i; } });
   return k;
 }
-function bordeCerca(a, w){
-  const tol = VERTICE_PX / S.vista.s; let mejor = null;
+function bordeCerca(a, w, factor = 1){
+  const tol = factor * VERTICE_PX / S.vista.s; let mejor = null;
   for (let i = 0; i < a.coords.length; i++){
     const [d, q] = distSeg(w, a.coords[i], a.coords[(i + 1) % a.coords.length]);
     if (d <= tol && (!mejor || d < mejor[0])) mejor = [d, i, q];
@@ -815,8 +921,8 @@ cv.addEventListener("pointerdown", e => {
       S.arr = {tipo:"vertice", path:a.path, k, c:a.coords.map(v => v.slice()), movio:false, x:px[0], y:px[1]};
       return;
     }
-    if (doble){
-      const b = bordeCerca(a, w);
+    if (doble || S.tool === "vertice"){
+      const b = bordeCerca(a, w, S.tool === "vertice" ? 1.5 : 1);
       if (b){
         const c = a.coords.slice(); c.splice(b[1] + 1, 0, [r3(b[2][0]), r3(b[2][1])]);
         cambiar(a, {coords:c, origen:"manual"}, "vértice agregado a mano"); S.vsel = b[1] + 1; return;
@@ -1129,6 +1235,7 @@ function enlazar(){
   $("btnBorrar").onclick = borrarSel;
   $("btnRevisado").onclick = () => { const a = S.sel && S.areas.get(S.sel); if (a) cambiar(a, {revisar:!a.revisar}); };
   $("btnQuitarV").onclick = () => quitarVertice(S.vsel);
+  $("btnUnir").onclick = unirConVecinas;
   $("btnCerrar").onclick = cerrarFigura;
   $("btnDeshacer").onclick = deshacer;
   $("btnIman").onclick = () => { S.iman = !S.iman; $("btnIman").classList.toggle("on", S.iman); };
