@@ -1,4 +1,4 @@
-<title>Demoliciones en línea</title>
+<title>WambriDemoliciones</title>
 <style>
 :root{
   --bg:#f4f5f7;--panel:#ffffff;--panel2:#f0f2f5;--text:#1d2330;--muted:#5b6475;--line:#d9dde5;
@@ -86,7 +86,7 @@ th:first-child,td:first-child{text-align:left}
 
 <div id="app">
   <header>
-    <h1 id="titulo">Demoliciones en línea</h1>
+    <h1 id="titulo">WambriDemoliciones</h1>
     <span id="estado">Conectando…</span>
     <div id="gente"></div>
     <button id="btnLado" title="Mostrar panel">Panel</button>
@@ -1113,7 +1113,7 @@ async function cargarBase(info){
 function alInfo(snap){
   const info = snap.exists ? snap.data() : null;
   const antes = S.info; S.info = info;
-  $("titulo").textContent = info && info.nombre ? "Demoliciones · " + info.nombre : "Demoliciones en línea";
+  $("titulo").textContent = info && info.nombre ? "WambriDemoliciones · " + info.nombre : "WambriDemoliciones";
   if (!info){ pintarVacio(S.owner ? "Carga el proyecto: pestaña Proyecto → \"Cargar proyecto…\" (proyecto_web.json + ZIP de fotos)." : "El dueño todavía no ha cargado el proyecto."); pintarProyecto(); if (S.owner) abrirPane("pProy"); return; }
   pintarVacio("");
   S.tiles = info.tiles || [];

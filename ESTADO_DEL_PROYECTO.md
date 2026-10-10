@@ -1,4 +1,4 @@
-# Estado del proyecto: plano de demoliciones desde topografía + ortofoto
+# Estado del proyecto WambriDemoliciones: plano de demoliciones desde topografía + ortofoto
 
 Versión publicada: **1.0.19** o posterior. Código con las mejoras 1.1 (sección 9): pendiente de subir al repositorio (instalador en GitHub → Releases → `instalador-v1.0.N` más reciente).
 Repositorio: `llullyto-hash/planos-bambu`, rama `claude/demolition-plans-automation-h0etwe`.
@@ -29,7 +29,7 @@ Flujo en la ventana: **1. Archivos → 2. Códigos y capas → 3. Láminas y mem
 
 ## 2. Cómo ejecutarlo
 
-- Usuario final: instalar `Instalar_TopografiaMetrados.exe` (no necesita Python).
+- Usuario final: instalar `Instalar_WambriDemoliciones.exe` (no necesita Python).
 - Desde el código (Windows): `INSTALAR.bat` una vez, luego `ABRIR_PROGRAMA.bat`.
 - Desde el código (cualquier sistema, Python 3.10+):
   ```
@@ -171,4 +171,4 @@ Línea de comandos nueva: `--escala`, `--cartel`, `--sin-corte-lineal`, `--lamin
 `--traslape`, `--prefijo-lamina`, `--membrete datos.json`, `--sin-vista-pdf`, `--carpeta-por-corrida`,
 `--numero-separa`, `--codigos-control`.
 
-La página publicada en claude.ai todavía es la versión anterior; la nueva está en `web/revision_colaborativa.html`.
+Programa, instalador y página colaborativa se llaman **WambriDemoliciones**. La página publicada (mismo enlace) ya tiene la versión 1.1.

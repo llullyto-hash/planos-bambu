@@ -33,7 +33,7 @@ jobs:
 
       - name: Compilar programa (PyInstaller)
         run: >
-          pyinstaller --noconfirm --windowed --name TopografiaMetrados --paths .
+          pyinstaller --noconfirm --windowed --name WambriDemoliciones --paths .
           --add-data "ortofoto/codigos.json;ortofoto"
           --add-data "ortofoto/plantilla_petro.dxf;ortofoto"
           --collect-all rasterio --collect-all shapely
@@ -43,7 +43,7 @@ jobs:
       - name: Probar el ejecutable
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "dist\TopografiaMetrados\TopografiaMetrados.exe" -ArgumentList "--prueba","$env:RUNNER_TEMP\prueba" -Wait -PassThru
+          $p = Start-Process -FilePath "dist\WambriDemoliciones\WambriDemoliciones.exe" -ArgumentList "--prueba","$env:RUNNER_TEMP\prueba" -Wait -PassThru
           Get-ChildItem "$env:RUNNER_TEMP\prueba"
           if (-not (Test-Path "$env:RUNNER_TEMP\prueba\PRUEBA_OK.txt")) { throw "El ejecutable no paso la prueba (codigo $($p.ExitCode))" }
 
@@ -55,8 +55,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Instalar_TopografiaMetrados
-          path: dist_instalador/Instalar_TopografiaMetrados.exe
+          name: Instalar_WambriDemoliciones
+          path: dist_instalador/Instalar_WambriDemoliciones.exe
 
       - name: Publicar en Releases
         uses: softprops/action-gh-release@v2
@@ -64,7 +64,7 @@ jobs:
           tag_name: instalador-v1.0.${{ github.run_number }}
           name: Instalador Topografia - Metrados v1.0.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          files: dist_instalador/Instalar_TopografiaMetrados.exe
+          files: dist_instalador/Instalar_WambriDemoliciones.exe
           body: |
-            Descargue **Instalar_TopografiaMetrados.exe**, abralo y siga los pasos (Siguiente > Siguiente > Instalar).
+            Descargue **Instalar_WambriDemoliciones.exe**, abralo y siga los pasos (Siguiente > Siguiente > Instalar).
             No necesita Python. Queda un acceso directo en el escritorio.

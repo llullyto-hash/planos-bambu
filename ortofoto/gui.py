@@ -22,7 +22,7 @@ from . import laminas as lammod
 from . import topografia, unir
 from .__main__ import CODIGOS_DEFECTO, Opciones, calcular, exportar_calculo, procesar
 
-TITULO = "Topografia -> polilineas, areas, metrados y laminas"
+TITULO = "WambriDemoliciones"
 CONFIG_VENTANA = Path.home() / ".planos_bambu" / "ventana.json"
 VERDE, VERDE_CLARO, GRIS = "#2e7d32", "#e8f5e9", "#666"
 COLUMNAS = [  # (clave, titulo, ancho, editable)
@@ -201,8 +201,10 @@ class App(tk.Tk):
         estilo.configure("Paso.TLabel", font=("Segoe UI", 11, "bold"))
         cab = tk.Frame(self, bg=VERDE)
         cab.pack(fill="x")
-        tk.Label(cab, text="Planos de demolicion desde la topografia", bg=VERDE, fg="white",
+        tk.Label(cab, text="WambriDemoliciones", bg=VERDE, fg="white",
                  font=("Segoe UI", 14, "bold")).pack(side="left", padx=12, pady=6)
+        tk.Label(cab, text="Planos de demolicion desde la topografia", bg=VERDE, fg="#c8e6c9",
+                 font=("Segoe UI", 10)).pack(side="left", padx=4)
         tk.Label(cab, text="Siga las pestanas en orden: 1 > 2 > 3 > 4 > 5", bg=VERDE, fg="#c8e6c9",
                  font=("Segoe UI", 10)).pack(side="left", padx=8)
         tk.Button(cab, text="Guia rapida", command=self._guia, bg="white", relief="flat").pack(side="right", padx=10)

@@ -1,4 +1,4 @@
-# planos-bambu
+# WambriDemoliciones (planos-bambu)
 
 > Para retomar el trabajo, lea primero **ESTADO_DEL_PROYECTO.md** (criterios acordados, pendientes y cómo continuar).
 
