@@ -52,6 +52,7 @@ class Cara:
     atras: float = 0.0  # m que la fachada real (CSH) esta detras de esta cara (fachada del plano corrida)
     puntos: list = field(default_factory=list)  # (t, d, indice, esquina)
     intervalos: list = field(default_factory=list)  # [t0, t1, ancho, revisar]
+    reglas: list = field(default_factory=list)  # (t, texto): criterios aplicados en esta cara
 
     def t_d(self, xy):
         v = np.asarray(xy, float) - self.p0
@@ -183,6 +184,7 @@ def _intervalos(cara, secs, conf, orto, csh):
     if len(secs) == 1:
         t0, t1, w = secs[0]
         if t1 - t0 < 1.0:  # una sola seccion: un pedazo corto a revisar
+            cara.reglas.append(((t0 + t1) / 2, "punto suelto: pedazo de 2 m (a revisar)"))
             m = (t0 + t1) / 2
             return [[max(m - LARGO_SUELTO / 2, 0.0), min(m + LARGO_SUELTO / 2, cara.largo), w, True]]
         return [[t0, t1, w, False]]
@@ -198,10 +200,13 @@ def _intervalos(cara, secs, conf, orto, csh):
                 rellenar = (gap <= HUECO_LARGO and abs(wa - wb) <= DIF_HUECO_LARGO and
                             f is not None and f["suelo"] < SUELO_HUECO_LARGO)
                 revisar = True
+                cara.reglas.append(((a1 + b0) / 2, f"hueco largo de {gap:.1f} m " +
+                                    ("unido (a revisar)" if rellenar else "sin unir")))
             elif (_lote_vacio(f) and _hay_csh(cara, -1e9, 1e9, csh)
                   and not _hay_csh(cara, a1, b0, csh)):
                 # la fachada se levanto (hay CSH en la cara) pero no en este tramo
                 rellenar = False  # frente de un lote vacio: no hay vereda
+                cara.reglas.append(((a1 + b0) / 2, "lote vacio: hueco sin vereda"))
         if rellenar and gap > 0.05:
             # La seccion ancha se estira sobre el hueco solo mientras la foto muestre concreto
             ext_a = ext_b = 0.0
@@ -209,6 +214,8 @@ def _intervalos(cara, secs, conf, orto, csh):
                 ext_a = _estirar(cara, a1, +1, gap, wb, wa, orto)
             elif wb - wa > UNIR_ANCHOS:
                 ext_b = _estirar(cara, b0, -1, gap, wa, wb, orto)
+            if ext_a or ext_b:
+                cara.reglas.append(((a1 + b0) / 2, "losa estirada hasta donde la foto ve concreto"))
             if ext_a:
                 out[-1][1] = a1 + ext_a
             out.append([a1 + ext_a, b0 - ext_b, w, revisar])
@@ -225,6 +232,7 @@ def _intervalos(cara, secs, conf, orto, csh):
     grupos.append(actual)
     for g in grupos:
         if g[-1][1] - g[0][0] < 1.0:
+            cara.reglas.append(((g[0][0] + g[-1][1]) / 2, "tramo aislado corto: pedazo de 2 m (a revisar)"))
             m = (g[0][0] + g[-1][1]) / 2
             w = max(it[2] for it in g)
             g[:] = [[max(m - LARGO_SUELTO / 2, 0.0), min(m + LARGO_SUELTO / 2, cara.largo), w, True]]
@@ -283,7 +291,7 @@ def _ajustar(intervalos):
     return res
 
 
-def _esquina(f, g, hueco):
+def _esquina(f, g, hueco, orto=None, csh=()):
     """Une la vereda de dos caras seguidas (esquina o quiebre) si las dos tienen puntos y entre los
     ultimos de una y los primeros de la otra no hay mas de `hueco` m. Cada cara conserva su ancho
     (medido perpendicular a ella); el borde exterior dobla donde se cruzan los dos bordes.
@@ -293,7 +301,16 @@ def _esquina(f, g, hueco):
     a, b = f.intervalos[-1], g.intervalos[0]
     if (f.largo - a[1]) + b[0] > hueco:
         return None
+    # Lote vacio en la union de la esquina: el estiramiento hasta la esquina pasa frente a un lote
+    # sin fachada levantada (CSH) y la foto ve maleza o tierra: no se une (pendiente 7888-7893)
+    if orto is not None and csh:
+        for cara, t0, t1, w in ((f, a[1], f.largo, a[2]), (g, 0.0, b[0], b[2])):
+            if t1 - t0 >= 1.0 and not _hay_csh(cara, t0 - 0.6, t1 + 0.6, csh) and \
+                    _lote_vacio(_fracciones(orto, cara.rect(t0, t1, 0.0, w))):
+                f.reglas.append((f.largo, "esquina sin unir: lote vacio"))
+                return None
     a[1], b[0] = f.largo, 0.0
+    f.reglas.append((f.largo, "esquina unida"))
     v = f.p1
     m = np.array([f.u, -g.u]).T
     if abs(np.linalg.det(m)) < 1e-6:
@@ -362,22 +379,29 @@ def veredas_contra_fachada(res, limites, manzanas=None, csh=(), indices=None, re
                 if len(adentro) >= 2 and len(adentro) >= 0.6 * len(cerca):
                     cara.atras = float(np.median(adentro))
             cara.puntos = [(t, max(d * cara.lado, 0.0), i, esq) for t, d, i, esq in cara.puntos]
+            if cara.atras:
+                cara.reglas.append((cara.largo / 2, "fachada del plano corrida: vereda hasta la fachada real (CSH)"))
             fuera = {}
             secs = _secciones(cara, xy_all, zz_all, orto, fuera)
             for j, motivo in fuera.items():
+                t_j = next((t for t, d, i, e in cara.puntos if i == j), cara.largo / 2)
+                cara.reglas.append((t_j, f"punto {res.puntos[j].num} excluido ({motivo})"))
                 p = res.puntos[j]
                 revisar.append((p.e, p.n, f"{p.num} {p.desc}: fuera de la vereda ({motivo})"))
             if secs:
                 cara.intervalos = _intervalos(cara, secs, conf, orto, csh)
                 if orto is not None:
-                    cara.intervalos = [it for it in cara.intervalos if not _frente_de_lote(cara, it, orto, csh)]
+                    quedan = [it for it in cara.intervalos if not _frente_de_lote(cara, it, orto, csh)]
+                    if len(quedan) < len(cara.intervalos):
+                        cara.reglas.append((cara.largo / 2, "frente de lote vacio: tramo quitado"))
+                    cara.intervalos = quedan
         # Esquinas entre caras seguidas (y la ultima con la primera en una manzana cerrada)
         piezas = []
         pares = list(zip(caras, caras[1:]))
         if limites[k].is_closed and len(caras) > 2:
             pares.append((caras[-1], caras[0]))
         for f, g in pares:
-            e = _esquina(f, g, conf.hueco_max or 10.0)
+            e = _esquina(f, g, conf.hueco_max or 10.0, orto, csh)
             if e is not None:
                 piezas.append((e, False))
         permitido = []
@@ -404,9 +428,15 @@ def veredas_contra_fachada(res, limites, manzanas=None, csh=(), indices=None, re
                         if cara.rect(t0, t1, 0.0, max(w, 0.01)).intersects(comp))
             largo = largo or comp.length / 2
             dudoso = sum(g.intersection(comp).area for g, r in de_aqui if r)
-            areas.append(Area(res.codigo, conf, comp, "fachada", comp.area / max(largo, 1e-6), largo,
-                              dudoso > 0.5 * comp.area,
-                              nota="tramo sin puntos suficientes: largo o union supuestos" if dudoso else ""))
+            ar = Area(res.codigo, conf, comp, "fachada", comp.area / max(largo, 1e-6), largo,
+                      dudoso > 0.5 * comp.area,
+                      nota="tramo sin puntos suficientes: largo o union supuestos" if dudoso else "")
+            zona = comp.buffer(1.0)
+            for cara in caras:
+                for t, texto in cara.reglas:
+                    if texto not in ar.reglas and zona.contains(Point(*cara.punto(min(max(t, 0), cara.largo), 0.05))):
+                        ar.reglas.append(texto)
+            areas.append(ar)
             borde = comp.exterior.difference(limites[k].buffer(0.02))
             bordes += [g for g in getattr(borde, "geoms", [borde]) if isinstance(g, LineString) and g.length > 0.1]
     return areas, bordes, usados

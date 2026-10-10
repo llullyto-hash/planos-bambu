@@ -3,7 +3,7 @@
  "codigos": {
   "VER":    {"nombre": "Vereda", "misma_manzana": true, "capa": "VEREDA EXIS.", "tipo": "franja", "separacion_max": 14, "hueco_max": 10, "ancho_min": 0.3, "ancho_max": 4.0, "color": 10,
              "capa_area": "Vereda a demoler", "prefijo": "VD", "color_area": 180, "patron": "NET3", "escala_patron": 0.15,
-             "referencia": ["CSH", "LP"]},
+             "referencia": ["CSH", "LP"], "corte_lineal": true},
   "MAR":    {"nombre": "Martillo", "misma_manzana": true, "capa": "MARTILLO", "tipo": "contorno", "separacion_max": 8, "color": 31,
              "capa_area": "Martillo a demoler", "prefijo": "MT", "color_area": 30, "patron": "NET3", "escala_patron": 0.3},
   "MRTLLO": {"alias": "MAR"},

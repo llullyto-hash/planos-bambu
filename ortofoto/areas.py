@@ -36,6 +36,8 @@ class Area:
     revisar: bool = False
     etiqueta: str = ""
     nota: str = ""
+    lamina: str = ""
+    reglas: list = field(default_factory=list)  # criterios que formaron o recortaron el area
 
     @property
     def area(self):
@@ -50,6 +52,8 @@ class Linea:
     etiqueta: str = ""
     sin_pareja: bool = False  # borde de franja que no se pudo cerrar
     borde: bool = False  # borde de un area armada por secciones (se dibuja en la capa del codigo)
+    dibujar: bool = False  # la linea no viene de los puntos (corte lineal): se dibuja en su capa
+    lamina: str = ""
 
 
 @dataclass
@@ -272,6 +276,8 @@ def cerrar_areas(resultados, base=None, usar_foto=False):
             if resto.area < AREA_MIN or not isinstance(resto, Polygon):
                 continue
             ar.poligono = resto
+            if ar.conf.referencia:
+                ar.reglas.append("recortada contra canal/cuneta (tienen prioridad)")
         met.areas.append(ar)
         ocupado = ar.poligono if ocupado is None else unary_union([ocupado, ar.poligono])
     _numerar(met)
@@ -632,23 +638,107 @@ def agregar_concreto_visible(met, poligonos, conf, puntos_xy=()):
     _numerar(met)
 
 
-def _numerar(met):
-    """VD - 01, VD - 02... ordenadas de norte a sur y de oeste a este."""
+def _numerar(met, clave=None):
+    """VD - 01, VD - 02... ordenadas de norte a sur y de oeste a este.
+
+    `clave(geom, elemento)`: otro orden (p.ej. por lamina, ver laminas.clave_orden)."""
+    if clave is None:
+        clave = lambda g, _e: (-round(g.centroid.y / 20), g.centroid.x)  # noqa: E731
     por_prefijo = {}
     for ar in met.areas:
         por_prefijo.setdefault(ar.conf.prefijo or ar.codigo, []).append(ar)
     for pref, lista in por_prefijo.items():
-        lista.sort(key=lambda a: (-round(a.poligono.centroid.y / 20), a.poligono.centroid.x))
+        lista.sort(key=lambda a: clave(a.poligono, a))
         for k, ar in enumerate(lista, 1):
             ar.etiqueta = f"{pref} - {k:02d}"
     por_prefijo = {}
     for ln in met.lineas:
-        if ln.conf.prefijo and ln.conf.tipo == "linea":
+        if ln.conf.prefijo and ln.conf.tipo == "linea" and not ln.borde and not ln.sin_pareja:
             por_prefijo.setdefault(ln.conf.prefijo, []).append(ln)
     for pref, lista in por_prefijo.items():
-        lista.sort(key=lambda l: (-round(l.linea.centroid.y / 20), l.linea.centroid.x))
+        lista.sort(key=lambda l: clave(l.linea, l))
         for k, ln in enumerate(lista, 1):
             ln.etiqueta = f"{pref} - {k:02d}"
+
+
+# Corte lineal (CL): en PETRO es el borde de la vereda a demoler que coincide con el limite de
+# propiedad (62 de sus 66 lineas de corte estan sobre LINEA DE LOTE y sobre la vereda).
+CORTE_TOL = 0.10  # m: borde del area a esta distancia del limite de propiedad = corte
+CORTE_MIN = 1.0  # m: tramos de corte mas cortos que esto no se dibujan
+CORTE_HUECO = 1.5  # m: tramos de corte separados por menos que esto forman una sola linea
+
+
+def conf_corte():
+    from .unir import Codigo
+
+    return Codigo(capa="LINEA CORTE", tipo="linea", prefijo="CL", nombre="Corte lineal", color=242,
+                  tipo_linea="ACAD_ISO10W100", separacion_max=0)
+
+
+def cortes_lineales(met, base=None, resultados=()):
+    """Agrega a met.lineas las lineas de corte (CL) de las areas cuyo codigo tiene corte_lineal."""
+    met.lineas = [l for l in met.lineas if l.codigo != "CL"]
+    limites = list(base.limites) if base is not None and not base.vacio else []
+    refs = set()
+    for a in met.areas:
+        if getattr(a.conf, "corte_lineal", False):
+            refs.update(a.conf.referencia or [])
+    for r in resultados:
+        if r.codigo in refs and r.conf.tipo == "linea":
+            for cad in r.cadenas:
+                if len(cad) >= 2:
+                    limites.append(LineString(r.xy(cad)))
+    if not limites:
+        return []
+    zona = unary_union([l.buffer(CORTE_TOL) for l in limites])
+    arbol = STRtree(limites)
+
+    def paralelo(a, b):
+        """El tramo a-b corre a lo largo del limite (no es el extremo de la vereda que lo cruza)."""
+        m = Point((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+        lim = limites[int(arbol.nearest(m))]
+        d = lim.project(m)
+        p0, p1 = lim.interpolate(max(d - 0.05, 0)), lim.interpolate(min(d + 0.05, lim.length))
+        u = np.array([p1.x - p0.x, p1.y - p0.y])
+        v = np.array([b[0] - a[0], b[1] - a[1]])
+        nu, nv = np.hypot(*u), np.hypot(*v)
+        return nu > 1e-9 and nv > 1e-9 and abs(u @ v) / (nu * nv) > 0.87  # menos de 30 grados
+
+    # Cada tramo de borde paralelo al limite se proyecta sobre ese limite; los tramos seguidos (con
+    # huecos de menos de CORTE_HUECO m, p.ej. entre dos veredas vecinas) forman una sola linea de corte
+    # que va por el limite de propiedad, como en PETRO.
+    intervalos = {}
+    for a in met.areas:
+        if not getattr(a.conf, "corte_lineal", False):
+            continue
+        c = list(a.poligono.exterior.coords)
+        for p, q in zip(c[:-1], c[1:]):
+            g = LineString([p, q]).intersection(zona)
+            for parte in getattr(g, "geoms", [g]):
+                if isinstance(parte, LineString) and parte.length > 0.01:
+                    pc = list(parte.coords)
+                    if paralelo(pc[0], pc[-1]):
+                        m = parte.interpolate(0.5, normalized=True)
+                        k = int(arbol.nearest(m))
+                        t0, t1 = sorted((limites[k].project(Point(pc[0])), limites[k].project(Point(pc[-1]))))
+                        intervalos.setdefault(k, []).append([t0, t1])
+    conf = conf_corte()
+    nuevas = []
+    for k, ivs in intervalos.items():
+        ivs.sort()
+        unidos = [ivs[0]]
+        for t0, t1 in ivs[1:]:
+            if t0 - unidos[-1][1] <= CORTE_HUECO:
+                unidos[-1][1] = max(unidos[-1][1], t1)
+            else:
+                unidos.append([t0, t1])
+        for t0, t1 in unidos:
+            if t1 - t0 >= CORTE_MIN:
+                ln = substring(limites[k], t0, t1)
+                if isinstance(ln, LineString) and ln.length >= CORTE_MIN:
+                    nuevas.append(Linea("CL", conf, ln, dibujar=True))
+    met.lineas += nuevas
+    return nuevas
 
 
 def punto_etiqueta(pol):
@@ -657,22 +747,22 @@ def punto_etiqueta(pol):
     return p.x, p.y
 
 
-def guardar_metrado(met, ruta_xlsx, ruta_csv=None):
-    """Planilla de metrados (Excel) y CSV."""
+def guardar_metrado(met, ruta_xlsx, ruta_csv=None, laminas=None):
+    """Planilla de metrados (Excel) y CSV. Las columnas nuevas (perimetro, lamina) van al final."""
     filas = []
     for ar in met.areas:
         x, y = punto_etiqueta(ar.poligono)
         filas.append([ar.etiqueta, ar.conf.nombre or ar.codigo, ar.conf.capa_area, "m2", round(ar.area, 2),
                       round(ar.largo, 2), round(ar.ancho, 2), "SI" if ar.revisar else "", round(x, 3), round(y, 3),
-                      ar.nota])
+                      ar.nota, round(ar.poligono.exterior.length, 2), ar.lamina, "; ".join(ar.reglas)])
     for ln in met.lineas:
         if not ln.etiqueta:
             continue
         x, y = ln.linea.interpolate(0.5, normalized=True).coords[0]
         filas.append([ln.etiqueta, ln.conf.nombre or ln.codigo, ln.conf.capa, "m", round(ln.linea.length, 2),
-                      round(ln.linea.length, 2), "", "", round(x, 3), round(y, 3), ""])
+                      round(ln.linea.length, 2), "", "", round(x, 3), round(y, 3), "", "", ln.lamina, ""])
     cab = ["Etiqueta", "Elemento", "Capa", "Unidad", "Metrado", "Largo (m)", "Ancho medio (m)", "Revisar",
-           "Este", "Norte", "Observacion"]
+           "Este", "Norte", "Observacion", "Perimetro (m)", "Lamina", "Reglas aplicadas"]
     resumen = {}
     for f in filas:
         clave = (f[0].split(" - ")[0], f[1], f[3])
@@ -700,8 +790,20 @@ def guardar_metrado(met, ruta_xlsx, ruta_csv=None):
     det.append(cab)
     for f in filas:
         det.append(f)
+    hojas = [hoja, det]
+    if any(f[12] for f in filas):
+        por = wb.create_sheet("Por lamina")
+        por.append(["Lamina", "Codigo", "Elemento", "Unidad", "Cantidad", "Metrado total", "Perimetro total (m)"])
+        tot_l = {}
+        for f in filas:
+            k = (f[12], f[0].split(" - ")[0], f[1], f[3])
+            n, m, p = tot_l.get(k, (0, 0.0, 0.0))
+            tot_l[k] = (n + 1, m + f[4], p + (f[11] or 0.0))
+        for (lam, pref, nombre, und), (n, m, p) in sorted(tot_l.items()):
+            por.append([lam, pref, nombre, und, n, round(m, 2), round(p, 2) if und == "m2" else ""])
+        hojas.append(por)
     amarillo = PatternFill("solid", fgColor="FFF2CC")
-    for h in (hoja, det):
+    for h in hojas:
         for c in h[1]:
             c.font = Font(bold=True)
         for col in h.columns:

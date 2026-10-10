@@ -16,25 +16,26 @@ ALTURA_TEXTO = 0.25
 
 
 def _capa(doc, nombre, color=7, tipo_linea="Continuous", plantilla=None, apagada=False):
-    if nombre in doc.layers:
-        return doc.layers.get(nombre)
-    lw = -3
-    if plantilla is not None and nombre in plantilla.layers:
-        ref = plantilla.layers.get(nombre)
-        color, tipo_linea, lw = ref.dxf.color, ref.dxf.linetype, ref.dxf.lineweight
-    if tipo_linea not in doc.linetypes:
-        tipo_linea = "Continuous"
-    capa = doc.layers.add(nombre, color=abs(color) or 7, linetype=tipo_linea, lineweight=lw)
-    if apagada:
-        capa.off()
-    return capa
+    """Compatibilidad: crea una capa copiando sus propiedades de `plantilla` si la tiene."""
+    from .estilo import Estilo
+
+    return Estilo(doc, [plantilla]).capa(nombre, color, tipo_linea, apagada)
 
 
 def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=None, plantilla=None,
-                capas_apagadas=(), base_dxf=None):
+                capas_apagadas=(), base_dxf=None, escala=500, cartel="petro", laminas=None, conf_laminas=None,
+                base=None, avisar=None, limites=None):
     """Guarda el resultado. Con `base_dxf` se trabaja sobre una copia del plano del proyecto:
-    se conserva todo lo original (lotes, fachadas, ortofoto) y se agregan las capas nuevas."""
+    se conserva todo lo original (lotes, fachadas, ortofoto) y se agregan las capas nuevas.
+
+    Capas y estilos de texto salen como en el plano PETRO (o como en `plantilla` si se elige otra).
+    cartel: "petro" (recuadro + flecha con area y perimetro) o "simple" (texto suelto, como antes).
+    laminas: lista de laminas.Lamina para crear los layouts con membrete (o None).
+    Devuelve (doc, nombres de los layouts creados, cantidad de carteles encimados)."""
     import ezdxf
+
+    from . import carteles
+    from .estilo import Estilo, cargar_plantilla
 
     alias = alias or {}
     if base_dxf:
@@ -44,14 +45,23 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
     else:
         doc = ezdxf.new("R2018", setup=True)
         doc.header["$INSUNITS"] = 6  # metros
-    tpl = None
+    tpl_usuario = None
     if plantilla:
         from ezdxf import recover
 
-        tpl, _ = recover.readfile(plantilla)
+        tpl_usuario, _ = recover.readfile(plantilla)
+    est = Estilo(doc, [tpl_usuario, cargar_plantilla()])
+    est.estilos_texto()
     msp = doc.modelspace()
-    for nombre, color in ((CAPA_REVISAR, 1), (CAPA_REVISAR_AREA, 1), (CAPA_SIN_PAREJA, 6), (CAPA_ETIQUETAS, 7)):
-        _capa(doc, nombre, color, plantilla=tpl)
+    for nombre, color in ((CAPA_REVISAR, 1), (CAPA_REVISAR_AREA, 1), (CAPA_SIN_PAREJA, 6)):
+        est.capa(nombre, color)
+    if cartel == "petro":
+        est.capa(carteles.CAPA_RECUADRO, 230)
+        est.capa(carteles.CAPA_TEXTO, 144)
+        est.capa(carteles.CAPA_ENCIMADO, 1).dxf.plot = 0
+        estilo_cota = carteles.preparar_estilo_cota(doc, escala)
+    else:
+        est.capa(CAPA_ETIQUETAS, 7)
 
     # Puntos visibles: circulo con cruz de 25 cm (si no, AutoCAD los dibuja como un punto diminuto)
     doc.header["$PDMODE"] = 34
@@ -61,7 +71,7 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
         cod = alias.get(p.codigo, p.codigo) or "SIN-CODIGO"
         conf = codigos.get(cod)
         capa = PREFIJO_PUNTOS + cod
-        _capa(doc, capa, conf.color if conf else 8, apagada=capa in capas_apagadas)
+        est.capa(capa, conf.color if conf else 8, apagada=capa in capas_apagadas)
         msp.add_point((p.e, p.n, p.z), dxfattribs={"layer": capa})
         msp.add_text(f"{p.num} {p.desc} {p.z:.2f}", height=0.1, dxfattribs={"layer": capa}).set_placement(
             (p.e + 0.08, p.n + 0.08))
@@ -71,7 +81,7 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
         conf = r.conf
         if conf.tipo == "punto":
             continue
-        _capa(doc, conf.capa, conf.color, conf.tipo_linea, tpl, conf.capa in capas_apagadas)
+        est.capa(conf.capa, conf.color, conf.tipo_linea, conf.capa in capas_apagadas)
         for cad in r.cadenas:
             cerrada = cad[0] == cad[-1]
             idx = cad[:-1] if cerrada else cad
@@ -82,23 +92,42 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
                 a, b = r.puntos[u.i], r.puntos[u.j]
                 msp.add_line((a.e, a.n), (b.e, b.n), dxfattribs={"layer": CAPA_REVISAR})
 
+    manzanas = base.union_manzanas() if base is not None and not base.vacio else None
+    giro = laminas[0].angulo if laminas else 0.0
+    colocador = carteles.Colocador(escala, [a.poligono for a in metrado.areas], manzanas, giro)
+
+    def etiqueta(geom, titulo, filas, simple):
+        if cartel == "petro":
+            lineas_txt = [titulo] + [f"{n} {v}" for n, v in filas]
+            c = colocador.colocar(geom, lineas_txt)
+            carteles.dibujar(msp, c, carteles.texto_petro(titulo, filas), lineas_txt, escala, estilo_cota,
+                             angulo=giro)
+        else:
+            if geom.geom_type.endswith("Polygon"):
+                x, y = punto_etiqueta(geom)
+            else:
+                x, y = geom.interpolate(0.5, normalized=True).coords[0]
+            msp.add_mtext(simple, dxfattribs={"layer": CAPA_ETIQUETAS, "char_height": ALTURA_TEXTO, "insert": (x, y),
+                                              "attachment_point": 5})
+
     # Bordes de franja que no encontraron su pareja: hay que cerrarlos a mano
     for ln in metrado.lineas:
         if ln.borde:
             msp.add_lwpolyline(list(ln.linea.coords), dxfattribs={"layer": ln.conf.capa})
         elif ln.sin_pareja:
             msp.add_lwpolyline(list(ln.linea.coords), dxfattribs={"layer": CAPA_SIN_PAREJA})
-        elif ln.etiqueta:
-            x, y = ln.linea.interpolate(0.5, normalized=True).coords[0]
-            msp.add_mtext(f"{ln.etiqueta}\\PLONG={ln.linea.length:.2f}M",
-                          dxfattribs={"layer": CAPA_ETIQUETAS, "char_height": ALTURA_TEXTO, "insert": (x, y),
-                                      "attachment_point": 5})
+        else:
+            if ln.dibujar:  # corte lineal: no viene de los puntos
+                est.capa(ln.conf.capa, ln.conf.color, ln.conf.tipo_linea, ln.conf.capa in capas_apagadas)
+                msp.add_lwpolyline(list(ln.linea.coords), dxfattribs={"layer": ln.conf.capa})
+            if ln.etiqueta:
+                etiqueta(ln.linea, ln.etiqueta, [("LONG=", f"{ln.linea.length:,.2f} M")],
+                         f"{ln.etiqueta}\\PLONG={ln.linea.length:.2f}M")
 
-    # Areas cerradas + achurado + etiqueta tipo PETRO
+    # Areas cerradas + achurado + cartel tipo PETRO
     for ar in metrado.areas:
         conf = ar.conf
-        _capa(doc, conf.capa_area, conf.color_area or conf.color, plantilla=tpl,
-              apagada=conf.capa_area in capas_apagadas)
+        est.capa(conf.capa_area, conf.color_area or conf.color, apagada=conf.capa_area in capas_apagadas)
         exterior = list(ar.poligono.exterior.coords)[:-1]
         attrs = {"layer": conf.capa_area}
         msp.add_lwpolyline(exterior, close=True, dxfattribs=attrs)
@@ -111,24 +140,24 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
         h.paths.add_polyline_path(exterior, is_closed=True)
         for agujero in ar.poligono.interiors:
             h.paths.add_polyline_path(list(agujero.coords)[:-1], is_closed=True)
-        x, y = punto_etiqueta(ar.poligono)
-        largo = f"\\PLONG= {ar.largo:.2f} M" if getattr(conf, "etiqueta_largo", False) and ar.largo else ""
-        msp.add_mtext(f"{ar.etiqueta}{largo}\\PAREA= {ar.area:.2f} M2",
-                      dxfattribs={"layer": CAPA_ETIQUETAS, "char_height": ALTURA_TEXTO, "insert": (x, y),
-                                  "attachment_point": 5})
+        con_largo = getattr(conf, "etiqueta_largo", False) and ar.largo
+        largo = f"\\PLONG= {ar.largo:.2f} M" if con_largo else ""
+        etiqueta(ar.poligono, ar.etiqueta,
+                 carteles.filas_area(ar.area, ar.poligono.exterior.length, ar.largo if con_largo else None),
+                 f"{ar.etiqueta}{largo}\\PAREA= {ar.area:.2f} M2")
         if ar.revisar:
             msp.add_lwpolyline(exterior, close=True, dxfattribs={"layer": CAPA_REVISAR_AREA, "lineweight": 50})
 
     # Puntos que no calzan con lo que se ve en la ortofoto
     if metrado.puntos_revisar:
-        _capa(doc, CAPA_PUNTO_FOTO, 1)
+        est.capa(CAPA_PUNTO_FOTO, 1)
         for x, y, motivo in metrado.puntos_revisar:
             msp.add_circle((x, y), 0.4, dxfattribs={"layer": CAPA_PUNTO_FOTO})
             msp.add_text(motivo, height=0.15, dxfattribs={"layer": CAPA_PUNTO_FOTO}).set_placement((x + 0.5, y + 0.2))
 
     # Concreto visto en la foto sin puntos topograficos que lo respalden (solo contorno, sin metrado)
     if metrado.sin_puntos:
-        _capa(doc, "REVISAR CONCRETO SIN PUNTOS", 6)
+        est.capa("REVISAR CONCRETO SIN PUNTOS", 6)
         for g in metrado.sin_puntos:
             msp.add_lwpolyline(list(g.exterior.coords)[:-1], close=True,
                                dxfattribs={"layer": "REVISAR CONCRETO SIN PUNTOS"})
@@ -136,7 +165,7 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
     # Ortofoto de fondo: el archivo original, con el calce corregido (no se copia).
     # Si se trabaja sobre el plano del proyecto, la foto ya esta insertada ahi.
     if orto is not None and orto.origen is not None and not base_dxf:
-        _capa(doc, CAPA_ORTOFOTO, 7)
+        est.capa(CAPA_ORTOFOTO, 7)
         w, h = orto.origen["tam"]
         a, b, c, d, e, f = orto.origen["afin"]
         idef = doc.add_image_def(filename=orto.origen["ruta"], size_in_pixel=(w, h))
@@ -146,7 +175,18 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
         img.dxf.u_pixel = (a, d, 0)
         img.dxf.v_pixel = (-b, -e, 0)
         msp.set_redraw_order([(img.dxf.handle, "1")])
+
+    if limites:  # solo para la vista previa (sin el plano base completo)
+        est.capa("LIMITE DE PROPIEDAD (PLANO BASE)", 5)
+        for ln in limites:
+            msp.add_lwpolyline(list(ln.coords), dxfattribs={"layer": "LIMITE DE PROPIEDAD (PLANO BASE)"})
+    creados = []
+    if laminas:
+        from . import laminas as lammod
+
+        creados = lammod.dibujar_laminas(doc, laminas, conf_laminas, est)
     doc.saveas(ruta)
+    return doc, creados, colocador.encimados
 
 
 def guardar_vista(resultados, ruta, orto=None, referencia=None, metrado=None, max_px=4000, ventana=None):

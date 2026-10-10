@@ -53,6 +53,7 @@ class Codigo:
     hueco_max: float = 0.0  # franja: m sin puntos a lo largo de la fachada que cortan el area (0 = 10 m)
     etiqueta_largo: bool = False  # la etiqueta del area lleva tambien la longitud (canales)
     ancho_defecto: float = 0.0  # franja: ancho supuesto para tramos levantados solo por su eje (0 = no)
+    corte_lineal: bool = False  # el borde del area contra el limite de propiedad lleva corte lineal (CL)
 
 
 def cargar_codigos(ruta):
@@ -174,9 +175,13 @@ class Barreras:
 
 
 class _Grafo:
-    def __init__(self, xy, barreras):
+    def __init__(self, xy, barreras, grado_max=None, cierre=None):
         self.xy = xy
         self.vec = [[] for _ in range(len(xy))]
+        # Codigos de control del topografo: un punto de inicio/fin de linea admite un solo vecino,
+        # un punto "cerrar" permite cerrar la figura aunque el codigo sea una linea.
+        self.grado_max = grado_max if grado_max is not None else [2] * len(xy)
+        self.cierre = cierre if cierre is not None else [False] * len(xy)
         self.padre = list(range(len(xy)))
         self.aceptadas = []
         self.barreras = barreras
@@ -188,8 +193,9 @@ class _Grafo:
         return i
 
     def admite(self, i, j, permitir_cierre):
-        if len(self.vec[i]) >= 2 or len(self.vec[j]) >= 2:
+        if len(self.vec[i]) >= self.grado_max[i] or len(self.vec[j]) >= self.grado_max[j]:
             return False
+        permitir_cierre = permitir_cierre or self.cierre[i] or self.cierre[j]
         if self.raiz(i) == self.raiz(j) and not (permitir_cierre and len(self.vec[i]) == 1 and len(self.vec[j]) == 1):
             return False
         for p, q in ((i, j), (j, i)):
@@ -252,7 +258,10 @@ def _resolver(res, xy, uniones, con_foto, barreras, completar=True):
     for u in uniones:
         u.costo = u.largo * (1 + ALFA * (1 - u.apoyo))
     uniones.sort(key=lambda u: u.costo)
-    g = _Grafo(xy, barreras)
+    usar = getattr(res, "usar_control", False) and len(res.puntos) == len(xy)
+    controles = [getattr(p, "control", "") for p in res.puntos] if usar else [""] * len(xy)
+    g = _Grafo(xy, barreras, [1 if c in ("inicio", "fin") else 2 for c in controles],
+               [c == "cerrar" for c in controles])
     cierre = conf.tipo == "contorno"
     for u in uniones:
         if con_foto and u.apoyo < APOYO_MIN:
@@ -311,8 +320,12 @@ def zonas_de(xy, base):
     return np.array([base.limite_de(x, y) for x, y in xy], int)
 
 
-def unir_todo(puntos, codigos, orto=None, solo=None, alias=None, avisar=print, completar=True, base=None):
-    """Une todos los codigos activos. Devuelve (resultados, {codigo_sin_configurar: n})."""
+def unir_todo(puntos, codigos, orto=None, solo=None, alias=None, avisar=print, completar=True, base=None,
+              numero_separa=False, control=False):
+    """Une todos los codigos activos. Devuelve (resultados, {codigo_sin_configurar: n}).
+
+    numero_separa: el numero pegado al codigo separa lineas (VER1 y VER2 nunca se unen entre si).
+    control: respetar los codigos de control del topografo (VER I = inicio, VER F = fin, MAR CLS = cerrar)."""
     grupos, sin_conf = agrupar(puntos, codigos, alias)
     preparados = []
     for cod, pts in sorted(grupos.items()):
@@ -321,9 +334,16 @@ def unir_todo(puntos, codigos, orto=None, solo=None, alias=None, avisar=print, c
             continue
         xy = np.array([(p.e, p.n) for p in pts], float)
         zonas = zonas_de(xy, base) if base is not None and not base.vacio and conf.misma_manzana else None
-        uniones = _candidatos(xy, conf, zonas=zonas) if conf.tipo != "punto" else []
+        grupos_union = zonas
+        if numero_separa:
+            nums = [getattr(p, "numero", "") for p in pts]
+            if len(set(nums)) > 1:
+                base_z = zonas if zonas is not None else [0] * len(pts)
+                grupos_union = np.array([f"{z}|{n}" for z, n in zip(base_z, nums)], dtype=object)
+        uniones = _candidatos(xy, conf, zonas=grupos_union) if conf.tipo != "punto" else []
         res = Resultado(cod, pts, conf)
         res.zonas = zonas
+        res.usar_control = control
         preparados.append((res, xy, uniones))
 
     if orto is not None:
