@@ -78,6 +78,7 @@ th:first-child,td:first-child{text-align:left}
 .nota{cursor:pointer}
 .nota p{margin:4px 0;white-space:pre-wrap;word-break:break-word}
 .nota.hecha{opacity:.6}
+.zonaOk{color:var(--ok);font-weight:700;margin:4px 0}
 @media (max-width:820px){
   header{padding:6px 16px}
   #barra{padding:6px 16px}
@@ -105,6 +106,7 @@ th:first-child,td:first-child{text-align:left}
     <span class="sep"></span>
     <button id="btnBorrar" title="Borrar el área seleccionada (Supr)">Borrar</button>
     <button id="btnRevisado" title="Quitar o poner la marca 'a revisar'">Revisado</button>
+    <button id="btnOk" title="Marcar el área como terminada (ya corregida): se pinta de verde">✓ Terminada</button>
     <button id="btnQuitarV" title="Quitar el vértice marcado">Quitar vértice</button>
     <button id="btnUnir" title="Unir el área seleccionada con las áreas pegadas del mismo código">Unir con vecinas</button>
     <button id="btnCerrar" title="Cerrar la figura que se dibuja (Enter)">Cerrar figura</button>
@@ -135,11 +137,12 @@ th:first-child,td:first-child{text-align:left}
         <div class="fila">
           <select id="fCod"><option value="">Todos</option></select>
           <label class="muted"><input type="checkbox" id="fRev"> solo a revisar</label>
+          <label class="muted"><input type="checkbox" id="fPend"> solo sin terminar</label>
           <label class="muted"><input type="checkbox" id="fZona"> solo mi zona</label>
           <label class="muted"><input type="checkbox" id="fLam" checked> ver láminas</label>
           <label class="muted"><input type="checkbox" id="fLotes" checked> ver lotes</label>
         </div>
-        <table><thead><tr><th>Área</th><th>m²</th><th>Perím.</th><th>Largo</th><th>Lám.</th><th>Rev.</th></tr></thead><tbody id="lista"></tbody></table>
+        <table><thead><tr><th>Área</th><th>m²</th><th>Perím.</th><th>Largo</th><th>Lám.</th><th>Rev.</th><th>OK</th></tr></thead><tbody id="lista"></tbody></table>
       </div>
       <div class="pane" id="pNotas">
         <div class="fila"><label class="muted"><input type="checkbox" id="fNotasHechas"> mostrar también las resueltas</label></div>
@@ -166,7 +169,7 @@ th:first-child,td:first-child{text-align:left}
         </div>
         <div class="card">
           <h3>Cómo se usa</h3>
-          <p class="muted">Rueda o pellizco: zoom. Arrastrar el fondo: mover. Clic en un área: seleccionarla. Arrastrar un vértice amarillo: moverlo (se pega a los puntos y al límite de propiedad magenta; el rombo verde indica que ya llegó al límite). Doble clic en un borde: agregar vértice. Shift+clic en un vértice (o tocarlo y "Quitar vértice"): quitarlo. Cortar: dos clics a través del área. Dibujar: clic en cada esquina, doble clic o Enter para cerrar. Nota: clic en el plano y escribe; clic en una nota (o en la pestaña Notas) para editarla, marcarla resuelta o borrarla. Lo que cada uno cambia se guarda solo y los demás lo ven al instante.</p>
+          <p class="muted">Rueda o pellizco: zoom. Arrastrar el fondo: mover. Clic en un área: seleccionarla. Arrastrar un vértice amarillo: moverlo (se pega a los puntos y al límite de propiedad magenta; el rombo verde indica que ya llegó al límite). Doble clic en un borde: agregar vértice. Shift+clic en un vértice (o tocarlo y "Quitar vértice"): quitarlo. Cortar: dos clics a través del área. Dibujar: clic en cada esquina, doble clic o Enter para cerrar. ✓ Terminada: marca el área como lista y se pinta de verde (cuando todas las de una zona están listas, la zona sale TERMINADA y se avisa a todos). Nota: clic en el plano y escribe; clic en una nota (o en la pestaña Notas) para editarla, marcarla resuelta o borrarla. Lo que cada uno cambia se guarda solo y los demás lo ven al instante.</p>
         </div>
       </div>
     </aside>
@@ -183,7 +186,7 @@ th:first-child,td:first-child{text-align:left}
 // ---------------------------------------------------------------- constantes
 const IMAN_PX = 10, VERTICE_PX = 14, AREA_MIN = 0.15, POR_COLECCION = 800, EN_LIMITE = 0.02;
 const COLOR_PUNTO = {VER:"#ff9f1c", CSH:"#3a86ff", ALC:"#00d2ff", OCHV:"#3a86ff", LP:"#3a86ff"};
-const COLOR_LIMITE = "#ff3df5", COLOR_LOTE = "#e8f4ff";
+const COLOR_LIMITE = "#ff3df5", COLOR_LOTE = "#e8f4ff", COLOR_OK = "#00e676";
 const PALETA = ["#e6194b","#3cb44b","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45"];
 const AYUDA = {
   sel: "Clic: seleccionar · arrastrar vértice: moverlo (Ctrl: sin imán) · doble clic en borde: agregar vértice · Shift+clic en vértice: quitarlo · arrastrar fondo: mover · rueda: zoom",
@@ -194,6 +197,7 @@ const AYUDA = {
   zona: "NUEVA ZONA: clic en cada esquina de la zona de trabajo. Doble clic o Enter: cerrar. Esc: cancelar",
 };
 const $ = id => document.getElementById(id);
+const INICIO = Date.now();
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ---------------------------------------------------------------- estado
@@ -403,9 +407,10 @@ function dibujar(){
   for (const z of S.zonas.values()){
     if (!z.coords || !vis(z.bb)) continue;
     const mia = S.uid && (z.asignados || []).includes(S.uid);
-    trazar(z.coords); ctx.setLineDash([10, 6]); ctx.lineWidth = mia ? 3.5 : 2; ctx.strokeStyle = z.color || "#fff"; ctx.stroke(); ctx.setLineDash([]);
-    const q = aPantalla(z.bb[0], z.bb[3]); ctx.font = "bold 13px system-ui"; ctx.fillStyle = z.color || "#fff";
-    ctx.fillText(z.nombre || "Zona", q[0] + 4, q[1] + 15);
+    const zc = z.terminada ? COLOR_OK : (z.color || "#fff");
+    trazar(z.coords); ctx.setLineDash(z.terminada ? [] : [10, 6]); ctx.lineWidth = mia || z.terminada ? 3.5 : 2; ctx.strokeStyle = zc; ctx.stroke(); ctx.setLineDash([]);
+    const q = aPantalla(z.bb[0], z.bb[3]); ctx.font = "bold 13px system-ui"; ctx.fillStyle = zc;
+    ctx.fillText((z.terminada ? "✓ " : "") + (z.nombre || "Zona") + (z.terminada ? " · TERMINADA" : ""), q[0] + 4, q[1] + 15);
   }
   // líneas de lotes (capa "lotes" del plano base)
   if (S.lotes.length && $("fLotes").checked){
@@ -439,9 +444,9 @@ function dibujar(){
   for (const a of S.areas.values()){
     if (a.borrado) continue; const c = coordsVivas(a); const bb = c === a.coords ? a.bb : caja(c); if (!vis(bb)) continue;
     visibles.push(a);
-    trazar(c); const col = colorCod(a.cod);
-    ctx.globalAlpha = 0.38; ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 1;
-    ctx.lineWidth = 1.4; ctx.strokeStyle = col; ctx.stroke();
+    trazar(c); const col = a.ok ? COLOR_OK : colorCod(a.cod);
+    ctx.globalAlpha = a.ok ? 0.5 : 0.38; ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.lineWidth = a.ok ? 2 : 1.4; ctx.strokeStyle = col; ctx.stroke();
     if (a.revisar && s > 1.5){ ctx.setLineDash([5, 4]); ctx.strokeStyle = "#ff1744"; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]); }
   }
   // puntos
@@ -643,22 +648,22 @@ async function pintarSel(){
   sc.onchange = () => cambiar(a, {cod: sc.value, largo0: 0}, "código cambiado");
   f.appendChild(sc); box.appendChild(f);
   const m = document.createElement("div"); m.className = "muted";
-  m.textContent = [a.revisar ? "⚠ A revisar" : "", a.nota || "", quien ? "Último cambio: " + quien + " " + hace(a.t) : ""].filter(Boolean).join(" · ");
+  m.textContent = [a.ok ? "✓ Terminada" : "", a.revisar ? "⚠ A revisar" : "", a.nota || "", quien ? "Último cambio: " + quien + " " + hace(a.t) : ""].filter(Boolean).join(" · ");
   box.appendChild(m);
 }
 let listaPend = null;
-function refrescarLuego(){ clearTimeout(listaPend); listaPend = setTimeout(() => { numerar(); llenarLista(); totales(); pintarSel(); pintarZonas(); pedirDibujo(); }, 120); }
+function refrescarLuego(){ clearTimeout(listaPend); listaPend = setTimeout(() => { numerar(); revisarZonas(); llenarLista(); totales(); pintarSel(); pintarZonas(); pedirDibujo(); }, 120); }
 function misZonas(){ return [...S.zonas.values()].filter(z => S.uid && (z.asignados || []).includes(S.uid) && z.coords); }
 function enZonas(a, zs){ return zs.some(z => dentro(a.cen, z.coords)); }
 function llenarLista(){
-  const fc = $("fCod").value, fr = $("fRev").checked, fz = $("fZona").checked; const zs = fz ? misZonas() : null;
-  const l = vivas().filter(a => (!fc || a.cod === fc) && (!fr || a.revisar) && (!zs || enZonas(a, zs)));
+  const fc = $("fCod").value, fr = $("fRev").checked, fz = $("fZona").checked, fp = $("fPend").checked; const zs = fz ? misZonas() : null;
+  const l = vivas().filter(a => (!fc || a.cod === fc) && (!fr || a.revisar) && (!fp || !a.ok) && (!zs || enZonas(a, zs)));
   l.sort((a, b) => (a.etq || "").localeCompare(b.etq || "", "es", {numeric:true}));
   const tb = $("lista"); tb.innerHTML = "";
   const fr2 = document.createDocumentFragment();
   for (const a of l){
     const tr = document.createElement("tr"); tr.dataset.p = a.path; if (a.revisar) tr.className = "rev";
-    for (const v of [a.etq || a.cod, fmt(a.area), fmt(a.perim), (S.codigos[a.cod] || {}).largo ? fmt(a.largo) : "", a.lam || "", a.revisar ? "sí" : ""]){ const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
+    for (const v of [a.etq || a.cod, fmt(a.area), fmt(a.perim), (S.codigos[a.cod] || {}).largo ? fmt(a.largo) : "", a.lam || "", a.revisar ? "sí" : "", a.ok ? "✓" : ""]){ const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
     fr2.appendChild(tr);
   }
   tb.appendChild(fr2); marcarLista();
@@ -681,6 +686,8 @@ function totales(){
     tb.appendChild(tr);
     resumen.push((cf.prefijo || k) + " " + fmt(e.m2, 1) + " m²");
   }
+  const vv = vivas(), hechas = vv.filter(a => a.ok).length;
+  if (vv.length) resumen.unshift("✓ " + hechas + "/" + vv.length + " terminadas (" + Math.round(100 * hechas / vv.length) + "%)");
   $("estado").textContent = resumen.join(" · ") || (S.info ? "Sin áreas" : "");
 }
 function llenarCodigos(){
@@ -696,7 +703,7 @@ function llenarCodigos(){
 // ---------------------------------------------------------------- escrituras de áreas
 function cuerpo(a){
   return {cod:a.cod, coords:a.coords, revisar:!!a.revisar, nota:a.nota || "", largo0:a.largo0 || 0, area0:a.area0 || 0,
-          origen:a.origen || "", borrado:!!a.borrado, por:a.por || null, t:a.t || 0, id0:a.id0 || ""};
+          origen:a.origen || "", borrado:!!a.borrado, por:a.por || null, t:a.t || 0, id0:a.id0 || "", ok:!!a.ok};
 }
 function puedeEditar(){
   if (S.soloLectura){ toast("Solo lectura: pide al dueño que te invite como Editor."); return false; }
@@ -742,6 +749,8 @@ function botones(){
   $("btnBorrar").disabled = !a; $("btnRevisado").disabled = !a;
   $("btnQuitarV").disabled = !(a && S.vsel >= 0 && a.coords.length > 3);
   $("btnUnir").disabled = !a;
+  $("btnOk").disabled = !a;
+  $("btnOk").textContent = a && a.ok ? "Quitar terminada" : "✓ Terminada";
   $("btnCerrar").disabled = !((S.tool === "dibujar" || S.tool === "zona") && S.temp.length >= 3);
   $("btnDeshacer").disabled = !S.pila.length;
   $("btnRevisado").textContent = a && !a.revisar ? "Marcar a revisar" : "Revisado";
@@ -1132,6 +1141,27 @@ async function pintarNotas(){
   }
 }
 
+// ---------------------------------------------------------------- avance: áreas y zonas terminadas
+// Una zona queda terminada cuando todas sus áreas lo están; se avisa a todos los que tienen la página abierta.
+function revisarZonas(){
+  const todas = vivas();
+  for (const z of S.zonas.values()){
+    if (!z.coords) continue;
+    const dz = todas.filter(a => dentro(a.cen, z.coords));
+    const t = dz.length > 0 && dz.every(a => a.ok);
+    if (t && z.terminada === false && Date.now() - INICIO > 10000) toast("✓ La zona \"" + (z.nombre || "Zona") + "\" quedó terminada.", 6000);
+    z.terminada = t;
+  }
+}
+async function marcarZonaTerminada(z, dz){
+  const faltan = dz.filter(a => !a.ok);
+  if (!faltan.length || !puedeEditar()) return;
+  if (!await modal("¿Marcar como terminadas las " + faltan.length + " áreas que faltan en \"" + (z.nombre || "Zona") + "\"?", [["Cancelar", false], ["Marcar terminadas", true, "prim"]])) return;
+  const ops = [], ahora = Date.now();
+  for (const a of faltan){ ops.push({path:a.path, antes:cuerpo(a)}); escribirArea(a.path, Object.assign(cuerpo(a), {ok:true, por:S.uid, t:ahora})); }
+  guardarPila(ops);
+}
+
 // ---------------------------------------------------------------- zonas
 async function crearZona(c){
   const n = S.zonas.size + 1; const id = "z" + Date.now().toString(36);
@@ -1164,8 +1194,15 @@ async function pintarZonas(){
     card.appendChild(h);
     const dentroZ = todas.filter(a => dentro(a.cen, z.coords));
     const est = document.createElement("div"); est.className = "muted";
-    est.textContent = dentroZ.length + " áreas · " + dentroZ.filter(a => a.revisar).length + " a revisar · " + dentroZ.filter(a => a.por).length + " corregidas";
+    const okZ = dentroZ.filter(a => a.ok).length;
+    est.textContent = dentroZ.length + " áreas · " + okZ + " terminadas · " + dentroZ.filter(a => a.revisar).length + " a revisar · " + dentroZ.filter(a => a.por).length + " corregidas";
     card.appendChild(est);
+    if (z.terminada){ const b = document.createElement("div"); b.className = "zonaOk"; b.textContent = "✓ ZONA TERMINADA"; card.appendChild(b); }
+    else if (dentroZ.length){
+      const bt = document.createElement("button"); bt.textContent = "Marcar todas terminadas";
+      bt.title = "Marca como terminadas todas las áreas de esta zona (se puede deshacer)";
+      bt.onclick = () => marcarZonaTerminada(z, dentroZ); card.appendChild(bt);
+    }
     const f = document.createElement("div"); f.className = "fila";
     for (const u of z.asignados || []){
       const pf = S.perfiles[u] || {}; const ch = document.createElement("span"); ch.className = "chip";
@@ -1283,7 +1320,7 @@ async function bajar(nombre, texto, tipo){
 function bajarCorrecciones(){
   numerar();
   const areas = [...S.areas.values()].map(a => ({id:a.id0 || a.id, cod:a.cod, coords:a.coords, revisar:!!a.revisar, nota:a.nota || "",
-    largo:r3(a.largo), ancho:r3(a.ancho), origen:a.origen || "web", borrado:!!a.borrado, etiqueta:a.etq || ""}));
+    largo:r3(a.largo), ancho:r3(a.ancho), origen:a.origen || "web", borrado:!!a.borrado, etiqueta:a.etq || "", terminada:!!a.ok}));
   const d = {formato:"planos-bambu/correcciones", version:1, nombre:(S.info && S.info.nombre) || "", exportado:new Date().toISOString(), areas,
     notas:[...S.notas.values()].map(n => ({x:n.x, y:n.y, texto:n.texto || "", hecha:!!n.hecha, lamina:laminaDe([n.x, n.y])}))};
   bajar("correcciones_web.json", JSON.stringify(d), "application/json");
@@ -1360,13 +1397,14 @@ function enlazar(){
   $("btnRevisado").onclick = () => { const a = S.sel && S.areas.get(S.sel); if (a) cambiar(a, {revisar:!a.revisar}); };
   $("btnQuitarV").onclick = () => quitarVertice(S.vsel);
   $("btnUnir").onclick = unirConVecinas;
+  $("btnOk").onclick = () => { const a = S.sel && S.areas.get(S.sel); if (a) cambiar(a, {ok:!a.ok}); };
   $("btnCerrar").onclick = cerrarFigura;
   $("btnDeshacer").onclick = deshacer;
   $("btnIman").onclick = () => { S.iman = !S.iman; $("btnIman").classList.toggle("on", S.iman); };
   $("btnTodo").onclick = verTodo;
   $("btnMiZona").onclick = irMiZona;
   $("btnLado").onclick = () => $("lado").classList.toggle("abierto");
-  $("fCod").onchange = llenarLista; $("fRev").onchange = llenarLista; $("fZona").onchange = llenarLista; $("fLam").onchange = pedirDibujo; $("fLotes").onchange = pedirDibujo;
+  $("fCod").onchange = llenarLista; $("fRev").onchange = llenarLista; $("fPend").onchange = llenarLista; $("fZona").onchange = llenarLista; $("fLam").onchange = pedirDibujo; $("fLotes").onchange = pedirDibujo;
   $("fNotasHechas").onchange = () => { pintarNotas(); pedirDibujo(); };
   $("lista").onclick = e => { const tr = e.target.closest("tr"); if (tr){ seleccionar(tr.dataset.p, true); cerrarLadoMovil(); } };
   $("btnCargar").onclick = () => $("fileProy").click();
@@ -1393,7 +1431,9 @@ async function iniciar(){
   $("estado").textContent = "";
   db.doc("proyecto/info").onSnapshot(alInfo, e => toast("Sin acceso a los datos (" + e.code + ")."));
   db.collection("zonas").onSnapshot(snap => {
-    S.zonas.clear(); for (const d of snap.docs){ const z = Object.assign({id:d.id}, d.data()); if (z.coords) z.bb = caja(z.coords); S.zonas.set(d.id, z); }
+    const antes = new Map([...S.zonas].map(([k, z]) => [k, z.terminada]));
+    S.zonas.clear(); for (const d of snap.docs){ const z = Object.assign({id:d.id}, d.data()); if (z.coords) z.bb = caja(z.coords); z.terminada = antes.get(d.id); S.zonas.set(d.id, z); }
+    revisarZonas();
     pintarZonas(); pedirDibujo(); if ($("fZona").checked) llenarLista();
   }, () => {});
   db.collection("notas").onSnapshot(snap => {
