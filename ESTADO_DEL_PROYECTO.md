@@ -1,6 +1,6 @@
 # Estado del proyecto WambriDemoliciones: plano de demoliciones desde topografía + ortofoto
 
-Versión publicada: **1.0.19** o posterior. Código con las mejoras 1.1 (sección 9): pendiente de subir al repositorio (instalador en GitHub → Releases → `instalador-v1.0.N` más reciente).
+Versión publicada: **WambriDemoliciones 1.1.N** (instalador en GitHub → Releases → `instalador-v1.1.N` más reciente; antes 1.0.19).
 Repositorio: `llullyto-hash/planos-bambu`, rama `claude/demolition-plans-automation-h0etwe`.
 
 Este archivo resume todo lo necesario para retomar el trabajo (con Claude u otra persona) sin perder
@@ -39,7 +39,7 @@ Flujo en la ventana: **1. Archivos → 2. Códigos y capas → 3. Láminas y mem
   python -m pytest -q tests         # 35 pruebas automáticas (deben pasar todas)
   ```
 - Instalador: cada `git push` a la rama dispara `.github/workflows/instalador-windows.yml`
-  (pruebas → PyInstaller → prueba del .exe → Inno Setup → Release `instalador-v1.0.N`).
+  (pruebas → PyInstaller → prueba del .exe → Inno Setup → Release `instalador-v1.1.N`).
 
 ## 3. Mapa del código
 

@@ -29,7 +29,7 @@ jobs:
 
       - name: Numero de version
         shell: pwsh
-        run: Set-Content ortofoto/_version.py "VERSION = '1.0.$env:GITHUB_RUN_NUMBER'"
+        run: Set-Content ortofoto/_version.py "VERSION = '1.1.$env:GITHUB_RUN_NUMBER'"
 
       - name: Compilar programa (PyInstaller)
         run: >
@@ -50,7 +50,7 @@ jobs:
       - name: Crear instalador (Inno Setup)
         shell: pwsh
         run: |
-          $env:VERSION_APP = "1.0.$env:GITHUB_RUN_NUMBER"
+          $env:VERSION_APP = "1.1.$env:GITHUB_RUN_NUMBER"
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" instalador\instalador.iss
 
       - uses: actions/upload-artifact@v4
@@ -61,8 +61,8 @@ jobs:
       - name: Publicar en Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: instalador-v1.0.${{ github.run_number }}
-          name: Instalador Topografia - Metrados v1.0.${{ github.run_number }}
+          tag_name: instalador-v1.1.${{ github.run_number }}
+          name: Instalador WambriDemoliciones v1.1.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           files: dist_instalador/Instalar_WambriDemoliciones.exe
           body: |
