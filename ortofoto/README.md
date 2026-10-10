@@ -76,7 +76,11 @@ Tipos:
 - Láminas: norte arriba o giradas según las calles, traslape, prefijo (`D-`) y primer número,
   numerar las áreas lámina por lámina, PDF de vista previa.
 - Datos del membrete (proyecto, CUI, entidad, ubicación, plano, fecha, profesional).
-  **Guardar como predeterminado** los recuerda para la próxima vez.
+  **Guardar como predeterminado** los recuerda para la próxima vez; **Guardar datos como… / Abrir datos…**
+  guarda un archivo por proyecto.
+- **Escudo / logo:** una imagen PNG/JPG reemplaza al escudo de PETRO (*Sin escudo* lo quita).
+- **Aplicar este membrete a un DXF ya generado…:** cambia solo el membrete de las láminas de un
+  `resultado.dxf` (hecho con la versión 1.1 o posterior) sin volver a procesar; guarda `<nombre>_membrete.dxf`.
 
 **4. Procesar** → en la carpeta de resultados quedan:
 - `resultado.dxf`: puntos por capa, bordes, áreas con achurado, etiquetas y la ortofoto de fondo

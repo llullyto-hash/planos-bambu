@@ -646,3 +646,29 @@ def test_cartel_simple_como_antes(tmp_path):
     msp = ezdxf.readfile(tmp_path / "s" / "resultado.dxf").modelspace()
     assert not any("PERIM=" in m.text for m in msp.query("MTEXT"))
     assert not msp.query('LWPOLYLINE[layer=="LETRERO"]')
+
+
+def test_actualizar_membrete_de_un_plano_ya_generado(tmp_path):
+    import ezdxf
+
+    from ortofoto import laminas as lammod
+
+    pts = _vereda_por_secciones(n=3)
+    procesar(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s"),
+                      laminas=lammod.ConfLaminas(vista_pdf=False)), avisar=lambda *a: None)
+    ruta = tmp_path / "s" / "resultado.dxf"
+    Image.new("RGB", (40, 60), (200, 0, 0)).save(tmp_path / "logo.png")
+    datos = dict(lammod.MEMBRETE_PETRO, proyecto="PROYECTO BAMBU", entidad="ENTIDAD NUEVA",
+                 profesional="ING. PRUEBA", logo=str(tmp_path / "logo.png"))
+    lammod.escribir_membrete(tmp_path / "m.json", datos)
+    assert lammod.leer_membrete(tmp_path / "m.json")["proyecto"] == "PROYECTO BAMBU"
+    salida, n = lammod.actualizar_membrete(ruta, lammod.leer_membrete(tmp_path / "m.json"), avisar=lambda *a: None)
+    assert n >= 1
+    lay = ezdxf.readfile(salida).layouts.get("D-01")
+    textos = " ".join(e.text for e in lay.query("MTEXT"))
+    assert "PROYECTO BAMBU" in textos and "ENTIDAD NUEVA" in textos and "ING. PRUEBA" in textos
+    assert "CORONEL PORTILLO" not in textos.split("CUI")[0]
+    assert len(lay.query("IMAGE")) == 1
+    assert not [e for e in lay.query("INSERT") if e.dxf.name.upper().startswith("ESCUDO")]
+    # el original no se toca
+    assert "PROYECTO BAMBU" not in " ".join(e.text for e in ezdxf.readfile(ruta).layouts.get("D-01").query("MTEXT"))

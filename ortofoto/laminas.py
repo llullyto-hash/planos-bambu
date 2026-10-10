@@ -50,13 +50,27 @@ MEMBRETE_PETRO = {
     "plano": "PLANO DE DEMOLICIONES",
     "fecha": "JUNIO 2025",
     "profesional": "",
+    "logo": "",  # imagen (PNG/JPG) que reemplaza al escudo de PETRO; vacio = escudo de PETRO; "-" = sin escudo
 }
+APP_MEMBRETE = "WAMBRI_MEMBRETE"  # XDATA que marca los textos del membrete para poder actualizarlos despues
+CAJA_ESCUDO = (510.5, 13.2, 534.7, 42.1)  # mm en la lamina, donde va el escudo de PETRO
 CAMPOS_MEMBRETE = [  # (clave, titulo en la ventana)
     ("proyecto", "Proyecto"), ("cui", "CUI"), ("entidad", "Entidad"), ("urbanizacion", "Urbanización"),
     ("distrito", "Distrito"), ("provincia", "Provincia"), ("region", "Región"), ("zona", "Zona UTM"),
     ("proyeccion", "Proyección"), ("datum", "Datum"), ("plano", "Nombre del plano"), ("fecha", "Fecha"),
     ("profesional", "Profesional (firma)"),
 ]
+
+
+def leer_membrete(ruta):
+    """Datos del membrete guardados en un archivo .json (completa con PETRO lo que falte)."""
+    datos = dict(MEMBRETE_PETRO)
+    datos.update(json.loads(Path(ruta).read_text(encoding="utf-8")))
+    return datos
+
+
+def escribir_membrete(ruta, datos):
+    Path(ruta).write_text(json.dumps(datos, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def cargar_membrete():
@@ -253,16 +267,92 @@ def _nuevo_layout(doc, nombre, tpl):
     return lay
 
 
+def _marcar(doc, e, campo, nombre, escala):
+    if APP_MEMBRETE not in doc.appids:
+        doc.appids.new(APP_MEMBRETE)
+    e.set_xdata(APP_MEMBRETE, [(1000, campo), (1000, nombre), (1040, float(escala))])
+
+
+def _logo(lay, ruta):
+    """Cambia el escudo de PETRO por la imagen elegida ("-" lo quita; vacio lo deja)."""
+    if not ruta:
+        return
+    doc = lay.doc
+    for e in list(lay.query("INSERT")):
+        if e.dxf.name.upper().startswith("ESCUDO"):
+            lay.delete_entity(e)
+    for e in list(lay.query("IMAGE")):
+        if e.has_xdata(APP_MEMBRETE):
+            lay.delete_entity(e)
+    if ruta == "-" or not Path(ruta).exists():
+        return
+    from PIL import Image
+
+    with Image.open(ruta) as im:
+        w, h = im.size
+    x0, y0, x1, y1 = CAJA_ESCUDO
+    f = min((x1 - x0) / w, (y1 - y0) / h)
+    ancho, alto = w * f, h * f
+    idef = doc.add_image_def(filename=str(Path(ruta).resolve()), size_in_pixel=(w, h))
+    img = lay.add_image(idef, insert=((x0 + x1 - ancho) / 2, (y0 + y1 - alto) / 2), size_in_units=(ancho, alto),
+                        dxfattribs={"layer": CAPA_PANEL})
+    if APP_MEMBRETE not in doc.appids:
+        doc.appids.new(APP_MEMBRETE)
+    img.set_xdata(APP_MEMBRETE, [(1000, "logo")])
+
+
 def _llenar_membrete(lay, conf, nombre):
     campos = _texto_campos(conf.membrete, nombre, conf.escala)
     for e in lay.query("MTEXT"):
         t = e.text.strip()
         if t in campos:
             e.text = campos[t]
-    if conf.membrete.get("profesional"):
-        lay.add_mtext("\\pxqc;" + conf.membrete["profesional"],
-                      dxfattribs={"layer": CAPA_PANEL, "char_height": 2.0, "insert": (749.7, 13.5),
-                                  "attachment_point": 8, "width": 40})
+            _marcar(lay.doc, e, t, nombre, conf.escala)
+    prof = lay.add_mtext("\\pxqc;" + conf.membrete.get("profesional", ""),
+                         dxfattribs={"layer": CAPA_PANEL, "char_height": 2.0, "insert": (749.7, 13.5),
+                                     "attachment_point": 8, "width": 40})
+    _marcar(lay.doc, prof, "%%PROFESIONAL%%", nombre, conf.escala)
+    _logo(lay, conf.membrete.get("logo", ""))
+
+
+def actualizar_membrete(ruta_dxf, datos, salida=None, avisar=print):
+    """Cambia los datos del membrete de un DXF ya generado, sin volver a procesar.
+
+    Solo toca los textos del membrete (marcados al crear las laminas) y el escudo. Guarda una copia
+    (`<nombre>_membrete.dxf`) y devuelve (ruta, cantidad de laminas actualizadas)."""
+    import ezdxf
+    from ezdxf import recover
+
+    try:
+        doc = ezdxf.readfile(ruta_dxf)
+    except Exception:  # noqa: BLE001 - archivos guardados por AutoCAD con errores menores
+        doc = recover.readfile(ruta_dxf)[0]
+    hechas = 0
+    for lay in doc.layouts:
+        if lay.name == "Model":
+            continue
+        tocada = False
+        for e in lay.query("MTEXT"):
+            if not e.has_xdata(APP_MEMBRETE):
+                continue
+            x = e.get_xdata(APP_MEMBRETE)
+            campo, nombre, escala = x[0].value, x[1].value, x[2].value
+            if campo == "%%PROFESIONAL%%":
+                e.text = "\\pxqc;" + datos.get("profesional", "")
+            else:
+                nuevo = _texto_campos(datos, nombre, escala).get(campo)
+                if nuevo is not None:
+                    e.text = nuevo
+            tocada = True
+        if tocada:
+            _logo(lay, datos.get("logo", ""))
+            hechas += 1
+    if salida is None:
+        p = Path(ruta_dxf)
+        salida = p.with_name(p.stem + "_membrete.dxf")
+    doc.saveas(salida)
+    avisar(f"Membrete actualizado en {hechas} laminas: {Path(salida).name}")
+    return str(salida), hechas
 
 
 def _texto(lay, txt, x, y, alto, capa, adj=1, rot=0.0, estilo=ESTILO_TEXTO):

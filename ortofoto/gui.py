@@ -60,7 +60,8 @@ GUIA = """COMO USAR EL PROGRAMA (paso a paso)
 
 3. LAMINAS Y MEMBRETE
    Escala, orientacion y numeracion de las laminas, y los datos del membrete (proyecto, entidad,
-   ubicacion, fecha). Los datos se pueden guardar como predeterminados.
+   ubicacion, fecha) y el escudo o logo. Los datos se guardan como predeterminados o en un archivo por
+   proyecto. "Aplicar este membrete a un DXF ya generado" cambia el membrete sin volver a procesar.
 
 4. PROCESAR
    Pulse PROCESAR. Si marca "revisar antes de exportar", se abre la pestana 5 para ver y corregir
@@ -395,7 +396,8 @@ class App(tk.Tk):
         self._intro(f, "Paso 3: carteles, laminas y membrete",
                     "El dibujo se divide en laminas A1 con el membrete del plano PETRO, leyenda, plano clave y "
                     "cuadro de metrados. Las areas llevan un cartel con area y perimetro. Aqui elige la escala, "
-                    "como se numeran y los datos del membrete.").pack(fill="x", pady=(0, 8))
+                    "como se numeran y los datos del membrete. Puede llenar el membrete aqui, guardarlo por "
+                    "proyecto y aplicarlo despues a un plano ya generado.").pack(fill="x", pady=(0, 8))
         cuerpo = ttk.Frame(f)
         cuerpo.pack(fill="both", expand=True)
         izq = ttk.LabelFrame(cuerpo, text="Dibujo", padding=8)
@@ -458,10 +460,32 @@ class App(tk.Tk):
                 v = tk.StringVar(value=self.membrete.get(clave, ""))
                 ttk.Entry(der, textvariable=v).grid(row=i, column=1, sticky="we", pady=2)
                 self.var_membrete[clave] = v
+        n = len(lammod.CAMPOS_MEMBRETE)
+        ttk.Label(der, text="Escudo / logo:").grid(row=n, column=0, sticky="w", pady=2)
+        fl = ttk.Frame(der)
+        fl.grid(row=n, column=1, sticky="we", pady=2)
+        v = tk.StringVar(value=self.membrete.get("logo", ""))
+        self.var_membrete["logo"] = v
+        e = ttk.Entry(fl, textvariable=v)
+        e.pack(side="left", fill="x", expand=True)
+        Ayuda(e, "Imagen PNG o JPG con el escudo o logo de la entidad. Vacio = el escudo del plano PETRO; "
+                 "'Sin escudo' lo quita.")
+        ttk.Button(fl, text="Examinar...", command=lambda: v.set(filedialog.askopenfilename(
+            filetypes=[("Imagen", "*.png *.jpg *.jpeg *.bmp"), ("Todos", "*.*")]) or v.get())).pack(side="left", padx=2)
+        ttk.Button(fl, text="Sin escudo", command=lambda: v.set("-")).pack(side="left")
         bot = ttk.Frame(der)
-        bot.grid(row=len(lammod.CAMPOS_MEMBRETE), column=0, columnspan=2, sticky="w", pady=(8, 0))
+        bot.grid(row=n + 1, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        ttk.Button(bot, text="Abrir datos...", command=self._abrir_membrete).pack(side="left")
+        ttk.Button(bot, text="Guardar datos como...", command=self._guardar_membrete_como).pack(side="left", padx=4)
         ttk.Button(bot, text="Guardar como predeterminado", command=self._guardar_membrete).pack(side="left")
-        ttk.Button(bot, text="Restaurar datos de PETRO", command=self._restaurar_membrete).pack(side="left", padx=6)
+        ttk.Button(bot, text="Dejar en blanco", command=lambda: self._poner_membrete({})).pack(side="left", padx=4)
+        ttk.Button(bot, text="Restaurar datos de PETRO", command=self._restaurar_membrete).pack(side="left")
+        bot2 = ttk.Frame(der)
+        bot2.grid(row=n + 2, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        b = ttk.Button(bot2, text="Aplicar este membrete a un DXF ya generado...", command=self._aplicar_membrete_dxf)
+        b.pack(side="left")
+        Ayuda(b, "Cambia solo el membrete (y el escudo) de las laminas de un resultado.dxf que ya hizo el "
+                 "programa, sin volver a procesar. Guarda una copia: <nombre>_membrete.dxf.")
         self._siguiente(f, 3, "procesar").pack(anchor="e", pady=8)
         return f
 
@@ -525,6 +549,11 @@ class App(tk.Tk):
         self.btn_revisar.pack(side="left", padx=6)
         ttk.Label(f, text="El informe (resumen.md y CSV) queda en una carpeta 'analisis' junto al plano.",
                   foreground=GRIS).pack(anchor="w", pady=4)
+        fila2 = ttk.Frame(f)
+        fila2.pack(fill="x", pady=(8, 0))
+        ttk.Label(fila2, text="Membrete:").pack(side="left")
+        ttk.Button(fila2, text="Aplicar el membrete de la pestana 3 a un DXF ya generado...",
+                   command=self._aplicar_membrete_dxf).pack(side="left", padx=4)
         t = tk.Text(f, wrap="word", font=("Consolas", 10), height=24)
         t.insert("1.0", GUIA)
         t.config(state="disabled")
@@ -599,14 +628,55 @@ class App(tk.Tk):
         lammod.guardar_membrete(self._leer_membrete())
         messagebox.showinfo("Membrete", "Datos guardados. Se usaran la proxima vez que abra el programa.")
 
-    def _restaurar_membrete(self):
+    def _poner_membrete(self, datos):
         for clave, w in self.var_membrete.items():
-            valor = lammod.MEMBRETE_PETRO.get(clave, "")
+            valor = datos.get(clave, "")
             if isinstance(w, tk.Text):
                 w.delete("1.0", "end")
                 w.insert("1.0", valor)
             else:
                 w.set(valor)
+
+    def _restaurar_membrete(self):
+        self._poner_membrete(lammod.MEMBRETE_PETRO)
+
+    def _abrir_membrete(self):
+        r = filedialog.askopenfilename(filetypes=[("Datos de membrete", "*.json")])
+        if r:
+            try:
+                self._poner_membrete(lammod.leer_membrete(r))
+            except (OSError, ValueError) as e:
+                messagebox.showerror("Membrete", f"No se pudo leer: {e}")
+
+    def _guardar_membrete_como(self):
+        r = filedialog.asksaveasfilename(defaultextension=".json", initialfile="membrete.json",
+                                         filetypes=[("Datos de membrete", "*.json")])
+        if r:
+            lammod.escribir_membrete(r, self._leer_membrete())
+
+    def _aplicar_membrete_dxf(self):
+        ruta = filedialog.askopenfilename(title="Plano generado por el programa", filetypes=[("DXF", "*.dxf")])
+        if not ruta:
+            return
+        datos = self._leer_membrete()
+        self.nb.select(3)
+        self.barra.start(12)
+        self.lbl_paso.config(text="Actualizando membrete...")
+        self._escribir(f"\n=== Actualizando el membrete de {Path(ruta).name}... ===\n")
+        self._op_actual = None
+
+        def trabajo():
+            try:
+                salida, n = lammod.actualizar_membrete(ruta, datos, avisar=lambda t: self.cola.put(str(t) + "\n"))
+                if not n:
+                    self.cola.put("Ese DXF no tiene laminas hechas por el programa (version 1.1 o posterior).\n")
+                self.ultima_salida = str(Path(salida).parent)
+                self.cola.put(("FIN", None))
+            except Exception as e:  # noqa: BLE001 - se muestra al usuario
+                self.cola.put(traceback.format_exc())
+                self.cola.put(("FIN", str(e)))
+
+        threading.Thread(target=trabajo, daemon=True).start()
 
     def _conf_laminas(self):
         if not self.lam_activar.get():
