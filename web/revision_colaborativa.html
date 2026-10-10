@@ -102,6 +102,7 @@ th:first-child,td:first-child{text-align:left}
     <button data-tool="cortar" title="Partir un área con una línea">Cortar</button>
     <button data-tool="dibujar" title="Dibujar un área nueva">Dibujar</button>
     <button data-tool="nota" title="Poner una nota en un punto del plano">Nota</button>
+    <button data-tool="cota" title="Medir y acotar: clic en el inicio y clic en el final (se pega a los puntos)">Cota</button>
     <select id="codNuevo" title="Código del área nueva"></select>
     <span class="sep"></span>
     <button id="btnBorrar" title="Borrar el área seleccionada (Supr)">Borrar</button>
@@ -141,6 +142,7 @@ th:first-child,td:first-child{text-align:left}
           <label class="muted"><input type="checkbox" id="fZona"> solo mi zona</label>
           <label class="muted"><input type="checkbox" id="fLam" checked> ver láminas</label>
           <label class="muted"><input type="checkbox" id="fLotes" checked> ver lotes</label>
+          <label class="muted"><input type="checkbox" id="fCotas" checked> ver cotas</label>
         </div>
         <table><thead><tr><th>Área</th><th>m²</th><th>Perím.</th><th>Largo</th><th>Lám.</th><th>Rev.</th><th>OK</th></tr></thead><tbody id="lista"></tbody></table>
       </div>
@@ -169,7 +171,7 @@ th:first-child,td:first-child{text-align:left}
         </div>
         <div class="card">
           <h3>Cómo se usa</h3>
-          <p class="muted">Rueda o pellizco: zoom. Arrastrar el fondo: mover. Clic en un área: seleccionarla. Arrastrar un vértice amarillo: moverlo (se pega a los puntos y al límite de propiedad magenta; el rombo verde indica que ya llegó al límite). Doble clic en un borde: agregar vértice. Shift+clic en un vértice (o tocarlo y "Quitar vértice"): quitarlo. Cortar: dos clics a través del área. Dibujar: clic en cada esquina, doble clic o Enter para cerrar. ✓ Terminada: marca el área como lista y se pinta de verde (cuando todas las de una zona están listas, la zona sale TERMINADA y se avisa a todos). Nota: clic en el plano y escribe; clic en una nota (o en la pestaña Notas) para editarla, marcarla resuelta o borrarla. Lo que cada uno cambia se guarda solo y los demás lo ven al instante.</p>
+          <p class="muted">Rueda o pellizco: zoom. Arrastrar el fondo: mover. Clic en un área: seleccionarla. Arrastrar un vértice amarillo: moverlo (se pega a los puntos y al límite de propiedad magenta; el rombo verde indica que ya llegó al límite). Doble clic en un borde: agregar vértice. Shift+clic en un vértice (o tocarlo y "Quitar vértice"): quitarlo. Cortar: dos clics a través del área. Dibujar: clic en cada esquina, doble clic o Enter para cerrar. ✓ Terminada: marca el área como lista y se pinta de verde (cuando todas las de una zona están listas, la zona sale TERMINADA y se avisa a todos). Cota: clic en el inicio y en el final para medir (queda puesta; se quita con Seleccionar + clic sobre ella). Nota: clic en el plano y escribe; clic en una nota (o en la pestaña Notas) para editarla, marcarla resuelta o borrarla. Lo que cada uno cambia se guarda solo y los demás lo ven al instante.</p>
         </div>
       </div>
     </aside>
@@ -186,13 +188,14 @@ th:first-child,td:first-child{text-align:left}
 // ---------------------------------------------------------------- constantes
 const IMAN_PX = 10, VERTICE_PX = 14, AREA_MIN = 0.15, POR_COLECCION = 800, EN_LIMITE = 0.02;
 const COLOR_PUNTO = {VER:"#ff9f1c", CSH:"#3a86ff", ALC:"#00d2ff", OCHV:"#3a86ff", LP:"#3a86ff"};
-const COLOR_LIMITE = "#ff3df5", COLOR_LOTE = "#e8f4ff", COLOR_OK = "#00e676";
+const COLOR_LIMITE = "#ff3df5", COLOR_LOTE = "#e8f4ff", COLOR_OK = "#00e676", COLOR_COTA = "#40c4ff";
 const PALETA = ["#e6194b","#3cb44b","#4363d8","#f58231","#911eb4","#42d4f4","#f032e6","#bfef45"];
 const AYUDA = {
   sel: "Clic: seleccionar · arrastrar vértice: moverlo (Ctrl: sin imán) · doble clic en borde: agregar vértice · Shift+clic en vértice: quitarlo · arrastrar fondo: mover · rueda: zoom",
   vertice: "AGREGAR VÉRTICE: toca un área para elegirla y luego clic sobre su borde para poner un vértice nuevo (después puedes arrastrarlo). Esc: volver a Seleccionar",
   cortar: "CORTAR: clic a un lado del área y clic al otro lado. Esc: terminar",
   dibujar: "DIBUJAR: clic en cada esquina (se pega a puntos y límites). Doble clic o Enter: cerrar. Retroceso: quitar el último. Esc: cancelar",
+  cota: "COTA: clic en el inicio y clic en el final (se pega a los puntos y límites; Ctrl: sin imán). La cota queda puesta para todos. Para quitarla: Seleccionar y clic sobre la cota. Esc: terminar",
   nota: "NOTA: clic en el lugar del plano donde va la nota y escribe el texto. Clic en una nota para verla, editarla o marcarla resuelta. Esc: terminar",
   zona: "NUEVA ZONA: clic en cada esquina de la zona de trabajo. Doble clic o Enter: cerrar. Esc: cancelar",
 };
@@ -204,7 +207,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const S = {
   db:null, user:null, room:null, assets:null, downloads:null,
   uid:null, owner:false, soloLectura:false,
-  info:null, base:null, codigos:{}, tiles:[], areas:new Map(), zonas:new Map(), notas:new Map(), personas:new Map(),
+  info:null, base:null, codigos:{}, tiles:[], areas:new Map(), zonas:new Map(), notas:new Map(), cotas:new Map(), personas:new Map(),
   subsAreas:[], prefActual:null,
   vista:{cx:0, cy:0, s:1}, W:0, H:0, dpr:1,
   sel:null, vsel:-1, tool:"sel", temp:[], arr:null, iman:true, cursor:null, snapLim:null,
@@ -491,6 +494,8 @@ function dibujar(){
       ctx.fillRect(q[0] + 10, q[1] + 10, w, 16); ctx.fillStyle = "#fff"; ctx.fillText(nm, q[0] + 14, q[1] + 22);
     }
   }
+  // cotas
+  if ($("fCotas").checked) for (const ct of S.cotas.values()) if (vis(caja([ct.a, ct.b]))) dibujarCota(ct.a, ct.b, ct.id === S.cotaSel);
   // notas
   const verHechas = $("fNotasHechas").checked;
   for (const n of S.notas.values()){
@@ -529,7 +534,8 @@ function dibujar(){
   if (S.temp.length){
     const pts = S.temp.concat(S.cursor && S.tool !== "sel" ? [S.cursor] : []);
     ctx.beginPath(); pts.forEach((p, i) => { const q = aPantalla(p[0], p[1]); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
-    ctx.strokeStyle = S.tool === "cortar" ? "#ff1744" : "#00ff66"; ctx.lineWidth = 2; ctx.stroke();
+    if (S.tool === "cota"){ if (pts.length > 1) dibujarCota(pts[0], pts[1], true); }
+    else { ctx.strokeStyle = S.tool === "cortar" ? "#ff1744" : "#00ff66"; ctx.lineWidth = 2; ctx.stroke(); }
     for (const p of S.temp){ const q = aPantalla(p[0], p[1]); ctx.fillStyle = "#00ff66"; ctx.fillRect(q[0] - 3, q[1] - 3, 6, 6); }
   }
   if (S.snapLim){
@@ -978,6 +984,10 @@ cv.addEventListener("pointerdown", e => {
     S.arr = {tipo:"pan", x:px[0], y:px[1], v:Object.assign({}, S.vista), movio:false, clic:w, nota:notaEn(px)};
     return;
   }
+  if (S.tool === "cota"){
+    S.arr = {tipo:"pan", x:px[0], y:px[1], v:Object.assign({}, S.vista), movio:false, clic:iman(w, libre)};
+    return;
+  }
   { const n = notaEn(px); if (n){ S.arr = {tipo:"pan", x:px[0], y:px[1], v:Object.assign({}, S.vista), movio:false, nota:n}; return; } }
   const a = S.sel && S.areas.get(S.sel);
   if (a && !a.borrado){
@@ -1013,6 +1023,7 @@ cv.addEventListener("pointermove", e => {
   if (!A){
     if ((S.tool === "dibujar" || S.tool === "zona") && S.temp.length){ S.cursor = iman(w, e.ctrlKey || e.metaKey); pedirDibujo(); }
     else if (S.tool === "cortar" && S.temp.length){ S.cursor = w; pedirDibujo(); }
+    else if (S.tool === "cota" && S.temp.length){ S.cursor = iman(w, e.ctrlKey || e.metaKey); $("coord").textContent = "Distancia " + fmt(Math.hypot(S.cursor[0] - S.temp[0][0], S.cursor[1] - S.temp[0][1])) + " m"; pedirDibujo(); }
     return;
   }
   if (A.tipo === "pan"){
@@ -1039,12 +1050,20 @@ function soltar(e){
     if (A.clic && (S.tool === "dibujar" || S.tool === "zona")){ S.temp.push(A.clic); S.cursor = null; botones(); pedirDibujo(); return; }
     if (A.nota){ abrirNota(A.nota); return; }
     if (A.clic && S.tool === "nota"){ nuevaNota(A.clic); return; }
+    if (A.clic && S.tool === "cota"){
+      S.temp.push(A.clic); S.snapLim = null;
+      if (S.temp.length === 2){ const [p, q] = S.temp; S.temp = []; S.cursor = null; crearCota(p, q); }
+      pedirDibujo(); return;
+    }
     if (A.clic && S.tool === "cortar"){
       S.temp.push(A.clic);
       if (S.temp.length === 2){ const [p, q] = S.temp; S.temp = []; S.cursor = null; cortar(p, q); }
       pedirDibujo(); return;
     }
-    if (A.sel){ const a = areaEn(A.w); seleccionar(a ? a.path : null); }
+    if (A.sel){
+      const ct = $("fCotas").checked && cotaEn([A.x, A.y]); if (ct){ abrirCota(ct); return; }
+      const a = areaEn(A.w); seleccionar(a ? a.path : null);
+    }
     return;
   }
   if (A.tipo === "vertice"){
@@ -1076,6 +1095,54 @@ document.addEventListener("keydown", e => {
   else if (e.key === "Delete"){ if (S.vsel >= 0) quitarVertice(S.vsel); else borrarSel(); }
   else if (e.key === "Backspace" && S.temp.length){ S.temp.pop(); botones(); pedirDibujo(); }
 });
+
+// ---------------------------------------------------------------- cotas (medir y acotar)
+function dibujarCota(a, b, resaltar){
+  const p = aPantalla(a[0], a[1]), q = aPantalla(b[0], b[1]);
+  const L = Math.hypot(q[0] - p[0], q[1] - p[1]); if (L < 1) return;
+  const ux = (q[0] - p[0]) / L, uy = (q[1] - p[1]) / L, nx = -uy, ny = ux;
+  ctx.strokeStyle = resaltar ? "#ffea00" : COLOR_COTA; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = resaltar ? 2 : 1.4;
+  ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]);
+  for (const r of [p, q]){
+    ctx.moveTo(r[0] - nx * 6, r[1] - ny * 6); ctx.lineTo(r[0] + nx * 6, r[1] + ny * 6);           // línea de extensión
+    ctx.moveTo(r[0] - (ux + nx) * 4, r[1] - (uy + ny) * 4); ctx.lineTo(r[0] + (ux + nx) * 4, r[1] + (uy + ny) * 4);  // marca
+  }
+  ctx.stroke();
+  let ang = Math.atan2(q[1] - p[1], q[0] - p[0]); if (ang > Math.PI / 2) ang -= Math.PI; if (ang < -Math.PI / 2) ang += Math.PI;
+  const txt = fmt(Math.hypot(b[0] - a[0], b[1] - a[1])) + " m";
+  ctx.save(); ctx.translate((p[0] + q[0]) / 2, (p[1] + q[1]) / 2); ctx.rotate(ang);
+  ctx.font = "bold 12px system-ui"; const w = ctx.measureText(txt).width + 8;
+  ctx.fillStyle = "rgba(0,0,0,.65)"; ctx.fillRect(-w / 2, -19, w, 15);
+  ctx.fillStyle = resaltar ? "#ffea00" : COLOR_COTA; ctx.textAlign = "center"; ctx.fillText(txt, 0, -7.5); ctx.restore(); ctx.textAlign = "start";
+}
+function cotaEn(px){
+  let mejor = null, md = 8;
+  for (const ct of S.cotas.values()){
+    const d = distSeg(px, aPantalla(ct.a[0], ct.a[1]), aPantalla(ct.b[0], ct.b[1]))[0];
+    if (d <= md){ md = d; mejor = ct; }
+  }
+  return mejor;
+}
+function crearCota(p, q){
+  if (Math.hypot(q[0] - p[0], q[1] - p[1]) < 0.01){ toast("Los dos puntos son el mismo."); return; }
+  if (!puedeEditar()) return;
+  const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const body = {a:[r3(p[0]), r3(p[1])], b:[r3(q[0]), r3(q[1])], por:S.uid, t:Date.now()};
+  S.cotas.set(id, Object.assign({id}, body)); pedirDibujo();
+  toast("Cota: " + fmt(Math.hypot(q[0] - p[0], q[1] - p[1])) + " m");
+  escribir("cotas/" + id, () => S.db.doc("cotas/" + id).set(body)).catch(() => {});
+}
+async function abrirCota(ct){
+  S.cotaSel = ct.id; pedirDibujo();
+  if (ct.por) await resolverPerfiles([ct.por]);
+  const quien = (ct.por && S.perfiles[ct.por] && S.perfiles[ct.por].name) || "alguien";
+  const r = await modal("Cota de " + fmt(Math.hypot(ct.b[0] - ct.a[0], ct.b[1] - ct.a[1])) + " m · puesta por " + quien + " " + hace(ct.t),
+    [["Quitar cota", "quitar", "peligro"], ["Cerrar", "cerrar", "prim"]]);
+  S.cotaSel = null; pedirDibujo();
+  if (r !== "quitar" || !puedeEditar()) return;
+  S.cotas.delete(ct.id); pedirDibujo();
+  escribir("cotas/" + ct.id, () => S.db.doc("cotas/" + ct.id).delete()).catch(() => {});
+}
 
 // ---------------------------------------------------------------- notas en el plano
 function notaEn(px){
@@ -1322,6 +1389,7 @@ function bajarCorrecciones(){
   const areas = [...S.areas.values()].map(a => ({id:a.id0 || a.id, cod:a.cod, coords:a.coords, revisar:!!a.revisar, nota:a.nota || "",
     largo:r3(a.largo), ancho:r3(a.ancho), origen:a.origen || "web", borrado:!!a.borrado, etiqueta:a.etq || "", terminada:!!a.ok}));
   const d = {formato:"planos-bambu/correcciones", version:1, nombre:(S.info && S.info.nombre) || "", exportado:new Date().toISOString(), areas,
+    cotas:[...S.cotas.values()].map(c => ({a:c.a, b:c.b})),
     notas:[...S.notas.values()].map(n => ({x:n.x, y:n.y, texto:n.texto || "", hecha:!!n.hecha, lamina:laminaDe([n.x, n.y])}))};
   bajar("correcciones_web.json", JSON.stringify(d), "application/json");
 }
@@ -1404,7 +1472,7 @@ function enlazar(){
   $("btnTodo").onclick = verTodo;
   $("btnMiZona").onclick = irMiZona;
   $("btnLado").onclick = () => $("lado").classList.toggle("abierto");
-  $("fCod").onchange = llenarLista; $("fRev").onchange = llenarLista; $("fPend").onchange = llenarLista; $("fZona").onchange = llenarLista; $("fLam").onchange = pedirDibujo; $("fLotes").onchange = pedirDibujo;
+  $("fCod").onchange = llenarLista; $("fRev").onchange = llenarLista; $("fPend").onchange = llenarLista; $("fZona").onchange = llenarLista; $("fLam").onchange = pedirDibujo; $("fLotes").onchange = pedirDibujo; $("fCotas").onchange = pedirDibujo;
   $("fNotasHechas").onchange = () => { pintarNotas(); pedirDibujo(); };
   $("lista").onclick = e => { const tr = e.target.closest("tr"); if (tr){ seleccionar(tr.dataset.p, true); cerrarLadoMovil(); } };
   $("btnCargar").onclick = () => $("fileProy").click();
@@ -1435,6 +1503,11 @@ async function iniciar(){
     S.zonas.clear(); for (const d of snap.docs){ const z = Object.assign({id:d.id}, d.data()); if (z.coords) z.bb = caja(z.coords); z.terminada = antes.get(d.id); S.zonas.set(d.id, z); }
     revisarZonas();
     pintarZonas(); pedirDibujo(); if ($("fZona").checked) llenarLista();
+  }, () => {});
+  db.collection("cotas").onSnapshot(snap => {
+    S.cotas.clear();
+    for (const d of snap.docs){ const c = Object.assign({id:d.id}, d.data()); if (Array.isArray(c.a) && Array.isArray(c.b)) S.cotas.set(d.id, c); }
+    pedirDibujo();
   }, () => {});
   db.collection("notas").onSnapshot(snap => {
     S.notas.clear(); for (const d of snap.docs){ const n = Object.assign({id:d.id}, d.data()); if (typeof n.x === "number" && typeof n.y === "number") S.notas.set(d.id, n); }

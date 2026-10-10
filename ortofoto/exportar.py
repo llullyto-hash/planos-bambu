@@ -16,6 +16,7 @@ ALTURA_TEXTO = 0.25
 
 
 CAPA_NOTAS = "NOTAS DE REVISION"
+CAPA_COTAS = "COTAS"
 
 
 def _capa(doc, nombre, color=7, tipo_linea="Continuous", plantilla=None, apagada=False):
@@ -196,6 +197,19 @@ def guardar_dxf(ruta, puntos, resultados, metrado, codigos, alias=None, orto=Non
             mt = msp.add_mtext("NOTA: " + texto, dxfattribs={"layer": CAPA_NOTAS, "char_height": alto,
                                                             "width": alto * 25})
             mt.set_location((x + alto * 1.1, y + alto * 1.1), attachment_point=7)
+
+    # Cotas puestas en la pagina colaborativa
+    cotas = getattr(metrado, "cotas", None) or []
+    if cotas:
+        from . import carteles as _c
+
+        est.capa(CAPA_COTAS, 4)
+        estilo = _c.preparar_estilo_cota(doc, escala)
+        for a, b in cotas:
+            if np.hypot(b[0] - a[0], b[1] - a[1]) < 0.01:
+                continue
+            msp.add_aligned_dim(p1=a, p2=b, distance=1.5 * escala / 1000.0, dimstyle=estilo,
+                                dxfattribs={"layer": CAPA_COTAS}).render()
 
     if limites:  # solo para la vista previa (sin el plano base completo)
         est.capa("LIMITE DE PROPIEDAD (PLANO BASE)", 5)

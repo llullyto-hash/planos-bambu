@@ -113,4 +113,8 @@ def importar_correcciones(calc, ruta):
     calc.met.notas = [{"x": float(n["x"]), "y": float(n["y"]), "texto": str(n.get("texto") or "")[:1000],
                        "hecha": bool(n.get("hecha"))}
                       for n in datos.get("notas", []) if isinstance(n, dict) and "x" in n and "y" in n]
+    # Cotas puestas en la pagina: salen como cotas alineadas (capa COTAS)
+    calc.met.cotas = [((float(c["a"][0]), float(c["a"][1])), (float(c["b"][0]), float(c["b"][1])))
+                      for c in datos.get("cotas", []) if isinstance(c, dict) and len(c.get("a") or []) == 2
+                      and len(c.get("b") or []) == 2]
     return len(nuevas), sorted(c for c in desconocidos if c)
