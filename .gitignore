@@ -1,6 +1,7 @@
 __pycache__/
 salida_analisis/
 *.dxf
+!ortofoto/plantilla_petro.dxf
 *.dwg
 *.zip
 .venv/
