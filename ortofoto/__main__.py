@@ -293,6 +293,8 @@ def exportar_calculo(c, avisar=print):
     if getattr(op, "corte_lineal", False):
         cortes = areas.cortes_lineales(met, c.base, resultados)
         avisar(f"Lineas de corte (CL): {len(cortes)} tramos, {sum(l.linea.length for l in cortes):,.2f} m")
+    else:
+        met.lineas = [l for l in met.lineas if l.codigo != "CL"]  # sin lineas de corte: ni lineas ni etiquetas CL
     conf_lam = getattr(op, "laminas", None)
     lams = lammod.dividir(met, conf_lam) if conf_lam is not None and conf_lam.activar else []
     if lams and conf_lam.cantidad:

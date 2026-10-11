@@ -967,6 +967,7 @@ class App(tk.Tk):
         self.lbl_paso.config(text="Exportando...")
         self._escribir("\n=== Exportando lo revisado... ===\n")
         self._op_actual = calc.op
+        calc.op.corte_lineal = self.corte_lineal.get()  # vale lo marcado ahora en la pestana 3
 
         def trabajo():
             try:

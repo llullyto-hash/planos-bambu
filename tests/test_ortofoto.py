@@ -650,6 +650,27 @@ def test_plano_con_carteles_corte_lineal_y_laminas(tmp_path):
     assert "Perimetro (m)" in cab and "Lamina" in cab
 
 
+def test_quitar_lineas_de_corte_al_exportar_lo_revisado(tmp_path):
+    import ezdxf
+
+    from ortofoto.__main__ import calcular, exportar_calculo
+
+    pts = []
+    for k, x in enumerate(np.arange(2, 39, 6)):
+        pts += [Punto(f"n{k}a", x, -0.2, 0, "VER"), Punto(f"n{k}b", x + 0.3, -1.8, 0, "VER")]
+    calc = calcular(Opciones(puntos=_csv(tmp_path, pts), salida=str(tmp_path / "s"), plano_base=_plano_base(tmp_path)),
+                    avisar=lambda *a: None)
+    exportar_calculo(calc, avisar=lambda *a: None)
+    assert ezdxf.readfile(tmp_path / "s" / "resultado.dxf").modelspace().query('LWPOLYLINE[layer=="LINEA CORTE"]')
+    # se desmarca "Lineas de corte (CL)" despues de calcular: ni lineas ni etiquetas CL
+    calc.op.corte_lineal = False
+    exportar_calculo(calc, avisar=lambda *a: None)
+    msp = ezdxf.readfile(tmp_path / "s" / "resultado.dxf").modelspace()
+    assert not msp.query('LWPOLYLINE[layer=="LINEA CORTE"]')
+    assert not any(m.text.startswith("CL") for m in msp.query("MTEXT"))
+    assert any("AREA=" in m.text for m in msp.query("MTEXT"))
+
+
 def test_cartel_simple_como_antes(tmp_path):
     import ezdxf
 
