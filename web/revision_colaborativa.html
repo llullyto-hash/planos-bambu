@@ -183,6 +183,8 @@ th:first-child,td:first-child{text-align:left}
         <div class="card">
           <h3>Bajar al programa</h3>
           <p class="muted">Descarga las correcciones y en el programa usa "Importar correcciones" en la pestaña 4; luego EXPORTAR DXF Y METRADO.</p>
+          <p class="muted" style="margin-bottom:2px">Qué se descarga (lo no marcado sigue en la página, solo no sale en el plano):</p>
+          <div class="fila" id="expCods"></div>
           <div class="fila"><button class="prim" id="btnBajar">Descargar correcciones_web.json</button><button id="btnCsv">Metrado (CSV)</button></div>
         </div>
         <div class="card">
@@ -726,6 +728,22 @@ function llenarCodigos(){
     const o2 = o.cloneNode(true); o2.textContent = k; cn.appendChild(o2);
   }
   fc.value = v1; cn.value = v2 || (S.codigos.VER ? "VER" : Object.keys(S.codigos)[0] || "");
+  pintarExport();
+}
+// Códigos que salen en la descarga para el programa (por defecto solo vereda y alcantarilla, para que el plano no se llene de etiquetas)
+const EXPORTAR_DEFECTO = ["VER", "ALC"];
+function codigosExport(){
+  let l = null; try { l = JSON.parse(localStorage.getItem("wd_exportar") || "null"); } catch (e) {}
+  return new Set(Array.isArray(l) ? l : EXPORTAR_DEFECTO);
+}
+function pintarExport(){
+  const box = $("expCods"); box.innerHTML = ""; const sel = codigosExport();
+  for (const [k, c] of Object.entries(S.codigos)){
+    const lb = document.createElement("label"); lb.className = "muted";
+    const ch = document.createElement("input"); ch.type = "checkbox"; ch.value = k; ch.checked = sel.has(k);
+    ch.onchange = () => { const l = [...box.querySelectorAll("input:checked")].map(x => x.value); try { localStorage.setItem("wd_exportar", JSON.stringify(l)); } catch (e) {} };
+    lb.appendChild(ch); lb.appendChild(document.createTextNode(" " + (c.nombre || k))); box.appendChild(lb);
+  }
 }
 
 // ---------------------------------------------------------------- escrituras de áreas
@@ -1642,16 +1660,20 @@ async function bajar(nombre, texto, tipo){
 }
 function bajarCorrecciones(){
   numerar();
-  const areas = [...S.areas.values()].map(a => ({id:a.id0 || a.id, cod:a.cod, coords:a.coords, revisar:!!a.revisar, nota:a.nota || "",
+  const exp = codigosExport();
+  if (!exp.size){ toast("Marca al menos un tipo de área para descargar."); return; }
+  const areas = [...S.areas.values()].filter(a => exp.has(a.cod)).map(a => ({id:a.id0 || a.id, cod:a.cod, coords:a.coords, revisar:!!a.revisar, nota:a.nota || "",
     largo:r3(a.largo), ancho:r3(a.ancho), origen:a.origen || "web", borrado:!!a.borrado, etiqueta:a.etq || "", terminada:!!a.ok}));
   const d = {formato:"planos-bambu/correcciones", version:1, nombre:(S.info && S.info.nombre) || "", exportado:new Date().toISOString(), areas,
     cotas:[...S.cotas.values()].map(c => ({a:c.a, b:c.b})),
     notas:[...S.notas.values()].map(n => ({x:n.x, y:n.y, texto:n.texto || "", hecha:!!n.hecha, lamina:laminaDe([n.x, n.y])}))};
   bajar("correcciones_web.json", JSON.stringify(d), "application/json");
+  toast("Descargadas " + areas.filter(a => !a.borrado).length + " áreas: " + [...exp].map(k => (S.codigos[k] || {}).nombre || k).join(", ") + ".", 5000);
 }
 function bajarCsv(){
   numerar();
-  const l = vivas().sort((a, b) => (a.etq || "").localeCompare(b.etq || "", "es", {numeric:true}));
+  const exp = codigosExport();
+  const l = vivas().filter(a => exp.has(a.cod)).sort((a, b) => (a.etq || "").localeCompare(b.etq || "", "es", {numeric:true}));
   const q = v => '"' + String(v).replace(/"/g, '""') + '"';
   const filas = [["Etiqueta", "Codigo", "Descripcion", "Area m2", "Largo m", "Ancho m", "Revisar", "Nota", "Este", "Norte", "Perimetro m", "Lamina"].map(q).join(",")];
   for (const a of l) filas.push([a.etq, a.cod, (S.codigos[a.cod] || {}).nombre || "", a.area.toFixed(2), a.largo.toFixed(2), a.ancho.toFixed(2), a.revisar ? "SI" : "", a.nota || "", a.cen[0].toFixed(3), a.cen[1].toFixed(3), (a.perim || 0).toFixed(2), a.lam || ""].map(q).join(","));
