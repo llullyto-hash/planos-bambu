@@ -295,6 +295,13 @@ def exportar_calculo(c, avisar=print):
         avisar(f"Lineas de corte (CL): {len(cortes)} tramos, {sum(l.linea.length for l in cortes):,.2f} m")
     else:
         met.lineas = [l for l in met.lineas if l.codigo != "CL"]  # sin lineas de corte: ni lineas ni etiquetas CL
+        avisar("Lineas de corte (CL): desactivadas")
+    try:
+        from ._version import VERSION
+    except ImportError:
+        VERSION = "desarrollo"
+    log.insert(0, f"WambriDemoliciones version {VERSION}; lineas de corte (CL): "
+                  + ("si" if getattr(op, "corte_lineal", False) else "no"))
     conf_lam = getattr(op, "laminas", None)
     lams = lammod.dividir(met, conf_lam) if conf_lam is not None and conf_lam.activar else []
     if lams and conf_lam.cantidad:
