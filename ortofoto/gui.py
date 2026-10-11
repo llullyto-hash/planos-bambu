@@ -139,7 +139,7 @@ class App(tk.Tk):
         self.numero_separa = tk.BooleanVar(value=False)
         self.codigos_control = tk.BooleanVar(value=False)
         self.cartel = tk.StringVar(value="petro")
-        self.corte_lineal = tk.BooleanVar(value=True)
+        self.corte_lineal = tk.BooleanVar(value=False)  # apagado por defecto: CL solo si se marca
         self.escala = tk.StringVar(value="500")
         self.lam_activar = tk.BooleanVar(value=True)
         self.lam_orientacion = tk.StringVar(value="norte")
@@ -169,7 +169,8 @@ class App(tk.Tk):
         return {"var": {k: v.get() for k, v in self.var.items()}, "capas_limite": self.capas_limite.get(),
                 "calce": self.calce.get(), "escala": self.escala.get(), "cartel": self.cartel.get(),
                 "orientacion": self.lam_orientacion.get(), "traslape": self.lam_traslape.get(),
-                "prefijo": self.lam_prefijo.get(), "cantidad": self.lam_cantidad.get(), "revisar_antes": self.revisar_antes.get()}
+                "prefijo": self.lam_prefijo.get(), "cantidad": self.lam_cantidad.get(), "revisar_antes": self.revisar_antes.get(),
+                "corte_lineal": self.corte_lineal.get()}
 
     def _cargar_ventana(self):
         try:
@@ -187,6 +188,8 @@ class App(tk.Tk):
                 var.set(d[clave])
         if "revisar_antes" in d:
             self.revisar_antes.set(bool(d["revisar_antes"]))
+        if "corte_lineal" in d:
+            self.corte_lineal.set(bool(d["corte_lineal"]))
 
     def _cerrar(self):
         try:

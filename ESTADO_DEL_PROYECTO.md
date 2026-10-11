@@ -165,7 +165,7 @@ Todo lo anterior sigue igual; lo nuevo se puede apagar y entonces el resultado e
 | Notas de la página colaborativa en el DXF (capa NOTAS DE REVISION, no se plotea; solo las pendientes) | `colaborativo.py`, `exportar.py` | — |
 | Fotos de campo en la página colaborativa (pestaña Fotos: KMZ/KML/ZIP/JPG; ubicación por KMZ o GPS de la foto, pasada a UTM; las sin ubicación se ponen con un clic; colección `fotoscampo`) | `web/revision_colaborativa.html` | — |
 | Descarga de la página solo con los tipos de área elegidos (por defecto vereda y alcantarilla; lo demás sigue en la página) | `web/revision_colaborativa.html` | — |
-| La casilla "Lineas de corte (CL)" de la pestaña 3 vale al exportar lo revisado: desmarcada, el DXF y el metrado salen sin lineas ni etiquetas CL | `__main__.exportar_calculo`, `gui._exportar` | ventana 3 |
+| La casilla "Lineas de corte (CL)" de la pestaña 3 vale al exportar lo revisado (desmarcada: sin lineas ni etiquetas CL); viene apagada por defecto y se recuerda al cerrar | `__main__.exportar_calculo`, `gui._exportar` | ventana 3 |
 | Numeración por lámina (VD-1… siguen el orden de las láminas) | `laminas.dividir` | ventana 3 |
 | Metrado con perímetro, lámina, reglas aplicadas y hoja *Por lamina* (columnas nuevas al final) | `areas.guardar_metrado` | — |
 | Verificación: etiquetas repetidas, áreas que se tocan, cartel vs. área (`revision_carteles.csv`) | `__main__.verificar`, `revisar_plano.py` | ventana 4 |
