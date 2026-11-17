@@ -775,3 +775,17 @@ def test_laminas_en_cantidad_fija_ajusta_la_escala():
     assert len(lammod.dividir(met, lammod.ConfLaminas(vista_pdf=False, escala=previa))) > 4
     # todas las areas quedan en alguna de las 4
     assert sum(len(l.areas) for l in cuatro) == len(met.areas)
+
+
+def test_canal_levantado_por_sus_dos_orillas():
+    """Simon Bolivar 9277-9298: puntos que alternan entre las dos orillas de un canal de 3 m; el area
+    se cierra entre las orillas (no en zigzag), y un eje recto no se confunde con dos orillas."""
+    from types import SimpleNamespace
+
+    from ortofoto.areas import _dos_orillas
+
+    conf = SimpleNamespace(ancho_min=0.8, ancho_max=8.0, ancho_defecto=0.8)
+    xy = [(0, 0), (0.2, 3), (6, 3.1), (6.1, 0), (12, 0.1), (12, 3), (18, 3), (18.2, 0)]
+    pol, ancho, largo = _dos_orillas(xy, conf)
+    assert abs(pol.area - 18 * 3) < 3 and abs(ancho - 3) < 0.3 and abs(largo - 18) < 0.6
+    assert _dos_orillas([(0, 0), (5, 0.1), (10, -0.05), (15, 0.08), (20, 0)], conf) is None

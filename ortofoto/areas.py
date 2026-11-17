@@ -208,6 +208,16 @@ def cerrar_areas(resultados, base=None, usar_foto=False):
             # 3) lo demas se une a lo largo (eje) y, si hay ancho supuesto, se cierra con ese ancho
             _unir_sobrantes(res, usados)
             if conf.ancho_defecto:
+                quedan = []
+                for cad in res.cadenas:
+                    orillas = _dos_orillas(res.xy(cad), conf) if len(cad) >= 4 else None
+                    if orillas is None:
+                        quedan.append(cad)
+                        continue
+                    pol, ancho, largo = orillas
+                    ars.append(Area(res.codigo, conf, pol, "orillas", ancho, largo,
+                                    nota="levantado por sus dos orillas"))
+                res.cadenas = quedan
                 ars3 = _franjas_por_eje(res)
                 ars += ars3
                 if ars3:
@@ -363,6 +373,38 @@ def _figuras_cerradas(res):
         areas.append(Area(res.codigo, conf, pol, "figura", lados[0], lados[-1], nota="figura cerrada por sus puntos"))
         usados.update(int(i) for i in idx)
     return areas, usados
+
+
+def _dos_orillas(xy, conf):
+    """Puntos de un canal levantado por sus dos orillas, alternando de un lado al otro (Simon Bolivar,
+    9277-9298): se separan por el lado de la linea central y el area se cierra entre las orillas.
+    Devuelve (poligono, ancho, largo) o None si los puntos no forman dos orillas claras."""
+    xy = np.asarray(xy, float)
+    if len(xy) < 4:
+        return None
+    c = xy.mean(axis=0)
+    _, _, vt = np.linalg.svd(xy - c)
+    u, n = vt[0], vt[1]
+    t, d = (xy - c) @ u, (xy - c) @ n
+    grado = 2 if len(xy) >= 6 else 1
+    r = d - np.polyval(np.polyfit(t, d, grado), t)
+    a, b = r > 0, r < 0
+    if a.sum() < 2 or b.sum() < 2:
+        return None
+    # las dos orillas deben correr juntas (no una despues de la otra)
+    comun = min(t[a].max(), t[b].max()) - max(t[a].min(), t[b].min())
+    if comun < 0.5 * (t.max() - t.min()):
+        return None
+    anchos = np.abs(r[a]).mean() + np.abs(r[b]).mean()
+    if not max(conf.ancho_min, 1.5 * (conf.ancho_defecto or 0)) <= anchos <= conf.ancho_max:
+        return None
+    oa = xy[a][np.argsort(t[a])]
+    ob = xy[b][np.argsort(t[b])][::-1]
+    pol = Polygon([tuple(q) for q in np.vstack([oa, ob])])
+    if not pol.is_valid or pol.area < AREA_MIN:
+        return None
+    largo = (LineString(oa).length + LineString(ob).length) / 2
+    return pol, pol.area / max(largo, 1e-6), largo
 
 
 def _franjas_por_eje(res):
