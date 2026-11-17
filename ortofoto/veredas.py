@@ -39,6 +39,8 @@ CONCRETO_LOSA = 0.5  # fraccion de concreto visible para estirar una losa
 MEDIO_LOSA_MIN = 0.5  # m: una losa de un solo punto ocupa al menos esto a cada lado (sin pasar vecinas)
 TOL_CSH = 2.0  # m: puntos CSH a menos de esto de una cara del plano sirven para revisarla
 CORRIDA = 0.1  # m: un CSH mas adentro que esto del lado del lote indica fachada del plano corrida
+QUIEBRE_PUENTE = 35.0  # grados: entre dos tramos casi paralelos, caras sin puntos no cortan la vereda
+ESCALON_PUENTE = 100.0  # grados: giro maximo en cada quiebre intermedio (retranqueo de un lote)
 
 
 @dataclass
@@ -329,6 +331,48 @@ def _esquina(f, g, hueco, orto=None, csh=()):
     return None
 
 
+def _giro(f, g):
+    """Angulo (grados) que dobla la fachada al pasar de la cara f a la g."""
+    return float(np.degrees(np.arccos(np.clip(f.u @ g.u, -1.0, 1.0))))
+
+
+def _puentes(caras, cerrado, hueco, orto=None, csh=()):
+    """Caras sin puntos entre dos tramos de vereda de la misma fachada (quiebres o retranqueos de los
+    lotes en el plano): si los dos tramos son casi paralelos y el hueco total no pasa de `hueco` m, la
+    vereda sigue con el ancho menor de los dos lados. Las esquinas reales (giro mayor) no se tocan."""
+    con = [k for k, c in enumerate(caras) if c.intervalos]
+    if len(con) < 2:
+        return
+    pares = list(zip(con, con[1:])) + ([(con[-1], con[0])] if cerrado and len(con) > 1 else [])
+    n = len(caras)
+    for a, b in pares:
+        vacias = list(range(a + 1, b)) if b > a else list(range(a + 1, n)) + list(range(0, b))
+        if not vacias or any(caras[k].puntos for k in vacias):
+            continue
+        cadena = [caras[a]] + [caras[k] for k in vacias] + [caras[b]]
+        f, g = caras[a], caras[b]
+        if _giro(f, g) > QUIEBRE_PUENTE or any(np.hypot(*(x.p1 - y.p0)) > 1e-6 or _giro(x, y) > ESCALON_PUENTE
+                                               for x, y in zip(cadena, cadena[1:])):
+            continue
+        ia, ib = f.intervalos[-1], g.intervalos[0]
+        if (f.largo - ia[1]) + sum(caras[k].largo for k in vacias) + ib[0] > hueco:
+            continue
+        w = min(ia[2], ib[2])
+        calle = f.nl * f.lado
+        nuevas = []
+        for k in vacias:
+            c = caras[k]
+            c.lado = 1 if c.nl @ calle >= 0 else -1
+            if orto is not None and csh and not _hay_csh(c, -0.6, c.largo + 0.6, csh) and \
+                    _lote_vacio(_fracciones(orto, c.rect(0.0, c.largo, 0.0, w))):
+                break  # frente de un lote vacio: no hay vereda
+            nuevas.append(c)
+        else:
+            for c in nuevas:
+                c.intervalos = [[0.0, c.largo, w, False]]
+                c.reglas.append((c.largo / 2, "hueco sobre un quiebre de la fachada: vereda continua"))
+
+
 def veredas_contra_fachada(res, limites, manzanas=None, csh=(), indices=None, revisar=None, alcance=None):
     """Veredas por caras. Devuelve (areas, bordes, usados).
 
@@ -395,6 +439,7 @@ def veredas_contra_fachada(res, limites, manzanas=None, csh=(), indices=None, re
                     if len(quedan) < len(cara.intervalos):
                         cara.reglas.append((cara.largo / 2, "frente de lote vacio: tramo quitado"))
                     cara.intervalos = quedan
+        _puentes(caras, limites[k].is_closed and len(caras) > 2, conf.hueco_max or 10.0, orto, csh)
         # Esquinas entre caras seguidas (y la ultima con la primera en una manzana cerrada)
         piezas = []
         pares = list(zip(caras, caras[1:]))

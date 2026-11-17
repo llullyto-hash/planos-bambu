@@ -446,6 +446,25 @@ def test_esquina_ancho_perpendicular_a_cada_cara(tmp_path):
     assert abs(pol.area - (10 * 1.5 + 10 * 1.0 + 1.0 * 1.5)) < 1e-3  # dos rectangulos + la esquina
 
 
+def test_retranqueo_de_lote_sin_puntos_no_corta_la_vereda(tmp_path):
+    """Simon Bolivar: la fachada del plano tiene un escalon (retranqueo de un lote) sin puntos VER;
+    los tramos de los dos lados son paralelos y el hueco es corto: la vereda sigue. Una esquina
+    real (90 grados) sin puntos en una de sus caras no se une."""
+    import ezdxf
+
+    doc = ezdxf.new("R2018")
+    # fachada abierta: y=0 hasta x=20, escalon de 1.2 m hacia adentro, y=1.2 desde x=24.5
+    doc.modelspace().add_lwpolyline([(0, 0), (20, 0), (21, 1.2), (24.5, 1.2), (45, 1.2), (45, 30)],
+                                     dxfattribs={"layer": "FACHADA"})
+    ruta = tmp_path / "base_escalon.dxf"
+    doc.saveas(ruta)
+    pts = [Punto(f"a{k}", x, -1.5, 0, "VER") for k, x in enumerate((2, 8, 14, 18))]
+    pts += [Punto(f"b{k}", x, -0.3, 0, "VER") for k, x in enumerate((26, 32, 38, 43))]
+    met, ver = _vereda_en(tmp_path, pts, base=str(ruta))
+    assert len(ver) == 1  # el escalon sin puntos no la corta
+    assert ver[0].poligono.bounds[2] < 45.0  # la cara x=45 (esquina, sin puntos) no se toca
+
+
 def test_fachada_del_plano_corrida_usa_la_fachada_real(tmp_path):
     """La FACHADA del plano esta 0.4 m hacia la calle; los CSH (fachada real) quedan detras: la
     vereda llega hasta la fachada real, sin cuna ni punta."""
