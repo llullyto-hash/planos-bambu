@@ -35,8 +35,10 @@ def sugerir_alias(sin_conf, conocidos):
         if letras and len(cod) >= 3:
             out[cod] = letras[0]
             continue
-        m = difflib.get_close_matches(cod, [c for c in conocidos if len(c) >= 3], n=1, cutoff=0.75)
-        if m and len(cod) >= 3:
+        # Parecido de letras solo con codigos de 4+ letras y la misma inicial: BOL no es ARBOL, PTE no es POSTE
+        m = difflib.get_close_matches(cod, [c for c in conocidos if len(c) >= 3 and c[0] == cod[0]], n=1,
+                                      cutoff=0.75)
+        if m and len(cod) >= 4:
             out[cod] = m[0]
     return out
 

@@ -584,6 +584,18 @@ def test_sugerir_alias_errores_de_escritura():
     s = sugerir_alias(["VERD", "CHS", "VAR", "FD"], {"VER", "CSH", "VA", "PTA"})
     assert s.get("VERD") == "VER" and s.get("CHS") == "CSH"
     assert "VAR" not in s and "FD" not in s  # VAR -> VA seria una adivinanza; FD no se parece a nada
+    s = sugerir_alias(["BOL", "PTE", "COL", "VEREDS"], {"ARBOL", "POSTE", "COLUM", "VEREDA"})
+    assert s == {"VEREDS": "VEREDA"}  # BOL no es ARBOL ni PTE es POSTE: esos se configuran a mano
+
+
+def test_codigos_de_otra_cuadrilla():
+    """Simon Bolivar: VEREDA/V, FACHA, L/EQ, SARDINEL, PISTA... se leen como los codigos del programa."""
+    from ortofoto import unir
+
+    _, alias = unir.cargar_codigos(str(CODIGOS_DEFECTO))
+    for cod, destino in {"VEREDA": "VER", "V": "VER", "FACHA": "CSH", "L": "LP", "EQ": "LP", "SARDINEL": "SAR",
+                         "PISTA": "PTA", "CAJAREGIS": "CJ", "TAPABUZON": "BZ", "POSTE": "PST"}.items():
+        assert alias[cod] == destino
 
 
 def test_texto_del_cartel_como_petro():

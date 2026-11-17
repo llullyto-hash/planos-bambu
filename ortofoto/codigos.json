@@ -51,6 +51,23 @@
   "BM":     {"nombre": "BM / control", "capa": "BM", "tipo": "punto", "color": 1},
   "PG":     {"alias": "BM"},
   "P":      {"nombre": "Punto de control del dron", "capa": "PUNTOS CONTROL DRON", "tipo": "punto", "color": 1},
-  "E":      {"nombre": "Estacion", "capa": "PUNTO ESTACION", "tipo": "punto", "color": 5}
+  "E":      {"nombre": "Estacion", "capa": "PUNTO ESTACION", "tipo": "punto", "color": 5},
+  "VEREDA": {"alias": "VER"},
+  "V":      {"alias": "VER"},
+  "FACHA":  {"alias": "CSH"},
+  "FACHADA":{"alias": "CSH"},
+  "L":      {"alias": "LP"},
+  "EQ":     {"alias": "LP"},
+  "SARDINEL":{"alias": "SAR"},
+  "PISTA":  {"alias": "PTA"},
+  "CANAL":  {"alias": "ALC"},
+  "ALCF":   {"alias": "ALC"},
+  "CAJAREGIS":{"alias": "CJ"},
+  "TAPABUZON":{"alias": "BZ"},
+  "BZT":    {"alias": "BZ"},
+  "POSTE":  {"alias": "PST"},
+  "ARBOL":  {"alias": "ARB"},
+  "COCO":   {"alias": "ARB"},
+  "HIDRANTE":{"alias": "HIDRA"}
  }
 }
